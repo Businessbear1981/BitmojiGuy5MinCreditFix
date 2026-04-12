@@ -1,7 +1,9 @@
 import uuid
+from pathlib import Path
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 
 from models import SessionLocal, init_db, CreditSession
@@ -17,6 +19,15 @@ app.add_middleware(
     allow_headers=["*"],
     allow_methods=["*"],
 )
+
+# Serve the Vite-built frontend in production
+STATIC_DIR = Path(__file__).resolve().parent.parent / "dist"
+if STATIC_DIR.is_dir():
+    @app.get("/")
+    async def serve_index():
+        return FileResponse(STATIC_DIR / "index.html")
+
+    app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"), name="assets")
 
 def db():
     s = SessionLocal()
