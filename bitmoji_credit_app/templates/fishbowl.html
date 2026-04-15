@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fishbowl — Credit Education — AE Labs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bangers&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--neon-blue:#00F0FF;--neon-pink:#FF2D9B;--neon-yellow:#EEFF00;--dark:#000000;--dark2:#06060C;--card:#0A0A14;--border:rgba(0,240,255,0.18);--text:#E8ECF0;--muted:#666;--green:#00FF88;--r:12px}
+html{scroll-behavior:smooth}
+body{background:var(--dark);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 20% 30%,rgba(0,240,255,.04),transparent 50%),radial-gradient(ellipse at 80% 70%,rgba(255,45,155,.03),transparent 50%);pointer-events:none;z-index:0}
+
+.header{position:relative;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.85);backdrop-filter:blur(16px)}
+.logo-wrap{display:flex;align-items:center;gap:12px}
+.stopwatch{position:relative;width:48px;height:48px;flex-shrink:0}
+.stopwatch-face{width:44px;height:44px;border-radius:50%;border:2.5px solid var(--neon-blue);position:absolute;bottom:0;left:2px;background:rgba(0,240,255,.04);box-shadow:0 0 20px rgba(0,240,255,.3),inset 0 0 12px rgba(0,240,255,.06)}
+.stopwatch-btn{position:absolute;top:0;left:50%;transform:translateX(-50%);width:8px;height:8px;background:var(--neon-pink);border-radius:2px 2px 1px 1px;box-shadow:0 0 8px rgba(255,45,155,.6)}
+.stopwatch-btn::before{content:'';position:absolute;top:-3px;left:50%;transform:translateX(-50%);width:12px;height:3px;background:var(--neon-pink);border-radius:2px}
+.stopwatch-lug-l,.stopwatch-lug-r{position:absolute;top:3px;width:6px;height:3px;background:var(--neon-yellow);border-radius:1px}
+.stopwatch-lug-l{left:8px;transform:rotate(-35deg)}
+.stopwatch-lug-r{right:8px;transform:rotate(35deg)}
+.stopwatch-five{position:absolute;bottom:0;left:2px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-family:'Bangers',cursive;font-size:30px;color:var(--neon-blue);line-height:1;text-shadow:0 0 12px rgba(0,240,255,.5);padding-top:2px}
+.logo-text{display:flex;flex-direction:column}
+.logo-main{font-family:'Bangers',cursive;font-size:22px;letter-spacing:2px;color:var(--neon-blue);text-shadow:0 0 14px rgba(0,240,255,.4);line-height:1.1}
+.logo-main span{color:var(--neon-yellow);text-shadow:0 0 14px rgba(238,255,0,.4)}
+.nav-links{display:flex;gap:16px;align-items:center}
+.nav-links a{color:var(--muted);font-size:13px;text-decoration:none;transition:color .2s}
+.nav-links a:hover{color:var(--neon-blue)}
+.nav-links a.active{color:var(--neon-yellow)}
+
+.container{position:relative;z-index:5;max-width:800px;margin:0 auto;padding:40px 20px 80px}
+
+.disclaimer{background:rgba(255,45,155,.06);border:1px solid rgba(255,45,155,.2);border-radius:var(--r);padding:20px 24px;margin-bottom:32px;font-size:13px;line-height:1.7}
+.disclaimer strong{color:var(--neon-pink);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:6px;text-shadow:0 0 6px rgba(255,45,155,.3)}
+
+.section{margin-bottom:40px}
+.section-title{font-family:'Bangers',cursive;font-size:32px;letter-spacing:2px;color:var(--neon-blue);text-shadow:0 0 12px rgba(0,240,255,.3);margin-bottom:16px}
+.section-sub{font-size:14px;color:var(--muted);margin-bottom:20px;line-height:1.6}
+
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:24px;margin-bottom:16px;box-shadow:0 0 20px rgba(0,240,255,.02)}
+.card h3{font-family:'Bangers',cursive;font-size:20px;color:var(--neon-pink);letter-spacing:1px;margin-bottom:8px}
+.card p,.card li{font-size:14px;line-height:1.7;color:rgba(232,236,240,.8)}
+.card ul{list-style:none;padding:0}
+.card li{padding:6px 0;padding-left:20px;position:relative}
+.card li::before{content:'';position:absolute;left:0;top:13px;width:8px;height:8px;border-radius:50%;border:2px solid var(--neon-blue);box-shadow:0 0 4px rgba(0,240,255,.3)}
+
+/* Timeline */
+.timeline{position:relative;padding-left:32px;margin-top:12px}
+.timeline::before{content:'';position:absolute;left:11px;top:0;bottom:0;width:2px;background:linear-gradient(to bottom,var(--neon-blue),var(--neon-pink),var(--neon-yellow))}
+.tl-item{position:relative;margin-bottom:24px}
+.tl-dot{position:absolute;left:-32px;top:2px;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
+.tl-dot.blue{background:rgba(0,240,255,.1);border:2px solid var(--neon-blue);color:var(--neon-blue);box-shadow:0 0 8px rgba(0,240,255,.2)}
+.tl-dot.pink{background:rgba(255,45,155,.1);border:2px solid var(--neon-pink);color:var(--neon-pink);box-shadow:0 0 8px rgba(255,45,155,.2)}
+.tl-dot.yellow{background:rgba(238,255,0,.1);border:2px solid var(--neon-yellow);color:var(--neon-yellow);box-shadow:0 0 8px rgba(238,255,0,.2)}
+.tl-dot.green{background:rgba(0,255,136,.1);border:2px solid var(--green);color:var(--green);box-shadow:0 0 8px rgba(0,255,136,.2)}
+.tl-title{font-size:15px;font-weight:700;margin-bottom:4px}
+.tl-desc{font-size:13px;color:var(--muted);line-height:1.5}
+
+/* Score factors */
+.factor-bar{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.factor-label{font-size:13px;font-weight:700;min-width:140px;color:rgba(232,236,240,.8)}
+.factor-track{flex:1;height:8px;background:rgba(255,255,255,.04);border-radius:4px;overflow:hidden}
+.factor-fill{height:100%;border-radius:4px;transition:width .6s ease}
+.factor-pct{font-size:12px;font-weight:700;min-width:36px;text-align:right}
+
+/* Glossary */
+.glossary-item{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.03)}
+.glossary-item:last-child{border-bottom:none}
+.glossary-term{font-weight:700;color:var(--neon-yellow);min-width:120px;font-size:13px;flex-shrink:0}
+.glossary-def{font-size:13px;color:rgba(232,236,240,.7);line-height:1.5}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="logo-wrap">
+    <div class="stopwatch">
+      <div class="stopwatch-btn"></div>
+      <div class="stopwatch-lug-l"></div>
+      <div class="stopwatch-lug-r"></div>
+      <div class="stopwatch-face"></div>
+      <div class="stopwatch-five">5</div>
+    </div>
+    <div class="logo-text">
+      <div class="logo-main">Min Credit <span>Fix</span></div>
+    </div>
+  </div>
+  <div class="nav-links">
+    <a href="/">Dispute Tool</a>
+    <a href="/fishbowl" class="active">Fishbowl</a>
+  </div>
+</header>
+
+<div class="container">
+
+  <div class="disclaimer">
+    <strong>Educational Information Only</strong>
+    The information on this page is for educational purposes only and does not constitute legal, financial, or credit repair advice. AE Labs / Arden Edge Capital is not a law firm, credit repair organization, or financial advisor. We do not guarantee any specific outcomes. For legal advice, consult a licensed attorney in your state. For financial guidance, consult a licensed financial advisor.
+  </div>
+
+  <!-- DISPUTE TIMELINE -->
+  <div class="section">
+    <div class="section-title">Dispute Timeline</div>
+    <div class="section-sub">Understanding the federal dispute process and key deadlines under the FCRA.</div>
+    <div class="card">
+      <div class="timeline">
+        <div class="tl-item">
+          <div class="tl-dot blue">1</div>
+          <div class="tl-title">Day 0 — Mail Dispute Letters</div>
+          <div class="tl-desc">Send dispute letters to all 3 bureaus via certified mail with return receipt. Keep your tracking numbers.</div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-dot blue">5</div>
+          <div class="tl-title">Day 5 — Bureau Receives Dispute</div>
+          <div class="tl-desc">Bureau must begin investigation within 5 business days of receipt. The 30-day clock starts when they receive your letter.</div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-dot pink">30</div>
+          <div class="tl-title">Day 30 — Bureau Response Deadline</div>
+          <div class="tl-desc">Under FCRA Section 611(a)(1), bureaus must complete their investigation and notify you within 30 days. If they don't respond, the disputed items should be deleted.</div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-dot pink">35</div>
+          <div class="tl-title">Day 35 — Send Follow-Up if No Response</div>
+          <div class="tl-desc">If no response received, send a 30-day follow-up letter citing their failure to comply with FCRA timelines.</div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-dot yellow">45</div>
+          <div class="tl-title">Day 45 — Request Method of Verification</div>
+          <div class="tl-desc">If the bureau claims "verified" but provides no detail, demand the method of verification under FCRA Section 611(a)(6)(B)(iii).</div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-dot yellow">60</div>
+          <div class="tl-title">Day 60 — Escalation Letter</div>
+          <div class="tl-desc">Send a 60-day escalation letter citing inadequate response or partial compliance. Reference specific case law supporting your position.</div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-dot green">90</div>
+          <div class="tl-title">Day 90 — Regulatory Complaints</div>
+          <div class="tl-desc">File formal complaints with the CFPB (consumerfinance.gov/complaint), FTC, and your state Attorney General. This often triggers immediate bureau action.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HOW CREDIT SCORING WORKS -->
+  <div class="section">
+    <div class="section-title">How Credit Scoring Works</div>
+    <div class="section-sub">FICO scores (the most widely used) are calculated from 5 categories of information in your credit report.</div>
+    <div class="card">
+      <div class="factor-bar">
+        <div class="factor-label">Payment History</div>
+        <div class="factor-track"><div class="factor-fill" style="width:35%;background:var(--neon-pink);box-shadow:0 0 8px rgba(255,45,155,.3)"></div></div>
+        <div class="factor-pct" style="color:var(--neon-pink)">35%</div>
+      </div>
+      <div class="factor-bar">
+        <div class="factor-label">Amounts Owed</div>
+        <div class="factor-track"><div class="factor-fill" style="width:30%;background:var(--neon-blue);box-shadow:0 0 8px rgba(0,240,255,.3)"></div></div>
+        <div class="factor-pct" style="color:var(--neon-blue)">30%</div>
+      </div>
+      <div class="factor-bar">
+        <div class="factor-label">Length of History</div>
+        <div class="factor-track"><div class="factor-fill" style="width:15%;background:var(--neon-yellow);box-shadow:0 0 8px rgba(238,255,0,.3)"></div></div>
+        <div class="factor-pct" style="color:var(--neon-yellow)">15%</div>
+      </div>
+      <div class="factor-bar">
+        <div class="factor-label">New Credit</div>
+        <div class="factor-track"><div class="factor-fill" style="width:10%;background:var(--green);box-shadow:0 0 8px rgba(0,255,136,.3)"></div></div>
+        <div class="factor-pct" style="color:var(--green)">10%</div>
+      </div>
+      <div class="factor-bar">
+        <div class="factor-label">Credit Mix</div>
+        <div class="factor-track"><div class="factor-fill" style="width:10%;background:#9B59B6;box-shadow:0 0 8px rgba(155,89,182,.3)"></div></div>
+        <div class="factor-pct" style="color:#9B59B6">10%</div>
+      </div>
+      <p style="margin-top:16px;font-size:13px;color:var(--muted)">Disputes primarily affect <strong>Payment History</strong> (removing late payments) and <strong>Amounts Owed</strong> (removing collections). Successfully disputing even one negative item can produce a meaningful score change.</p>
+    </div>
+  </div>
+
+  <!-- YOUR RIGHTS UNDER FCRA -->
+  <div class="section">
+    <div class="section-title">Your Rights Under the FCRA</div>
+    <div class="card">
+      <ul>
+        <li><strong>Right to dispute</strong> — You can dispute any inaccurate information directly with credit bureaus (FCRA Section 611)</li>
+        <li><strong>30-day investigation</strong> — Bureaus must investigate and respond within 30 days of receiving your dispute</li>
+        <li><strong>Delete if unverified</strong> — If a bureau cannot verify disputed information, it must be deleted (Section 611(a)(5)(A))</li>
+        <li><strong>Method of verification</strong> — You have the right to know HOW information was verified (Section 611(a)(6)(B)(iii))</li>
+        <li><strong>7-year reporting limit</strong> — Most negative items must be removed after 7 years from first delinquency (Section 605)</li>
+        <li><strong>No re-aging</strong> — Debt collectors cannot reset the 7-year clock by selling or transferring the debt (Section 605(c))</li>
+        <li><strong>Free annual report</strong> — You are entitled to one free credit report per year from each bureau at AnnualCreditReport.com</li>
+        <li><strong>Damages for violations</strong> — You can sue for actual damages, statutory damages ($100-$1,000), and attorney's fees (Sections 616-617)</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- THE GILMORE METHOD -->
+  <div class="section">
+    <div class="section-title">The Gilmore Dispute Order</div>
+    <div class="section-sub">Disputes are processed in a specific sequence designed to maximize impact.</div>
+    <div class="card">
+      <h3>Phase 1: Personal Information</h3>
+      <p>Fix wrong addresses, misspelled names, incorrect SSN. Clean personal info prevents mixed files and strengthens all subsequent disputes.</p>
+    </div>
+    <div class="card">
+      <h3>Phase 2: Inquiries & Unknown Accounts</h3>
+      <p>Remove unauthorized hard pulls and accounts you don't recognize. This addresses potential identity theft and reduces "new credit" impact.</p>
+    </div>
+    <div class="card">
+      <h3>Phase 3: Collections</h3>
+      <p>Challenge collection accounts with debt validation demands. Many collectors cannot produce original documentation.</p>
+    </div>
+    <div class="card">
+      <h3>Phase 4: Charge-Offs & Aged Debt</h3>
+      <p>Target old debts nearing or past the statute of limitations. Challenge re-aging and demand proof of original delinquency dates.</p>
+    </div>
+    <div class="card">
+      <h3>Phase 5: Late Payments</h3>
+      <p>Address late payment records last. By this point, removed collections and charge-offs may have already improved payment history reporting.</p>
+    </div>
+  </div>
+
+  <!-- GLOSSARY -->
+  <div class="section">
+    <div class="section-title">Glossary</div>
+    <div class="card">
+      <div class="glossary-item"><div class="glossary-term">CRA</div><div class="glossary-def">Credit Reporting Agency — Equifax, Experian, TransUnion. The companies that compile and sell your credit reports.</div></div>
+      <div class="glossary-item"><div class="glossary-term">FCRA</div><div class="glossary-def">Fair Credit Reporting Act — The federal law governing credit reporting accuracy and your rights to dispute.</div></div>
+      <div class="glossary-item"><div class="glossary-term">FDCPA</div><div class="glossary-def">Fair Debt Collection Practices Act — Federal law regulating how debt collectors can contact you and what they must prove.</div></div>
+      <div class="glossary-item"><div class="glossary-term">Furnisher</div><div class="glossary-def">Any entity that reports information to credit bureaus — banks, lenders, collection agencies.</div></div>
+      <div class="glossary-item"><div class="glossary-term">e-OSCAR</div><div class="glossary-def">Online System for Central Analysis and Reporting — The automated system bureaus use to communicate with furnishers during disputes. Often criticized for oversimplifying investigations.</div></div>
+      <div class="glossary-item"><div class="glossary-term">MOV</div><div class="glossary-def">Method of Verification — The procedure a bureau used to verify disputed information. You have a legal right to request this.</div></div>
+      <div class="glossary-item"><div class="glossary-term">CFPB</div><div class="glossary-def">Consumer Financial Protection Bureau — Federal agency that oversees credit bureaus. Filing a complaint often triggers immediate action.</div></div>
+      <div class="glossary-item"><div class="glossary-term">SOL</div><div class="glossary-def">Statute of Limitations — The time period during which a creditor can sue you for a debt. Varies by state (2-10 years).</div></div>
+      <div class="glossary-item"><div class="glossary-term">DOFD</div><div class="glossary-def">Date of First Delinquency — The date you first fell behind on payments. This starts the 7-year reporting clock.</div></div>
+      <div class="glossary-item"><div class="glossary-term">Charge-Off</div><div class="glossary-def">When a creditor writes off a debt as a loss. The debt doesn't disappear — it's often sold to a collection agency.</div></div>
+    </div>
+  </div>
+
+  <div class="disclaimer" style="margin-top:40px">
+    <strong>Reminder</strong>
+    Nothing on this page is legal advice. Credit dispute outcomes vary. Past results do not guarantee future performance. AE Labs provides tools and templates — not legal representation. If you believe your rights have been violated, consult a consumer rights attorney.
+  </div>
+
+</div>
+</body>
+</html>

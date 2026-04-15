@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — 5-Min Credit Fix</title>
+<link href="https://fonts.googleapis.com/css2?family=Bangers&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--neon-blue:#00F0FF;--neon-pink:#FF2D9B;--neon-yellow:#EEFF00;--dark:#000000;--dark2:#06060C;--card:#0A0A14;--border:rgba(0,240,255,0.18);--text:#E8ECF0;--muted:#666;--green:#00FF88;--blue:#00F0FF;--fire:#FF2D9B;--gold:#EEFF00;--r:12px}
+body{background:var(--dark);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh}
+
+.header{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.9);backdrop-filter:blur(16px)}
+.logo-wrap{display:flex;align-items:center;gap:12px}
+.stopwatch{position:relative;width:48px;height:48px;flex-shrink:0}
+.stopwatch-face{width:44px;height:44px;border-radius:50%;border:2.5px solid var(--neon-blue);position:absolute;bottom:0;left:2px;background:rgba(0,240,255,.04);box-shadow:0 0 20px rgba(0,240,255,.3),inset 0 0 12px rgba(0,240,255,.06)}
+.stopwatch-btn{position:absolute;top:0;left:50%;transform:translateX(-50%);width:8px;height:8px;background:var(--neon-pink);border-radius:2px 2px 1px 1px;box-shadow:0 0 8px rgba(255,45,155,.6)}
+.stopwatch-btn::before{content:'';position:absolute;top:-3px;left:50%;transform:translateX(-50%);width:12px;height:3px;background:var(--neon-pink);border-radius:2px}
+.stopwatch-lug-l,.stopwatch-lug-r{position:absolute;top:3px;width:6px;height:3px;background:var(--neon-yellow);border-radius:1px}
+.stopwatch-lug-l{left:8px;transform:rotate(-35deg)}
+.stopwatch-lug-r{right:8px;transform:rotate(35deg)}
+.stopwatch-five{position:absolute;bottom:0;left:2px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-family:'Bangers',cursive;font-size:30px;color:var(--neon-blue);line-height:1;text-shadow:0 0 12px rgba(0,240,255,.5);padding-top:2px}
+.logo-text{display:flex;flex-direction:column;gap:0}
+.logo-main{font-family:'Bangers',cursive;font-size:22px;letter-spacing:2px;color:var(--neon-blue);text-shadow:0 0 14px rgba(0,240,255,.4);line-height:1.1}
+.logo-main span{color:var(--neon-yellow);text-shadow:0 0 14px rgba(238,255,0,.4)}
+.header-right{display:flex;align-items:center;gap:16px}
+.header-right a{color:var(--muted);font-size:13px;text-decoration:none}
+.header-right a:hover{color:var(--neon-blue);text-shadow:0 0 6px rgba(0,240,255,.3)}
+
+.container{max-width:1100px;margin:0 auto;padding:24px 20px}
+
+/* Stats */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:32px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:24px;text-align:center;box-shadow:0 0 20px rgba(0,240,255,.03)}
+.stat-value{font-family:'Bangers',cursive;font-size:42px;letter-spacing:2px;line-height:1}
+.stat-value.fire{color:var(--neon-pink);text-shadow:0 0 10px rgba(255,45,155,.3)}
+.stat-value.green{color:var(--green);text-shadow:0 0 10px rgba(0,255,136,.3)}
+.stat-value.gold{color:var(--neon-yellow);text-shadow:0 0 10px rgba(238,255,0,.3)}
+.stat-value.blue{color:var(--neon-blue);text-shadow:0 0 10px rgba(0,240,255,.3)}
+.stat-label{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-top:8px}
+
+/* Table */
+.table-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;box-shadow:0 0 30px rgba(0,240,255,.03)}
+.table-header{display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--border)}
+.table-title{font-family:'Bangers',cursive;font-size:24px;color:var(--neon-blue);letter-spacing:1px;text-shadow:0 0 10px rgba(0,240,255,.3)}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);padding:12px 16px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.01)}
+td{padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.03);font-size:14px}
+tr:hover td{background:rgba(0,240,255,.02)}
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.badge-paid{background:rgba(0,255,136,.08);color:var(--green);border:1px solid rgba(0,255,136,.2);box-shadow:0 0 6px rgba(0,255,136,.1)}
+.badge-started{background:rgba(255,45,155,.08);color:var(--neon-pink);border:1px solid rgba(255,45,155,.2)}
+.badge-parsed{background:rgba(0,240,255,.06);color:var(--neon-blue);border:1px solid rgba(0,240,255,.15)}
+.badge-reviewed{background:rgba(238,255,0,.06);color:var(--neon-yellow);border:1px solid rgba(238,255,0,.15)}
+.initials-circle{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:rgba(0,240,255,.08);border:1px solid rgba(0,240,255,.25);font-size:12px;font-weight:700;color:var(--neon-blue);box-shadow:0 0 8px rgba(0,240,255,.1)}
+.empty-state{text-align:center;padding:60px 20px;color:var(--muted)}
+.empty-state div{font-size:48px;margin-bottom:12px}
+
+.refresh-btn{background:transparent;border:1px solid rgba(0,240,255,.15);color:var(--muted);padding:8px 16px;border-radius:8px;font-size:12px;cursor:pointer;font-family:inherit;transition:all .2s}
+.refresh-btn:hover{border-color:var(--neon-blue);color:var(--neon-blue);box-shadow:0 0 10px rgba(0,240,255,.1)}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="logo-wrap">
+    <div class="stopwatch">
+      <div class="stopwatch-btn"></div>
+      <div class="stopwatch-lug-l"></div>
+      <div class="stopwatch-lug-r"></div>
+      <div class="stopwatch-face"></div>
+      <div class="stopwatch-five">5</div>
+    </div>
+    <div class="logo-text">
+      <div class="logo-main">Admin <span>Dashboard</span></div>
+    </div>
+  </div>
+  <div class="header-right">
+    <a href="/">Back to App</a>
+    <span style="font-size:11px;color:var(--muted)">AE Labs</span>
+  </div>
+</header>
+
+<div class="container">
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-value fire">{{ stats.total }}</div>
+      <div class="stat-label">Total Submissions</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value green">{{ stats.paid }}</div>
+      <div class="stat-label">Paid</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value blue">{{ stats.pending }}</div>
+      <div class="stat-label">Pending</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value gold">${{ '%.2f'|format(stats.revenue) }}</div>
+      <div class="stat-label">Revenue</div>
+    </div>
+  </div>
+
+  <!-- Follow-up Stats -->
+  <div class="stats-grid" style="margin-bottom:16px">
+    <div class="stat-card">
+      <div class="stat-value blue">{{ stats.fu30 or 0 }}</div>
+      <div class="stat-label">30-Day Follow-Ups Sent</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value gold">{{ stats.fu60 or 0 }}</div>
+      <div class="stat-label">60-Day Follow-Ups Sent</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value fire">{{ stats.fu90 or 0 }}</div>
+      <div class="stat-label">90-Day Escalations Sent</div>
+    </div>
+    <div class="stat-card" style="display:flex;flex-direction:column;justify-content:center;gap:8px">
+      <button class="refresh-btn" onclick="runFollowups()" id="btnFollowup" style="width:100%">Run Follow-Ups</button>
+      <button class="refresh-btn" onclick="runPurge()" id="btnPurge" style="width:100%">Run 90-Day Purge</button>
+    </div>
+  </div>
+
+  <div class="table-card">
+    <div class="table-header">
+      <div class="table-title">All Submissions</div>
+      <button class="refresh-btn" onclick="location.reload()">&#8635; Refresh</button>
+    </div>
+    <div class="table-wrap">
+      {% if entries %}
+      <table>
+        <thead>
+          <tr>
+            <th></th>
+            <th>ID</th>
+            <th>Status</th>
+            <th>Confirmation</th>
+            <th>Follow-Ups</th>
+            <th>Created</th>
+            <th>Updated</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in entries %}
+          <tr>
+            <td><span class="initials-circle">{{ e.initials or '--' }}</span></td>
+            <td style="font-family:monospace;font-size:12px;color:var(--muted)">{{ e.session_id[:8] }}...</td>
+            <td>
+              {% if e.paid %}
+                <span class="badge badge-paid">Paid</span>
+              {% elif e.status == 'reviewed' %}
+                <span class="badge badge-reviewed">Reviewed</span>
+              {% elif e.status == 'parsed' %}
+                <span class="badge badge-parsed">Parsed</span>
+              {% else %}
+                <span class="badge badge-started">{{ e.status }}</span>
+              {% endif %}
+            </td>
+            <td style="font-family:monospace;font-size:12px">{{ e.confirmation or '---' }}</td>
+            <td style="font-size:11px">
+              {% if e.follow_up_30_sent %}<span style="color:var(--neon-blue)">30d</span>{% endif %}
+              {% if e.follow_up_60_sent %}<span style="color:var(--neon-yellow)">60d</span>{% endif %}
+              {% if e.follow_up_90_sent %}<span style="color:var(--neon-pink)">90d</span>{% endif %}
+              {% if not e.follow_up_30_sent and not e.follow_up_60_sent and not e.follow_up_90_sent %}---{% endif %}
+            </td>
+            <td style="font-size:12px;color:var(--muted)">{{ e.created_at[:16] }}</td>
+            <td style="font-size:12px;color:var(--muted)">{{ e.updated_at[:16] }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty-state">
+        <div>&#128203;</div>
+        <p>No submissions yet. They'll show up here in real time.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+
+<script>
+async function runFollowups() {
+  const btn = document.getElementById('btnFollowup');
+  btn.disabled = true; btn.textContent = 'Running...';
+  try {
+    const r = await fetch('/admin/api/run-followups', {method:'POST'});
+    const d = await r.json();
+    btn.textContent = d.processed ? `Done (${d.processed} processed)` : 'Done (none due)';
+    setTimeout(() => { btn.textContent = 'Run Follow-Ups'; btn.disabled = false; }, 3000);
+  } catch(e) { btn.textContent = 'Error'; btn.disabled = false; }
+}
+async function runPurge() {
+  const btn = document.getElementById('btnPurge');
+  btn.disabled = true; btn.textContent = 'Purging...';
+  try {
+    const r = await fetch('/admin/api/run-purge', {method:'POST'});
+    const d = await r.json();
+    btn.textContent = d.deleted ? `Done (${d.deleted} deleted)` : 'Done (none expired)';
+    setTimeout(() => { btn.textContent = 'Run 90-Day Purge'; btn.disabled = false; }, 3000);
+  } catch(e) { btn.textContent = 'Error'; btn.disabled = false; }
+}
+</script>
+</body>
+</html>

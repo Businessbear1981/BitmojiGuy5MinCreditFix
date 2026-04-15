@@ -1,0 +1,372 @@
+'use client'
+
+import { useState } from 'react'
+import { useShojiNav } from '@/lib/shojiNav'
+
+const STATES = ['CA', 'TX', 'WA', 'FL', 'NY', 'IL', 'GA', 'NC', 'OH', 'PA', 'Other']
+const BUREAUS = ['Equifax', 'TransUnion', 'Experian', 'All Three']
+const REASONS = [
+  'Identity theft',
+  'Account not mine',
+  'Incorrect balance',
+  'Outdated negative item',
+  'Duplicate account',
+]
+
+const inputStyle: React.CSSProperties = {
+  width: '100%',
+  background: 'rgba(40,26,12,0.88)',
+  border: '1px solid rgba(201,140,60,0.45)',
+  borderRadius: 3,
+  padding: '8px 12px',
+  color: '#F5E6C8',
+  fontFamily: 'var(--font-body)',
+  fontSize: 13,
+  outline: 'none',
+  transition: 'border-color 0.2s',
+}
+
+const labelStyle: React.CSSProperties = {
+  fontFamily: 'var(--font-cinzel), serif',
+  fontSize: '0.65rem',
+  color: '#D4A96C',
+  letterSpacing: 2,
+  textTransform: 'uppercase',
+  marginBottom: 4,
+  display: 'block',
+}
+
+export default function Step1DrakeMapRoom() {
+  const { navigateTo } = useShojiNav()
+  const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    address: '',
+    phone: '',
+    email: '',
+    state: 'CA',
+    bureau: 'All Three',
+    disputeReason: 'Identity theft',
+  })
+
+  const update = (k: keyof typeof formData, v: string) =>
+    setFormData((prev) => ({ ...prev, [k]: v }))
+
+  return (
+    <div
+      style={{
+        minHeight: '100vh',
+        position: 'relative',
+        overflow: 'hidden',
+        background:
+          'radial-gradient(ellipse at 50% 45%, #2a1808 0%, #140a04 45%, #050302 100%)',
+        color: '#F5E6C8',
+        fontFamily: 'var(--font-body)',
+      }}
+    >
+      {/* SCENE — dark study with desk, parchment map, compass, notebook */}
+      <svg
+        width="100%"
+        height="100%"
+        viewBox="0 0 1400 900"
+        preserveAspectRatio="xMidYMid slice"
+        style={{ position: 'absolute', inset: 0, zIndex: 0 }}
+      >
+        <defs>
+          <linearGradient id="deskGrain" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="#3A2414" />
+            <stop offset="100%" stopColor="#150802" />
+          </linearGradient>
+          <radialGradient id="vign" cx="50%" cy="50%" r="75%">
+            <stop offset="55%" stopColor="#000" stopOpacity="0" />
+            <stop offset="100%" stopColor="#000" stopOpacity="0.85" />
+          </radialGradient>
+        </defs>
+
+        {/* Dark paneled walls */}
+        <rect x="0" y="0" width="1400" height="900" fill="#0a0604" />
+        {[0, 150, 300, 450, 600, 750, 900, 1050, 1200, 1350].map((x) => (
+          <rect key={x} x={x} y="0" width="2" height="900" fill="#1a0e06" opacity="0.4" />
+        ))}
+
+        {/* Amber candle glow — left and right */}
+        <ellipse cx="300" cy="200" rx="320" ry="220" fill="#E89844" opacity="0.14" />
+        <ellipse cx="300" cy="200" rx="180" ry="140" fill="#FFC07A" opacity="0.09" />
+        <ellipse cx="1100" cy="200" rx="260" ry="190" fill="#E89844" opacity="0.09" />
+
+        {/* DESK */}
+        <rect x="80" y="380" width="1240" height="500" fill="#2A1808" />
+        <rect x="80" y="380" width="1240" height="10" fill="#4A2E14" />
+        <rect x="80" y="390" width="1240" height="490" fill="url(#deskGrain)" opacity="0.55" />
+        <rect x="80" y="860" width="1240" height="40" fill="#0A0402" opacity="0.7" />
+
+        {/* PARCHMENT MAP — aged, center of desk */}
+        <g transform="translate(360, 420) rotate(-2)">
+          <rect x="0" y="0" width="680" height="440" rx="4" fill="#D4AE76" />
+          <rect x="0" y="0" width="680" height="440" rx="4" fill="#B8945A" opacity="0.45" />
+          {/* Burn edges */}
+          <path
+            d="M0 0 Q18 12 10 50 Q4 130 16 210 Q8 300 14 380 Q22 420 4 440 L0 440 Z"
+            fill="#5A3A18"
+            opacity="0.6"
+          />
+          <path
+            d="M680 0 Q662 14 670 60 Q664 150 674 250 Q660 340 670 440 L680 440 Z"
+            fill="#5A3A18"
+            opacity="0.55"
+          />
+          {/* Map contour lines */}
+          <path
+            d="M80 90 Q160 70 240 110 Q320 150 400 130 Q480 110 580 150"
+            stroke="#4A2E10"
+            strokeWidth="1.2"
+            fill="none"
+            opacity="0.6"
+          />
+          <path
+            d="M60 190 Q140 210 220 180 Q300 160 380 200 Q460 230 560 200"
+            stroke="#4A2E10"
+            strokeWidth="1.2"
+            fill="none"
+            opacity="0.6"
+          />
+          <path
+            d="M80 300 Q180 280 280 310 Q380 340 480 320 Q560 300 600 320"
+            stroke="#4A2E10"
+            strokeWidth="1.2"
+            fill="none"
+            opacity="0.6"
+          />
+          {/* Compass rose on map */}
+          <circle cx="560" cy="100" r="34" fill="none" stroke="#4A2E10" strokeWidth="1" opacity="0.7" />
+          <path d="M560 66 L564 100 L560 134 L556 100 Z" fill="#4A2E10" opacity="0.75" />
+          <path d="M526 100 L560 104 L594 100 L560 96 Z" fill="#4A2E10" opacity="0.55" />
+          {/* X marks the spot */}
+          <path
+            d="M240 250 L270 280 M270 250 L240 280"
+            stroke="#8B2818"
+            strokeWidth="3.5"
+            opacity="0.9"
+          />
+        </g>
+
+        {/* COMPASS — brass, right of map */}
+        <g transform="translate(1100, 520)">
+          <circle cx="0" cy="0" r="58" fill="#1A0E06" />
+          <circle cx="0" cy="0" r="54" fill="#8B6A28" />
+          <circle cx="0" cy="0" r="50" fill="#D4A96C" />
+          <circle cx="0" cy="0" r="42" fill="#1A0E06" />
+          <text x="0" y="-28" textAnchor="middle" fill="#D4A96C" fontSize="10" fontFamily="serif">N</text>
+          <text x="28" y="4" textAnchor="middle" fill="#8B6A28" fontSize="9" fontFamily="serif">E</text>
+          <text x="0" y="34" textAnchor="middle" fill="#8B6A28" fontSize="9" fontFamily="serif">S</text>
+          <text x="-28" y="4" textAnchor="middle" fill="#8B6A28" fontSize="9" fontFamily="serif">W</text>
+          <path d="M0 -26 L4 0 L0 26 L-4 0 Z" fill="#C03018" />
+          <path d="M0 -26 L4 0 L-4 0 Z" fill="#E85038" />
+          <circle cx="0" cy="0" r="3" fill="#8B6A28" />
+          <ellipse cx="-14" cy="-16" rx="14" ry="8" fill="#FFF" opacity="0.12" />
+        </g>
+
+        {/* NOTEBOOK — leather bound, rubber-banded, left of map */}
+        <g transform="translate(160, 470) rotate(-5)">
+          <rect x="0" y="0" width="170" height="230" rx="4" fill="#3A1E0A" />
+          <rect x="0" y="0" width="170" height="230" rx="4" fill="#1A0A02" opacity="0.5" />
+          <rect x="4" y="4" width="162" height="222" rx="2" fill="#D4B080" opacity="0.3" />
+          {/* Rubber band */}
+          <rect x="-8" y="92" width="186" height="12" fill="#6A2818" />
+          <rect x="-8" y="92" width="186" height="2" fill="#8A3828" />
+          <rect x="-8" y="102" width="186" height="2" fill="#4A1808" />
+          <path d="M10 22 Q50 26 90 24 Q130 22 160 26" stroke="#1A0A02" strokeWidth="0.8" fill="none" opacity="0.5" />
+          <path d="M10 204 Q50 208 90 206 Q130 204 160 208" stroke="#1A0A02" strokeWidth="0.8" fill="none" opacity="0.5" />
+        </g>
+
+        {/* Candle — light source, left */}
+        <g transform="translate(260, 340)">
+          <rect x="-6" y="0" width="12" height="44" fill="#E8D4A8" />
+          <rect x="-6" y="0" width="2" height="44" fill="#F5E6C8" opacity="0.6" />
+          <ellipse cx="0" cy="0" rx="3" ry="7" fill="#FFD080" />
+          <ellipse cx="0" cy="-4" rx="2" ry="5" fill="#FFFFFF" opacity="0.85" />
+        </g>
+
+        {/* Inkwell and quill, far right */}
+        <g transform="translate(1230, 440)">
+          <rect x="-14" y="0" width="28" height="30" fill="#1A0E06" />
+          <rect x="-14" y="-4" width="28" height="6" fill="#3A2414" />
+          <path d="M0 0 L-2 -80 L10 -100" stroke="#D4B080" strokeWidth="1.5" fill="none" />
+        </g>
+
+        {/* Vignette */}
+        <rect x="0" y="0" width="1400" height="900" fill="url(#vign)" />
+      </svg>
+
+      {/* FORM OVERLAY — sits visually over the parchment on the desk */}
+      <div
+        style={{
+          position: 'relative',
+          zIndex: 10,
+          maxWidth: 720,
+          margin: '0 auto',
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          padding: '2rem 1rem',
+        }}
+      >
+        <div style={{ textAlign: 'center', marginBottom: 22 }}>
+          <p
+            style={{
+              fontFamily: 'var(--font-cinzel-decorative), serif',
+              fontSize: 12,
+              color: '#D4A96C',
+              letterSpacing: 4,
+              textTransform: 'uppercase',
+              marginBottom: 6,
+              textShadow: '0 0 20px rgba(232,152,68,0.45)',
+            }}
+          >
+            The Adventurer&rsquo;s Intake
+          </p>
+          <h1
+            style={{
+              fontFamily: 'var(--font-cinzel-decorative), serif',
+              fontSize: '1.8rem',
+              color: '#F5E6C8',
+              letterSpacing: 2,
+              textShadow: '0 0 24px rgba(232,152,68,0.35)',
+              margin: 0,
+            }}
+          >
+            Chart Your Course
+          </h1>
+        </div>
+
+        <div
+          style={{
+            background: 'rgba(40,26,14,0.55)',
+            backdropFilter: 'blur(3px)',
+            border: '1px solid rgba(201,140,60,0.4)',
+            borderRadius: 6,
+            padding: '1.5rem',
+            boxShadow:
+              '0 10px 60px rgba(0,0,0,0.85), inset 0 0 30px rgba(232,152,68,0.08)',
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '0.9rem 1rem',
+          }}
+        >
+          <div>
+            <label style={labelStyle}>First Name</label>
+            <input
+              type="text"
+              style={inputStyle}
+              value={formData.firstName}
+              onChange={(e) => update('firstName', e.target.value)}
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>Last Name</label>
+            <input
+              type="text"
+              style={inputStyle}
+              value={formData.lastName}
+              onChange={(e) => update('lastName', e.target.value)}
+            />
+          </div>
+          <div style={{ gridColumn: '1 / -1' }}>
+            <label style={labelStyle}>Address</label>
+            <input
+              type="text"
+              style={inputStyle}
+              value={formData.address}
+              onChange={(e) => update('address', e.target.value)}
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>Phone</label>
+            <input
+              type="tel"
+              style={inputStyle}
+              value={formData.phone}
+              onChange={(e) => update('phone', e.target.value)}
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>Email</label>
+            <input
+              type="email"
+              style={inputStyle}
+              value={formData.email}
+              onChange={(e) => update('email', e.target.value)}
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>State</label>
+            <select
+              style={inputStyle}
+              value={formData.state}
+              onChange={(e) => update('state', e.target.value)}
+            >
+              {STATES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label style={labelStyle}>Bureau</label>
+            <select
+              style={inputStyle}
+              value={formData.bureau}
+              onChange={(e) => update('bureau', e.target.value)}
+            >
+              {BUREAUS.map((b) => (
+                <option key={b} value={b}>
+                  {b}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div style={{ gridColumn: '1 / -1' }}>
+            <label style={labelStyle}>Dispute Reason</label>
+            <select
+              style={inputStyle}
+              value={formData.disputeReason}
+              onChange={(e) => update('disputeReason', e.target.value)}
+            >
+              {REASONS.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <button
+          onClick={() => navigateTo('/step/2')}
+          style={{
+            marginTop: 22,
+            alignSelf: 'center',
+            fontFamily: 'var(--font-cinzel), serif',
+            fontSize: 14,
+            fontWeight: 700,
+            letterSpacing: 3,
+            textTransform: 'uppercase',
+            color: '#1A0A02',
+            background: 'linear-gradient(135deg, #B07830, #F0C880)',
+            padding: '0.9rem 2.4rem',
+            borderRadius: 3,
+            border: '1px solid #8B5A20',
+            cursor: 'pointer',
+            boxShadow:
+              '0 4px 30px rgba(232,152,68,0.4), inset 0 1px 0 rgba(255,255,255,0.2)',
+            transition: 'all 0.2s',
+          }}
+        >
+          Set Sail &rarr;
+        </button>
+      </div>
+    </div>
+  )
+}

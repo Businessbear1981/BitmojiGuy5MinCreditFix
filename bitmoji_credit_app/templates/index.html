@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>5-Min Credit Fix — AE Labs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bangers&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+{% if stripe_key %}<script src="https://js.stripe.com/v3/"></script>{% endif %}
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--neon-blue:#00D4D4;--neon-pink:#A855C8;--neon-yellow:#D4B860;--dark:#050508;--dark2:#0A0A10;--card:#0E0E16;--border:rgba(140,100,180,0.15);--text:#E0DDE6;--muted:#706B7A;--green:#70C090;--blue:#00D4D4;--fire:#A855C8;--gold:#D4B860;--r:12px}
+html{scroll-behavior:smooth}
+body{background:var(--dark);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden}
+
+/* BG — animated smoke/fog */
+.bg-atoms{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.atom{position:absolute;border-radius:50%;opacity:.07;animation:float linear infinite;filter:blur(2px)}
+@keyframes float{from{transform:translateY(110vh) rotate(0) scale(1)}to{transform:translateY(-20vh) rotate(720deg) scale(1.3)}}
+.smoke-layer{position:fixed;inset:0;pointer-events:none;z-index:1;overflow:hidden}
+.smoke-layer::before,.smoke-layer::after{content:'';position:absolute;width:120vw;height:120vh;top:-10vh;left:-10vw;border-radius:50%;opacity:.035;filter:blur(80px);animation:drift linear infinite}
+.smoke-layer::before{background:radial-gradient(ellipse,rgba(100,60,140,.5),transparent 70%);animation-duration:25s}
+.smoke-layer::after{background:radial-gradient(ellipse,rgba(60,50,80,.4),transparent 70%);animation-duration:32s;animation-delay:-12s;animation-direction:reverse}
+@keyframes drift{0%{transform:translate(0,0) scale(1)}25%{transform:translate(8vw,-6vh) scale(1.1)}50%{transform:translate(-5vw,8vh) scale(.95)}75%{transform:translate(-10vw,-4vh) scale(1.05)}100%{transform:translate(0,0) scale(1)}}
+.fog-band{position:fixed;bottom:0;left:0;right:0;height:40vh;pointer-events:none;z-index:1;background:linear-gradient(to top,rgba(0,0,0,.6),transparent);opacity:.8}
+
+/* Header */
+.header{position:relative;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.85);backdrop-filter:blur(16px)}
+.logo-wrap{display:flex;align-items:center;gap:12px}
+.stopwatch{position:relative;width:48px;height:48px;flex-shrink:0}
+.stopwatch-face{width:44px;height:44px;border-radius:50%;border:2.5px solid var(--neon-blue);position:absolute;bottom:0;left:2px;background:rgba(0,240,255,.04);box-shadow:0 0 20px rgba(0,240,255,.3),0 0 40px rgba(0,240,255,.1),inset 0 0 12px rgba(0,240,255,.06)}
+.stopwatch-btn{position:absolute;top:0;left:50%;transform:translateX(-50%);width:8px;height:8px;background:var(--neon-pink);border-radius:2px 2px 1px 1px;box-shadow:0 0 8px rgba(255,45,155,.6)}
+.stopwatch-btn::before{content:'';position:absolute;top:-3px;left:50%;transform:translateX(-50%);width:12px;height:3px;background:var(--neon-pink);border-radius:2px}
+.stopwatch-lug-l,.stopwatch-lug-r{position:absolute;top:3px;width:6px;height:3px;background:var(--neon-yellow);border-radius:1px}
+.stopwatch-lug-l{left:8px;transform:rotate(-35deg)}
+.stopwatch-lug-r{right:8px;transform:rotate(35deg)}
+.stopwatch-five{position:absolute;bottom:0;left:2px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-family:'Bangers',cursive;font-size:30px;color:var(--neon-blue);line-height:1;text-shadow:0 0 12px rgba(0,240,255,.5),0 0 24px rgba(0,240,255,.2);padding-top:2px}
+.stopwatch-tick{position:absolute;bottom:0;left:2px;width:44px;height:44px}
+.stopwatch-tick::before,.stopwatch-tick::after{content:'';position:absolute;background:rgba(0,240,255,.3);border-radius:1px}
+.stopwatch-tick::before{top:3px;left:50%;transform:translateX(-50%);width:1.5px;height:5px}
+.stopwatch-tick::after{bottom:3px;left:50%;transform:translateX(-50%);width:1.5px;height:5px}
+.logo-text{display:flex;flex-direction:column;gap:0}
+.logo-main{font-family:'Bangers',cursive;font-size:22px;letter-spacing:2px;color:var(--neon-blue);text-shadow:0 0 14px rgba(0,240,255,.4),0 0 28px rgba(0,240,255,.15);line-height:1.1}
+.logo-main span{color:var(--neon-yellow);text-shadow:0 0 14px rgba(238,255,0,.4)}
+.logo-sub{font-size:9px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--muted);line-height:1}
+.ae-badge{font-size:10px;font-weight:700;letter-spacing:1px;color:var(--muted);text-transform:uppercase}
+
+/* Hero */
+.hero{position:relative;z-index:5;text-align:center;padding:50px 24px 30px}
+.hero-eyebrow{font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--neon-pink);text-shadow:0 0 10px rgba(255,45,155,.4);margin-bottom:12px}
+.hero-title{font-family:'Bangers',cursive;font-size:clamp(42px,7vw,80px);line-height:.95;letter-spacing:3px;color:var(--text);text-shadow:0 0 30px rgba(0,240,255,.3),4px 4px 0 rgba(0,240,255,.2);margin-bottom:16px}
+.hero-title .fw{color:var(--neon-blue);text-shadow:0 0 20px rgba(0,240,255,.5),0 0 40px rgba(0,240,255,.2),4px 4px 0 rgba(0,240,255,.15)}
+.hero-sub{font-size:16px;color:rgba(232,236,240,.6);max-width:500px;margin:0 auto 24px;line-height:1.6}
+
+/* Container */
+.app-container{position:relative;z-index:5;max-width:720px;margin:0 auto;padding:0 20px 80px}
+
+/* Progress */
+.progress-wrap{display:flex;align-items:center;gap:4px;margin-bottom:28px}
+.progress-step{display:flex;flex-direction:column;align-items:center;flex:1;position:relative}
+.progress-step::after{content:'';position:absolute;top:14px;left:60%;width:80%;height:2px;background:rgba(255,255,255,.06);z-index:-1}
+.progress-step:last-child::after{display:none}
+.progress-step.done::after{background:var(--neon-pink);box-shadow:0 0 6px rgba(255,45,155,.3)}
+.step-dot{width:28px;height:28px;border-radius:50%;border:2px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--muted);background:var(--dark2);transition:all .3s}
+.progress-step.active .step-dot{border-color:var(--neon-blue);background:rgba(0,240,255,.08);color:var(--neon-blue);box-shadow:0 0 14px rgba(0,240,255,.4)}
+.progress-step.done .step-dot{border-color:var(--neon-pink);background:rgba(255,45,155,.1);color:var(--neon-pink);box-shadow:0 0 10px rgba(255,45,155,.3)}
+.step-label{font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-top:4px;text-align:center}
+.progress-step.active .step-label{color:var(--neon-blue)}
+.progress-step.done .step-label{color:var(--neon-pink)}
+
+/* Panels */
+.step-panel{display:none;animation:slideIn .4s ease}
+.step-panel.active{display:block}
+@keyframes slideIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+
+/* Step layout with sidebar */
+.step-layout{display:flex;gap:24px;align-items:flex-start}
+.step-sidebar{width:120px;flex-shrink:0;text-align:center;position:sticky;top:100px}
+.step-content{flex:1;min-width:0}
+.bitmoji-guy{width:100px;height:140px;border-radius:var(--r);display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:64px;line-height:1;margin-bottom:8px;transition:all .4s ease;position:relative;overflow:hidden}
+.bitmoji-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:4px}
+/* Bitmoji character — CSS figure: bald man, black hoodie, grey jeans */
+.bitmoji-figure{position:relative;width:70px;height:110px}
+.bm-head{width:32px;height:32px;background:#D4A574;border-radius:50%;position:absolute;top:0;left:50%;transform:translateX(-50%);box-shadow:inset -3px -2px 0 rgba(0,0,0,.1)}
+.bm-head::before{content:'';position:absolute;bottom:6px;left:8px;width:16px;height:3px;border-bottom:2px solid rgba(0,0,0,.25);border-radius:0 0 8px 8px}
+.bm-eyes{position:absolute;top:10px;left:50%;transform:translateX(-50%);display:flex;gap:8px}
+.bm-eye{width:4px;height:4px;background:#222;border-radius:50%}
+.bm-hoodie{width:44px;height:38px;background:#1a1a1a;border-radius:6px 6px 4px 4px;position:absolute;top:30px;left:50%;transform:translateX(-50%);box-shadow:inset 0 -4px 8px rgba(0,0,0,.3)}
+.bm-hoodie::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:12px;height:8px;background:#222;border-radius:0 0 6px 6px}
+.bm-jeans{width:40px;height:32px;background:#555;border-radius:0 0 4px 4px;position:absolute;top:66px;left:50%;transform:translateX(-50%)}
+.bm-jeans::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:1px;height:100%;background:rgba(0,0,0,.15)}
+.bm-shoes{position:absolute;top:96px;left:50%;transform:translateX(-50%);display:flex;gap:6px}
+.bm-shoe{width:16px;height:6px;background:#222;border-radius:3px}
+/* Arms */
+.bm-arms{position:absolute;top:34px;left:50%;transform:translateX(-50%);width:60px;height:30px}
+.bm-arm-l,.bm-arm-r{position:absolute;width:8px;height:28px;background:#1a1a1a;border-radius:4px;top:0}
+.bm-arm-l{left:0}.bm-arm-r{right:0}
+.bm-hand-l,.bm-hand-r{width:8px;height:8px;background:#D4A574;border-radius:50%;position:absolute}
+/* Poses */
+.pose-crossed .bm-arm-l{transform:rotate(30deg);left:6px;top:4px}
+.pose-crossed .bm-arm-r{transform:rotate(-30deg);right:6px;top:4px}
+.pose-crossed .bm-hand-l{bottom:-2px;left:0}
+.pose-crossed .bm-hand-r{bottom:-2px;right:0}
+.pose-reading .bm-arm-l{transform:rotate(50deg);left:2px;top:2px;height:24px}
+.pose-reading .bm-arm-r{transform:rotate(-50deg);right:2px;top:2px;height:24px}
+.pose-reading .bm-hand-l{bottom:0;left:0}
+.pose-reading .bm-hand-r{bottom:0;right:0}
+.pose-reading::after{content:'';position:absolute;bottom:2px;left:50%;transform:translateX(-50%);width:20px;height:14px;background:#fff;border-radius:2px;border:1px solid #ccc;opacity:.8}
+.pose-pointing .bm-arm-l{transform:rotate(10deg);left:0;height:24px}
+.pose-pointing .bm-arm-r{transform:rotate(-70deg);right:-6px;top:-4px;height:30px}
+.pose-pointing .bm-hand-l{bottom:-2px;left:0}
+.pose-pointing .bm-hand-r{bottom:-2px;right:0}
+.pose-reviewing .bm-arm-l{transform:rotate(40deg);left:4px;top:4px;height:22px}
+.pose-reviewing .bm-arm-r{transform:rotate(-20deg);right:2px;top:2px;height:24px}
+.pose-reviewing .bm-hand-l{bottom:0;left:0}
+.pose-reviewing .bm-hand-r{bottom:-2px;right:0}
+.pose-celebrating .bm-arm-l{transform:rotate(-30deg);left:-4px;top:-10px;height:30px}
+.pose-celebrating .bm-arm-r{transform:rotate(30deg);right:-4px;top:-10px;height:30px}
+.pose-celebrating .bm-hand-l{top:-4px;left:0}
+.pose-celebrating .bm-hand-r{top:-4px;right:0}
+.pose-celebrating .bm-hand-l::after,.pose-celebrating .bm-hand-r::after{content:'';position:absolute;top:-2px;left:2px;width:4px;height:4px;background:var(--neon-yellow);border-radius:50%;box-shadow:0 0 6px var(--neon-yellow)}
+@media(max-width:640px){.step-sidebar{display:none}.step-layout{display:block}}
+
+/* ─── Per-step visual themes ─── */
+/* Step 1: Black + cherry blossom petals */
+#step-1{position:relative}
+#step-1 .step-theme-bg{position:absolute;inset:0;pointer-events:none;overflow:hidden;border-radius:var(--r);z-index:0}
+.petal{position:absolute;width:10px;height:10px;background:radial-gradient(ellipse,rgba(220,180,200,.7),rgba(180,140,160,.3));border-radius:50% 0 50% 0;animation:petalFall linear infinite;opacity:0}
+@keyframes petalFall{0%{opacity:0;transform:translate(0,-20px) rotate(0) scale(.8)}10%{opacity:.6}50%{opacity:.5;transform:translate(30px,50vh) rotate(180deg) scale(1)}100%{opacity:0;transform:translate(-10px,100vh) rotate(360deg) scale(.6)}}
+#step-1 .card{background:rgba(8,8,12,.95);border-color:rgba(200,170,190,.12);position:relative;z-index:1}
+#step-1 .card-title{color:#E8D5E0;text-shadow:0 0 12px rgba(200,170,190,.3)}
+
+/* Step 2: Deep purple gradient mist */
+#step-2 .card{background:linear-gradient(135deg,rgba(30,10,40,.95),rgba(20,8,35,.95));border-color:rgba(120,60,160,.2);box-shadow:0 0 40px rgba(80,30,120,.08)}
+#step-2 .card-title{color:#C490E4;text-shadow:0 0 14px rgba(160,100,220,.4)}
+#step-2 .upload-zone{border-color:rgba(120,60,160,.25)}
+#step-2 .upload-zone:hover{border-color:rgba(160,100,220,.5);background:rgba(120,60,160,.06)}
+
+/* Step 3: Dark teal + neon cyan glows */
+#step-3 .card{background:rgba(6,18,20,.95);border-color:rgba(0,220,210,.15);box-shadow:0 0 30px rgba(0,220,210,.05)}
+#step-3 .card-title{color:#00E8D8;text-shadow:0 0 14px rgba(0,220,210,.4)}
+#step-3 .dispute-item.selected{border-color:rgba(0,220,210,.4);background:rgba(0,220,210,.06)}
+#step-3 .dispute-item.selected .dispute-check{background:rgba(0,220,210,.8);border-color:rgba(0,220,210,.8)}
+#step-3 .dispute-type-badge{background:rgba(0,220,210,.08);color:#00E8D8;border:1px solid rgba(0,220,210,.15)}
+
+/* Step 4: Charcoal + gold text glow */
+#step-4 .card{background:rgba(24,22,20,.95);border-color:rgba(200,170,80,.12);box-shadow:0 0 30px rgba(200,170,80,.04)}
+#step-4 .card-title{color:#D4B860;text-shadow:0 0 16px rgba(200,170,80,.4)}
+#step-4 .price-amount{color:#D4B860;text-shadow:0 0 20px rgba(200,170,80,.4),0 0 40px rgba(200,170,80,.15)}
+#step-4 .price-display{background:rgba(200,170,80,.04);border-color:rgba(200,170,80,.12)}
+#step-4 .btn-fire{background:linear-gradient(135deg,#D4B860,#A08830);box-shadow:0 4px 24px rgba(200,170,80,.25)}
+#step-4 .btn-fire:hover{box-shadow:0 6px 32px rgba(200,170,80,.4)}
+#step-4 .pay-method.selected{border-color:rgba(200,170,80,.4);background:rgba(200,170,80,.06)}
+
+/* Step 5: Dark + white light radial burst */
+#step-5{position:relative}
+#step-5::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:600px;height:600px;background:radial-gradient(circle,rgba(255,255,255,.06) 0%,rgba(255,255,255,.02) 30%,transparent 70%);pointer-events:none;z-index:0;border-radius:50%}
+#step-5 .card{position:relative;z-index:1;background:rgba(10,10,14,.92);border-color:rgba(255,255,255,.08)}
+#step-5 .confirm-badge{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.3);box-shadow:0 0 30px rgba(255,255,255,.1),0 0 60px rgba(255,255,255,.03)}
+#step-5 .confirm-title{color:#fff;text-shadow:0 0 20px rgba(255,255,255,.3)}
+#step-5 .confirm-code{color:#D4B860;text-shadow:0 0 10px rgba(200,170,80,.3)}
+
+/* Cards */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:28px;margin-bottom:20px;box-shadow:0 0 30px rgba(0,240,255,.03)}
+.card-title{font-family:'Bangers',cursive;font-size:28px;letter-spacing:2px;color:var(--neon-blue);text-shadow:0 0 10px rgba(0,240,255,.3);margin-bottom:6px}
+.card-sub{font-size:14px;color:var(--muted);margin-bottom:20px}
+
+/* Form */
+.form-group{margin-bottom:16px}
+.form-label{display:block;font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.form-input{width:100%;background:rgba(0,240,255,.03);border:1px solid rgba(0,240,255,.15);border-radius:8px;padding:12px 16px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;outline:none;transition:border-color .2s,box-shadow .2s}
+.form-input:focus{border-color:var(--neon-blue);box-shadow:0 0 0 3px rgba(0,240,255,.1),0 0 12px rgba(0,240,255,.15)}
+.form-input::placeholder{color:var(--muted)}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:14px 28px;border-radius:8px;border:none;cursor:pointer;font-family:'Bangers',cursive;font-size:20px;letter-spacing:1.5px;text-transform:uppercase;transition:all .2s;text-decoration:none}
+.btn-fire{background:linear-gradient(135deg,var(--neon-pink),#D4006A);color:#fff;box-shadow:0 4px 24px rgba(255,45,155,.35),0 0 40px rgba(255,45,155,.1)}
+.btn-fire:hover{box-shadow:0 6px 32px rgba(255,45,155,.5),0 0 60px rgba(255,45,155,.15);transform:translateY(-1px)}
+.btn-fire:active{transform:scale(.98)}
+.btn-ghost{background:transparent;border:1px solid rgba(0,240,255,.2);color:rgba(0,240,255,.7);font-size:14px;font-family:'DM Sans',sans-serif;font-weight:500}
+.btn-ghost:hover{border-color:var(--neon-blue);color:var(--neon-blue);box-shadow:0 0 12px rgba(0,240,255,.15)}
+.btn-full{width:100%}
+.btn:disabled{opacity:.4;cursor:not-allowed;transform:none!important}
+
+/* Upload */
+.upload-zone{border:2px dashed rgba(0,240,255,.2);border-radius:var(--r);padding:40px 20px;text-align:center;cursor:pointer;transition:all .2s;position:relative}
+.upload-zone:hover,.upload-zone.drag-over{border-color:var(--neon-blue);background:rgba(0,240,255,.03);box-shadow:0 0 20px rgba(0,240,255,.08)}
+.upload-icon{font-size:48px;margin-bottom:12px}
+.upload-title{font-size:16px;font-weight:700;margin-bottom:6px}
+.upload-sub{font-size:13px;color:var(--muted)}
+.upload-input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.uploaded-files{margin-top:16px}
+.file-item{display:flex;align-items:center;gap:10px;background:rgba(0,255,136,.06);border:1px solid rgba(0,255,136,.2);border-radius:8px;padding:10px 14px;margin-bottom:8px}
+.file-name{font-size:13px;flex:1}
+.file-check{color:var(--green);font-size:16px;text-shadow:0 0 6px rgba(0,255,136,.4)}
+
+/* Dispute items */
+.dispute-item{display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:14px 16px;margin-bottom:10px;cursor:pointer;transition:all .15s}
+.dispute-item.selected{border-color:var(--neon-pink);background:rgba(255,45,155,.06);box-shadow:0 0 10px rgba(255,45,155,.08)}
+.dispute-check{width:22px;height:22px;border-radius:6px;border:2px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;font-size:12px}
+.dispute-item.selected .dispute-check{background:var(--neon-pink);border-color:var(--neon-pink);color:#fff;box-shadow:0 0 8px rgba(255,45,155,.4)}
+.dispute-text{font-size:14px;flex:1}
+.dispute-type-badge{font-size:10px;padding:3px 8px;border-radius:4px;background:rgba(0,240,255,.08);color:var(--neon-blue);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;border:1px solid rgba(0,240,255,.15)}
+.add-item-wrap{margin-top:12px;display:flex;gap:8px}
+.add-item-wrap .form-input{flex:1;padding:10px 14px;font-size:13px}
+.add-item-wrap select{background:var(--dark2);color:var(--text);border:1px solid rgba(0,240,255,.15);border-radius:8px;padding:10px;font-size:13px;font-family:inherit}
+
+/* Parsing results */
+.parse-summary{background:rgba(0,255,136,.04);border:1px solid rgba(0,255,136,.15);border-radius:var(--r);padding:20px;margin-bottom:20px}
+.parse-summary h3{font-family:'Bangers',cursive;color:var(--green);font-size:22px;margin-bottom:8px;letter-spacing:1px;text-shadow:0 0 10px rgba(0,255,136,.3)}
+.parse-stat{display:inline-block;background:rgba(0,240,255,.06);border:1px solid rgba(0,240,255,.15);border-radius:6px;padding:6px 12px;margin:4px;font-size:13px;font-weight:600;color:var(--neon-blue)}
+
+/* Payment */
+.price-display{text-align:center;padding:30px;background:rgba(238,255,0,.03);border:1px solid rgba(238,255,0,.12);border-radius:var(--r);margin-bottom:24px}
+.price-amount{font-family:'Bangers',cursive;font-size:72px;color:var(--neon-yellow);letter-spacing:2px;line-height:1;text-shadow:0 0 20px rgba(238,255,0,.3),0 0 40px rgba(238,255,0,.1)}
+.price-label{font-size:13px;color:var(--muted);margin-top:6px}
+.price-includes{font-size:12px;color:var(--muted);margin-top:12px;list-style:none;text-align:left;max-width:320px;margin-left:auto;margin-right:auto}
+.price-includes li{padding:4px 0}
+.price-includes li::before{content:'\\2713 ';color:var(--green);text-shadow:0 0 4px rgba(0,255,136,.4)}
+
+/* Confirmation */
+.confirm-hero{text-align:center;padding:20px 0 30px}
+.confirm-badge{display:inline-flex;align-items:center;justify-content:center;width:80px;height:80px;border-radius:50%;background:rgba(0,255,136,.08);border:2px solid var(--green);font-size:36px;margin-bottom:20px;box-shadow:0 0 24px rgba(0,255,136,.2),0 0 48px rgba(0,255,136,.08)}
+.confirm-title{font-family:'Bangers',cursive;font-size:42px;letter-spacing:2px;color:var(--green);margin-bottom:8px;text-shadow:0 0 16px rgba(0,255,136,.3)}
+.confirm-code{font-family:monospace;font-size:20px;font-weight:700;color:var(--neon-yellow);letter-spacing:3px;text-shadow:0 0 8px rgba(238,255,0,.3)}
+
+/* Letters */
+.letter-card{background:var(--dark2);border:1px solid var(--border);border-radius:var(--r);padding:20px;margin-bottom:16px}
+.letter-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px}
+.letter-bureau{font-family:'Bangers',cursive;font-size:20px;color:var(--neon-pink);letter-spacing:1px;text-shadow:0 0 8px rgba(255,45,155,.3)}
+.letter-variant{font-size:11px;padding:3px 8px;border-radius:4px;background:rgba(0,240,255,.08);color:var(--neon-blue);border:1px solid rgba(0,240,255,.15)}
+.letter-body{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:20px;font-size:13px;line-height:1.7;white-space:pre-wrap;font-family:'DM Sans',monospace;max-height:300px;overflow-y:auto}
+.letter-actions{display:flex;gap:8px;margin-top:12px}
+.letter-type-group{margin-bottom:24px}
+.letter-type-title{font-family:'Bangers',cursive;font-size:24px;color:var(--neon-yellow);letter-spacing:1px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid rgba(238,255,0,.1);text-shadow:0 0 8px rgba(238,255,0,.2)}
+
+/* Pay methods */
+.pay-methods{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px}
+.pay-method{background:rgba(255,255,255,.02);border:2px solid rgba(255,255,255,.06);border-radius:10px;padding:20px 16px;text-align:center;cursor:pointer;transition:all .2s;font-family:inherit;color:var(--text)}
+.pay-method:hover{border-color:var(--neon-blue);box-shadow:0 0 12px rgba(0,240,255,.1)}
+.pay-method.selected{border-color:var(--neon-pink);background:rgba(255,45,155,.06);box-shadow:0 0 20px rgba(255,45,155,.12)}
+.pay-method-icon{font-size:32px;display:block;margin-bottom:8px}
+.pay-method-name{font-size:14px;font-weight:700;margin-bottom:2px}
+.pay-method-tag{font-size:11px;color:var(--muted)}
+.pay-method-detail{display:none;margin-top:12px;font-size:13px;color:rgba(232,236,240,.8);line-height:1.6}
+.pay-method.selected .pay-method-detail{display:block}
+.pay-tag-input{width:100%;background:rgba(238,255,0,.04);border:1px solid rgba(238,255,0,.15);border-radius:8px;padding:10px 14px;color:var(--neon-yellow);font-family:monospace;font-size:15px;text-align:center;margin-top:8px;letter-spacing:1px;cursor:pointer;transition:all .2s;outline:none}
+.pay-tag-input:hover{border-color:var(--neon-yellow);background:rgba(238,255,0,.06);box-shadow:0 0 10px rgba(238,255,0,.1)}
+.pay-confirm-note{background:rgba(0,255,136,.04);border:1px solid rgba(0,255,136,.15);border-radius:8px;padding:14px 16px;font-size:13px;color:rgba(232,236,240,.8);margin-top:16px;margin-bottom:20px;display:none}
+.pay-confirm-note.show{display:block}
+@media(max-width:560px){.pay-methods{grid-template-columns:1fr}}
+
+/* Filter tabs */
+.filter-tabs{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
+.filter-tab{padding:8px 16px;border-radius:20px;font-size:12px;font-weight:700;border:1px solid rgba(255,255,255,.08);background:transparent;color:var(--muted);cursor:pointer;transition:all .2s;text-transform:uppercase;letter-spacing:.5px}
+.filter-tab.active{background:var(--neon-pink);border-color:var(--neon-pink);color:#fff;box-shadow:0 0 12px rgba(255,45,155,.3)}
+
+/* Toast */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 20px;font-size:14px;z-index:1000;transform:translateY(100px);opacity:0;transition:all .3s;max-width:320px;box-shadow:0 0 20px rgba(0,0,0,.5)}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.success{border-color:var(--green);box-shadow:0 0 16px rgba(0,255,136,.15)}
+.toast.error{border-color:var(--neon-pink);box-shadow:0 0 16px rgba(255,45,155,.15)}
+
+/* Loading */
+.loading-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:500;align-items:center;justify-content:center;flex-direction:column;gap:16px}
+.loading-overlay.show{display:flex}
+.loader{width:48px;height:48px;border-radius:50%;border:3px solid rgba(0,240,255,.15);border-top-color:var(--neon-blue);animation:spin .8s linear infinite;box-shadow:0 0 20px rgba(0,240,255,.15)}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-text{font-family:'Bangers',cursive;font-size:22px;color:var(--neon-blue);letter-spacing:2px;text-shadow:0 0 10px rgba(0,240,255,.3)}
+
+/* State select */
+.form-select{width:100%;background:rgba(0,240,255,.03);border:1px solid rgba(0,240,255,.15);border-radius:8px;padding:12px 16px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;outline:none;transition:border-color .2s,box-shadow .2s;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23666' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 16px center}
+.form-select:focus{border-color:var(--neon-blue);box-shadow:0 0 0 3px rgba(0,240,255,.1)}
+.form-select option{background:var(--dark2);color:var(--text)}
+
+/* Countdown timer */
+.countdown-card{background:linear-gradient(135deg,rgba(0,240,255,.05) 0%,rgba(255,45,155,.04) 100%);border:1px solid var(--border);border-radius:var(--r);padding:28px;text-align:center;margin-bottom:20px}
+.countdown-label{font-size:11px;text-transform:uppercase;letter-spacing:2px;color:var(--muted);margin-bottom:14px}
+.countdown-display{display:flex;justify-content:center;gap:16px;margin-bottom:8px}
+.countdown-unit{display:flex;flex-direction:column;align-items:center}
+.countdown-num{font-family:'Bangers',cursive;font-size:48px;letter-spacing:2px;color:var(--neon-blue);line-height:1;min-width:64px;text-shadow:0 0 12px rgba(0,240,255,.3)}
+.countdown-lbl{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-top:4px}
+.countdown-bar{width:100%;height:6px;background:rgba(255,255,255,.04);border-radius:3px;margin-top:16px;overflow:hidden}
+.countdown-fill{height:100%;background:linear-gradient(90deg,var(--neon-blue),var(--neon-pink));border-radius:3px;transition:width 1s ease;box-shadow:0 0 8px rgba(0,240,255,.3)}
+.countdown-note{font-size:12px;color:var(--muted);margin-top:10px}
+
+/* Credit building panel */
+.lever-section{margin-bottom:24px}
+.lever-title{font-family:'Bangers',cursive;font-size:22px;letter-spacing:1px;margin-bottom:6px}
+.lever-title.blue{color:var(--neon-blue);text-shadow:0 0 8px rgba(0,240,255,.3)}
+.lever-title.pink{color:var(--neon-pink);text-shadow:0 0 8px rgba(255,45,155,.3)}
+.lever-title.yellow{color:var(--neon-yellow);text-shadow:0 0 8px rgba(238,255,0,.3)}
+.lever-title.green{color:var(--green);text-shadow:0 0 8px rgba(0,255,136,.3)}
+.lever-desc{font-size:13px;color:rgba(232,236,240,.7);line-height:1.7;margin-bottom:14px}
+.lever-desc strong{color:var(--text)}
+.partner-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+.partner-card{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:16px;text-align:center;text-decoration:none;color:var(--text);transition:all .2s;display:block}
+.partner-card:hover{border-color:var(--neon-blue);background:rgba(0,240,255,.03);box-shadow:0 0 14px rgba(0,240,255,.08);transform:translateY(-2px)}
+.partner-icon{font-size:28px;margin-bottom:8px;display:block}
+.partner-name{font-size:14px;font-weight:700;margin-bottom:3px}
+.partner-desc{font-size:11px;color:var(--muted);line-height:1.4}
+.lever-tag{display:inline-block;font-size:10px;padding:2px 8px;border-radius:4px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+.lever-tag.remove{background:rgba(255,45,155,.08);color:var(--neon-pink);border:1px solid rgba(255,45,155,.15)}
+.lever-tag.add{background:rgba(0,240,255,.08);color:var(--neon-blue);border:1px solid rgba(0,240,255,.15)}
+.lever-tag.fix{background:rgba(238,255,0,.08);color:var(--neon-yellow);border:1px solid rgba(238,255,0,.15)}
+.lever-tag.build{background:rgba(0,255,136,.08);color:var(--green);border:1px solid rgba(0,255,136,.15)}
+.edu-callout{background:rgba(0,240,255,.03);border:1px solid rgba(0,240,255,.12);border-radius:var(--r);padding:20px;margin-top:20px;font-size:13px;line-height:1.7;color:rgba(232,236,240,.75)}
+.edu-callout strong{color:var(--neon-blue)}
+
+/* Status lookup */
+.status-lookup{border-top:1px solid var(--border);padding-top:20px;margin-top:20px}
+.status-inline{display:flex;gap:10px}
+.status-inline .form-input{flex:1}
+
+/* Print */
+@media print{
+  body{background:#fff;color:#000}
+  .header,.hero,.progress-wrap,.bg-atoms,.smoke-layer,.fog-band,.toast,.loading-overlay,.btn,.filter-tabs,.letter-actions,.status-lookup,.no-print{display:none!important}
+  .app-container{max-width:100%;padding:0}
+  .card,.letter-card{border:1px solid #ccc;background:#fff;break-inside:avoid;page-break-inside:avoid;box-shadow:none}
+  .letter-body{max-height:none;overflow:visible;color:#000;border-color:#ccc}
+  .card-title,.letter-bureau,.letter-type-title,.confirm-title{color:#000;text-shadow:none}
+}
+</style>
+</head>
+<body>
+
+<div class="bg-atoms" id="bgAtoms"></div>
+<div class="smoke-layer"></div>
+<div class="fog-band"></div>
+
+<header class="header">
+  <div class="logo-wrap">
+    <div class="stopwatch">
+      <div class="stopwatch-btn"></div>
+      <div class="stopwatch-lug-l"></div>
+      <div class="stopwatch-lug-r"></div>
+      <div class="stopwatch-face"></div>
+      <div class="stopwatch-tick"></div>
+      <div class="stopwatch-five">5</div>
+    </div>
+    <div class="logo-text">
+      <div class="logo-main">Min Credit <span>Fix</span></div>
+      <div class="logo-sub">AE Labs</div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:16px">
+    <a href="/fishbowl" style="font-size:12px;font-weight:700;letter-spacing:1px;color:var(--neon-yellow);text-decoration:none;text-transform:uppercase;text-shadow:0 0 6px rgba(238,255,0,.3)">Learn</a>
+    <div class="ae-badge">AE.CC.001</div>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="hero-eyebrow">Upload. Parse. Dispute. Done.</div>
+  <h1 class="hero-title">Fix Your <span class="fw">Credit</span> Now</h1>
+  <p class="hero-sub">Upload your credit report. We auto-detect problems, generate dispute letters for all 3 bureaus, and get you ready to mail in 5 minutes.</p>
+</section>
+
+<main class="app-container">
+
+  <!-- Progress Bar -->
+  <div class="progress-wrap" id="progressBar">
+    <div class="progress-step active" data-step="1"><div class="step-dot">1</div><div class="step-label">Info</div></div>
+    <div class="progress-step" data-step="2"><div class="step-dot">2</div><div class="step-label">Upload</div></div>
+    <div class="progress-step" data-step="3"><div class="step-dot">3</div><div class="step-label">Review</div></div>
+    <div class="progress-step" data-step="4"><div class="step-dot">4</div><div class="step-label">Pay</div></div>
+    <div class="progress-step" data-step="5"><div class="step-dot">5</div><div class="step-label">Letters</div></div>
+  </div>
+
+  <!-- STEP 1: Info -->
+  <div class="step-panel active" id="step-1">
+    <div class="step-theme-bg" id="petalContainer"></div>
+    <div class="step-layout">
+      <div class="step-sidebar">
+        <div class="bitmoji-figure"><div class="bm-head"><div class="bm-eyes"><div class="bm-eye"></div><div class="bm-eye"></div></div></div><div class="bm-hoodie"></div><div class="bm-arms pose-crossed"><div class="bm-arm-l"><div class="bm-hand-l"></div></div><div class="bm-arm-r"><div class="bm-hand-r"></div></div></div><div class="bm-jeans"></div><div class="bm-shoes"><div class="bm-shoe"></div><div class="bm-shoe"></div></div></div>
+        <div class="bitmoji-label">Ready</div>
+      </div>
+      <div class="step-content">
+    <div class="card">
+      <div class="card-title">Let's Go</div>
+      <div class="card-sub">Enter your info to start your dispute package.</div>
+      <div class="form-group">
+        <label class="form-label">Full Name</label>
+        <input class="form-input" id="inputName" placeholder="Your full legal name" autocomplete="name">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input class="form-input" id="inputEmail" type="email" placeholder="you@example.com" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Phone (optional)</label>
+        <input class="form-input" id="inputPhone" type="tel" placeholder="(555) 123-4567" autocomplete="tel">
+      </div>
+      <div class="form-group">
+        <label class="form-label">State</label>
+        <select class="form-select" id="inputState">
+          <option value="">Select your state...</option>
+          <option value="AL">Alabama</option><option value="AK">Alaska</option><option value="AZ">Arizona</option>
+          <option value="AR">Arkansas</option><option value="CA">California</option><option value="CO">Colorado</option>
+          <option value="CT">Connecticut</option><option value="DE">Delaware</option><option value="DC">District of Columbia</option>
+          <option value="FL">Florida</option><option value="GA">Georgia</option><option value="HI">Hawaii</option>
+          <option value="ID">Idaho</option><option value="IL">Illinois</option><option value="IN">Indiana</option>
+          <option value="IA">Iowa</option><option value="KS">Kansas</option><option value="KY">Kentucky</option>
+          <option value="LA">Louisiana</option><option value="ME">Maine</option><option value="MD">Maryland</option>
+          <option value="MA">Massachusetts</option><option value="MI">Michigan</option><option value="MN">Minnesota</option>
+          <option value="MS">Mississippi</option><option value="MO">Missouri</option><option value="MT">Montana</option>
+          <option value="NE">Nebraska</option><option value="NV">Nevada</option><option value="NH">New Hampshire</option>
+          <option value="NJ">New Jersey</option><option value="NM">New Mexico</option><option value="NY">New York</option>
+          <option value="NC">North Carolina</option><option value="ND">North Dakota</option><option value="OH">Ohio</option>
+          <option value="OK">Oklahoma</option><option value="OR">Oregon</option><option value="PA">Pennsylvania</option>
+          <option value="RI">Rhode Island</option><option value="SC">South Carolina</option><option value="SD">South Dakota</option>
+          <option value="TN">Tennessee</option><option value="TX">Texas</option><option value="UT">Utah</option>
+          <option value="VT">Vermont</option><option value="VA">Virginia</option><option value="WA">Washington</option>
+          <option value="WV">West Virginia</option><option value="WI">Wisconsin</option><option value="WY">Wyoming</option>
+        </select>
+      </div>
+      <button class="btn btn-fire btn-full" onclick="submitStep1()">Start My Credit Fix</button>
+    </div>
+      </div><!-- /step-content -->
+    </div><!-- /step-layout -->
+  </div>
+
+  <!-- STEP 2: Upload -->
+  <div class="step-panel" id="step-2">
+    <div class="step-layout">
+      <div class="step-sidebar">
+        <div class="bitmoji-figure"><div class="bm-head"><div class="bm-eyes"><div class="bm-eye"></div><div class="bm-eye"></div></div></div><div class="bm-hoodie"></div><div class="bm-arms pose-reading"><div class="bm-arm-l"><div class="bm-hand-l"></div></div><div class="bm-arm-r"><div class="bm-hand-r"></div></div></div><div class="bm-jeans"></div><div class="bm-shoes"><div class="bm-shoe"></div><div class="bm-shoe"></div></div></div>
+        <div class="bitmoji-label">Reviewing</div>
+      </div>
+      <div class="step-content">
+    <div class="card">
+      <div class="card-title">Upload Your Report</div>
+      <div class="card-sub">Upload your credit report (PDF or TXT). We'll scan it and find everything to dispute.</div>
+      <div style="background:rgba(0,240,255,.04);border:1px solid rgba(0,240,255,.12);border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:13px;line-height:1.6">
+        <strong style="color:var(--neon-blue)">Don't have your report yet?</strong> Get all 3 bureau reports free at
+        <a href="https://www.annualcreditreport.com" target="_blank" rel="noopener" style="color:var(--neon-yellow);text-decoration:underline;font-weight:700">AnnualCreditReport.com</a>
+        — the only federally authorized source. Download as PDF, then upload here.
+      </div>
+      <div class="upload-zone" id="uploadZone">
+        <input type="file" class="upload-input" id="fileInput" multiple accept=".pdf,.txt,.png,.jpg,.jpeg">
+        <div class="upload-icon">&#128196;</div>
+        <div class="upload-title">Drop your credit report here</div>
+        <div class="upload-sub">PDF, TXT, or image &middot; Up to 16 MB</div>
+      </div>
+      <div class="uploaded-files" id="uploadedFiles"></div>
+      <button class="btn btn-fire btn-full" id="btnUpload" onclick="submitStep2()" disabled style="margin-top:16px">Scan My Report</button>
+    </div>
+      </div><!-- /step-content -->
+    </div><!-- /step-layout -->
+  </div>
+
+  <!-- STEP 3: Review -->
+  <div class="step-panel" id="step-3">
+    <div class="step-layout">
+      <div class="step-sidebar">
+        <div class="bitmoji-figure"><div class="bm-head"><div class="bm-eyes"><div class="bm-eye"></div><div class="bm-eye"></div></div></div><div class="bm-hoodie"></div><div class="bm-arms pose-pointing"><div class="bm-arm-l"><div class="bm-hand-l"></div></div><div class="bm-arm-r"><div class="bm-hand-r"></div></div></div><div class="bm-jeans"></div><div class="bm-shoes"><div class="bm-shoe"></div><div class="bm-shoe"></div></div></div>
+        <div class="bitmoji-label">Targeting</div>
+      </div>
+      <div class="step-content">
+    <div class="card">
+      <div class="card-title">Review Disputes</div>
+      <div class="card-sub">We found these issues in your report. Select the ones to dispute.</div>
+      <div id="parseSummary"></div>
+      <div id="disputeItemsList"></div>
+      <div class="add-item-wrap">
+        <select id="addItemType">
+          <option value="collections">Collection</option>
+          <option value="late_payments">Late Payment</option>
+          <option value="wrong_addresses">Wrong Address</option>
+          <option value="unknown_accounts">Unknown Account</option>
+          <option value="aged_debt">Aged Debt</option>
+          <option value="mov_demand">MOV Demand (after bureau responds)</option>
+        </select>
+        <input class="form-input" id="addItemText" placeholder="Add a custom dispute item...">
+        <button class="btn btn-ghost" onclick="addCustomItem()">Add</button>
+      </div>
+      <button class="btn btn-fire btn-full" style="margin-top:20px" onclick="submitStep3()">Generate My Letters</button>
+    </div>
+      </div><!-- /step-content -->
+    </div><!-- /step-layout -->
+  </div>
+
+  <!-- STEP 4: Pay -->
+  <div class="step-panel" id="step-4">
+    <div class="step-layout">
+      <div class="step-sidebar">
+        <div class="bitmoji-figure"><div class="bm-head"><div class="bm-eyes"><div class="bm-eye"></div><div class="bm-eye"></div></div></div><div class="bm-hoodie"></div><div class="bm-arms pose-reviewing"><div class="bm-arm-l"><div class="bm-hand-l"></div></div><div class="bm-arm-r"><div class="bm-hand-r"></div></div></div><div class="bm-jeans"></div><div class="bm-shoes"><div class="bm-shoe"></div><div class="bm-shoe"></div></div></div>
+        <div class="bitmoji-label">Almost There</div>
+      </div>
+      <div class="step-content">
+    <div class="card">
+      <div class="card-title">Unlock Your Letters</div>
+      <div class="card-sub">Your dispute letters are ready. Choose how to pay.</div>
+      <div class="price-display">
+        <div class="price-amount">$19.99</div>
+        <div class="price-label">One-time payment &middot; No subscription</div>
+        <ul class="price-includes">
+          <li>Personalized dispute letters for all 3 bureaus</li>
+          <li id="letterCountLabel">Multiple letter variants per dispute type</li>
+          <li>FCRA/FDCPA legal citations included</li>
+          <li>Print-ready &mdash; just sign and mail</li>
+          <li>Confirmation email with next steps</li>
+        </ul>
+      </div>
+
+      <div class="pay-methods">
+        <div class="pay-method" onclick="selectPayMethod('card', this)">
+          <span class="pay-method-icon">&#128179;</span>
+          <div class="pay-method-name">Card</div>
+          <div class="pay-method-tag">Visa, Mastercard, etc.</div>
+          <div class="pay-method-detail">
+            Secure checkout powered by Stripe.
+          </div>
+        </div>
+        <div class="pay-method" onclick="selectPayMethod('cashapp', this)">
+          <span class="pay-method-icon">&#128181;</span>
+          <div class="pay-method-name">Cash App</div>
+          <div class="pay-method-tag">Send $19.99</div>
+          <div class="pay-method-detail">
+            Send <strong>$19.99</strong> to:
+            <input class="pay-tag-input" value="$AELabsCreditFix" readonly onclick="copyPayTag(this)" title="Click to copy">
+            <span style="font-size:11px;color:var(--muted);display:block;margin-top:4px">Click to copy &middot; Include your email in the note</span>
+          </div>
+        </div>
+        <div class="pay-method" onclick="selectPayMethod('chime', this)">
+          <span class="pay-method-icon">&#127974;</span>
+          <div class="pay-method-name">Chime</div>
+          <div class="pay-method-tag">Send $19.99</div>
+          <div class="pay-method-detail">
+            Send <strong>$19.99</strong> to:
+            <input class="pay-tag-input" value="$AELabsPay" readonly onclick="copyPayTag(this)" title="Click to copy">
+            <span style="font-size:11px;color:var(--muted);display:block;margin-top:4px">Click to copy &middot; Include your email in the note</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pay-confirm-note" id="manualPayNote">
+        After sending payment, click <strong>"I Sent Payment"</strong> below. We'll verify and unlock your letters within minutes.
+      </div>
+
+      <button class="btn btn-fire btn-full" id="btnPay" onclick="submitStep4()" style="display:none">Pay $19.99 with Card</button>
+      <button class="btn btn-fire btn-full" id="btnManualPay" onclick="confirmManualPay()" style="display:none">I Sent $19.99 &mdash; Unlock My Letters</button>
+      <p style="text-align:center;font-size:11px;color:var(--muted);margin-top:12px">Your data is encrypted and never stored.</p>
+    </div>
+      </div><!-- /step-content -->
+    </div><!-- /step-layout -->
+  </div>
+
+  <!-- STEP 5: Letters / Confirmation -->
+  <div class="step-panel" id="step-5">
+    <div class="step-layout">
+      <div class="step-sidebar">
+        <div class="bitmoji-figure"><div class="bm-head"><div class="bm-eyes"><div class="bm-eye"></div><div class="bm-eye"></div></div></div><div class="bm-hoodie"></div><div class="bm-arms pose-celebrating"><div class="bm-arm-l"><div class="bm-hand-l"></div></div><div class="bm-arm-r"><div class="bm-hand-r"></div></div></div><div class="bm-jeans"></div><div class="bm-shoes"><div class="bm-shoe"></div><div class="bm-shoe"></div></div></div>
+        <div class="bitmoji-label">Let's Go!</div>
+      </div>
+      <div class="step-content">
+    <div class="confirm-hero">
+      <div class="confirm-badge">&#10003;</div>
+      <div class="confirm-title">You're All Set</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:6px">CONFIRMATION</div>
+      <div class="confirm-code" id="confirmCode">---</div>
+    </div>
+
+    <!-- 30-Day Countdown Timer -->
+    <div class="countdown-card" id="countdownCard" style="display:none">
+      <div class="countdown-label">Bureau Response Deadline</div>
+      <div class="countdown-display">
+        <div class="countdown-unit"><div class="countdown-num" id="cdDays">30</div><div class="countdown-lbl">Days</div></div>
+        <div class="countdown-unit"><div class="countdown-num" id="cdHours">00</div><div class="countdown-lbl">Hours</div></div>
+        <div class="countdown-unit"><div class="countdown-num" id="cdMins">00</div><div class="countdown-lbl">Min</div></div>
+        <div class="countdown-unit"><div class="countdown-num" id="cdSecs">00</div><div class="countdown-lbl">Sec</div></div>
+      </div>
+      <div class="countdown-bar"><div class="countdown-fill" id="cdBar" style="width:100%"></div></div>
+      <div class="countdown-note" id="cdNote">Bureaus must respond within 30 days of receiving your dispute. Mail your letters today to start the clock.</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Your Dispute Letters</div>
+      <div class="card-sub">Print each letter, sign it, and mail via certified mail to the address shown.</div>
+
+      <div class="filter-tabs" id="filterTabs"></div>
+      <div id="lettersContainer"></div>
+
+      <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap" class="no-print">
+        <button class="btn btn-fire" onclick="window.print()">&#128424; Print All Letters</button>
+        <button class="btn btn-ghost" onclick="downloadAllLetters()">&#128190; Download All as Text</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Next Steps</div>
+      <div style="font-size:14px;line-height:1.8;color:rgba(240,237,232,.8)">
+        <strong>1.</strong> Print every letter above (or download the text file)<br>
+        <strong>2.</strong> Sign and date each letter<br>
+        <strong>3.</strong> Mail via <strong>certified mail with return receipt</strong> to each bureau address<br>
+        <strong>4.</strong> Keep your certified mail receipts — this is your proof<br>
+        <strong>5.</strong> Wait 30-45 days for bureau responses<br>
+        <strong>6.</strong> If they don't respond or verify, file a CFPB complaint
+      </div>
+    </div>
+
+    <!-- CREDIT BUILDING PANEL -->
+    <div class="card no-print">
+      <div class="card-title" style="color:var(--neon-yellow);text-shadow:0 0 12px rgba(238,255,0,.3)">Keep Building</div>
+      <div class="card-sub">Disputes are just one lever. Here are three more ways to move your score.</div>
+
+      <!-- Lever 1: Remove Bad (done) -->
+      <div class="lever-section">
+        <span class="lever-tag remove">Lever 1 — Done</span>
+        <div class="lever-title pink">Remove Negative Items</div>
+        <div class="lever-desc">You just did this. Your dispute letters challenge collections, late payments, and inaccurate info on your report. Once bureaus delete unverifiable items, your score starts recovering immediately. <strong>This alone can move you 30-100+ points.</strong></div>
+      </div>
+
+      <!-- Lever 2: Add Tradelines -->
+      <div class="lever-section">
+        <span class="lever-tag add">Lever 2 — Start Now</span>
+        <div class="lever-title blue">Add Positive Tradelines</div>
+        <div class="lever-desc">Every open account that reports "paid as agreed" adds a positive tradeline to your file. More positive history = higher score. Three ways to do this:</div>
+        <div style="font-size:13px;color:rgba(232,236,240,.7);line-height:1.8;margin-bottom:14px;padding-left:12px">
+          <strong style="color:var(--neon-blue)">Secured credit card</strong> — Put down a $200 deposit, get a $200 credit line. Use it for one small recurring bill (streaming, phone). Pay the full balance every month. After 6-12 months you'll graduate to an unsecured card and get your deposit back.<br>
+          <strong style="color:var(--neon-blue)">Credit builder loan</strong> — You make monthly payments into a locked savings account. Once the loan is paid off, you get the money. Every payment reports to all 3 bureaus as an installment loan paid on time.<br>
+          <strong style="color:var(--neon-blue)">Authorized user</strong> — If a family member with good credit adds you to their card, their payment history can appear on your report. No risk to them if you never use the card.
+        </div>
+        <div class="partner-grid">
+          <a href="https://www.capitalone.com/credit-cards/secured/" target="_blank" rel="noopener" class="partner-card">
+            <span class="partner-icon">&#127974;</span>
+            <div class="partner-name">Capital One Secured</div>
+            <div class="partner-desc">$0 annual fee, $200 min deposit, reports to all 3 bureaus</div>
+          </a>
+          <a href="https://www.discover.com/credit-cards/secured/" target="_blank" rel="noopener" class="partner-card">
+            <span class="partner-icon">&#128179;</span>
+            <div class="partner-name">Discover it Secured</div>
+            <div class="partner-desc">2% cash back, $200 min deposit, auto-review for upgrade</div>
+          </a>
+          <a href="https://www.self.inc/" target="_blank" rel="noopener" class="partner-card">
+            <span class="partner-icon">&#128176;</span>
+            <div class="partner-name">Self Credit Builder</div>
+            <div class="partner-desc">Credit builder loan from $25/mo, reports to all 3 bureaus</div>
+          </a>
+          <a href="https://www.chime.com/credit-builder/" target="_blank" rel="noopener" class="partner-card">
+            <span class="partner-icon">&#128184;</span>
+            <div class="partner-name">Chime Credit Builder</div>
+            <div class="partner-desc">No credit check, no interest, no fees, reports to all 3</div>
+          </a>
+        </div>
+      </div>
+
+      <!-- Lever 3: Fix Utilization -->
+      <div class="lever-section">
+        <span class="lever-tag fix">Lever 3 — Quick Win</span>
+        <div class="lever-title yellow">Fix Your Utilization</div>
+        <div class="lever-desc">Credit utilization is <strong>30% of your score</strong>. It measures how much of your available credit you're using. Under 30% is good. Under 10% is ideal. This updates every billing cycle — it's the fastest score lever you have.</div>
+        <div style="font-size:13px;color:rgba(232,236,240,.7);line-height:1.8;padding-left:12px;margin-bottom:8px">
+          <strong style="color:var(--neon-yellow)">Pay down balances</strong> — Get every card below 30% of its limit. If your limit is $1,000, keep the balance under $300.<br>
+          <strong style="color:var(--neon-yellow)">Pay before statement closes</strong> — Make a payment a few days before your statement date. The lower balance is what gets reported.<br>
+          <strong style="color:var(--neon-yellow)">Request a limit increase</strong> — Higher limit, same spending = lower utilization. Call your card issuer and ask. Most will do a soft pull.<br>
+          <strong style="color:var(--neon-yellow)">Balance transfer</strong> — Move high-interest debt to a 0% APR card. Consolidates payments and can lower per-card utilization.
+        </div>
+      </div>
+
+      <!-- Lever 4: Build from Zero -->
+      <div class="lever-section">
+        <span class="lever-tag build">Starting From Zero?</span>
+        <div class="lever-title green">The One-Card Strategy</div>
+        <div class="lever-desc">If you have no credit history or you're rebuilding from scratch, you only need one card and one bill. Here's the play:</div>
+        <div style="background:rgba(0,255,136,.03);border:1px solid rgba(0,255,136,.12);border-radius:10px;padding:18px;font-size:13px;line-height:1.8;color:rgba(232,236,240,.75);margin-bottom:14px">
+          <strong style="color:var(--green)">1.</strong> Open a secured card (Capital One, Discover, or Chime above)<br>
+          <strong style="color:var(--green)">2.</strong> Put one small recurring bill on it — your phone, a streaming service, anything under $30<br>
+          <strong style="color:var(--green)">3.</strong> Set up autopay to pay the full balance every month<br>
+          <strong style="color:var(--green)">4.</strong> Don't use the card for anything else<br>
+          <strong style="color:var(--green)">5.</strong> Wait 6 months. You'll have a score and positive history.
+        </div>
+        <div class="lever-desc">That's it. One card, one bill, autopay. In 6-12 months you'll have enough history to qualify for better cards, auto loans, and apartments. The secured deposit comes back when you upgrade.</div>
+      </div>
+
+      <!-- Educational callout -->
+      <div class="edu-callout">
+        <strong>More available credit is not a bad thing when managed correctly.</strong> A common myth is that opening a new card hurts your score. The hard inquiry is a small, temporary dip (5-10 points for a few months). But the new tradeline and increased available credit actually help your score long-term by lowering utilization and adding positive payment history. The key is discipline: get the card, use it for one bill, pay it every month, and leave it alone. That's how people go from no score to 700+ in under a year.
+      </div>
+
+      <!-- Free report link -->
+      <div style="text-align:center;margin-top:20px;font-size:13px;color:var(--muted)">
+        Check your progress for free at <a href="https://www.annualcreditreport.com" target="_blank" rel="noopener" style="color:var(--neon-yellow);text-decoration:underline;font-weight:700">AnnualCreditReport.com</a>
+      </div>
+    </div>
+
+    <div class="status-lookup no-print">
+      <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:10px">Check Status</div>
+      <div class="status-inline">
+        <input class="form-input" id="statusInput" placeholder="Enter confirmation code (AE-XXXXXXXX)">
+        <button class="btn btn-ghost" onclick="checkStatus()">Check</button>
+      </div>
+      <div id="statusResult" style="margin-top:10px;font-size:13px"></div>
+    </div>
+      </div><!-- /step-content -->
+    </div><!-- /step-layout -->
+  </div>
+
+</main>
+
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loader"></div>
+  <div class="loading-text" id="loadingText">Processing...</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── STATE ───────────────────────────────────────────────────────────────────
+let currentStep = 1;
+let disputeItems = [];
+let customItems = [];
+let letterData = [];
+let activeFilter = 'all';
+
+// ─── NAVIGATION ──────────────────────────────────────────────────────────────
+function goToStep(step) {
+  currentStep = step;
+  document.querySelectorAll('.step-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('step-' + step).classList.add('active');
+  document.querySelectorAll('.progress-step').forEach(s => {
+    const n = parseInt(s.dataset.step);
+    s.classList.remove('active','done');
+    if (n < step) s.classList.add('done');
+    else if (n === step) s.classList.add('active');
+  });
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+// ─── UTILS ───────────────────────────────────────────────────────────────────
+function showLoading(text) {
+  document.getElementById('loadingText').textContent = text || 'Processing...';
+  document.getElementById('loadingOverlay').classList.add('show');
+}
+function hideLoading() {
+  document.getElementById('loadingOverlay').classList.remove('show');
+}
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + (type || '') + ' show';
+  setTimeout(() => t.classList.remove('show'), 4000);
+}
+async function api(url, opts) {
+  const res = await fetch(url, opts);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Request failed');
+  return data;
+}
+
+// ─── STEP 1 ──────────────────────────────────────────────────────────────────
+async function submitStep1() {
+  const name = document.getElementById('inputName').value.trim();
+  const email = document.getElementById('inputEmail').value.trim();
+  const phone = document.getElementById('inputPhone').value.trim();
+  const state = document.getElementById('inputState').value;
+  if (!name || !email) return showToast('Name and email are required', 'error');
+  if (!state) return showToast('Please select your state — it adds state law citations to your letters', 'error');
+  showLoading('Starting your session...');
+  try {
+    await api('/api/start', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name, email, phone, state})});
+    hideLoading();
+    goToStep(2);
+  } catch(e) { hideLoading(); showToast(e.message, 'error'); }
+}
+
+// ─── STEP 2 ──────────────────────────────────────────────────────────────────
+const fileInput = document.getElementById('fileInput');
+const uploadZone = document.getElementById('uploadZone');
+let selectedFiles = [];
+
+fileInput.addEventListener('change', (e) => {
+  selectedFiles = Array.from(e.target.files);
+  renderFileList();
+});
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault(); uploadZone.classList.remove('drag-over');
+  selectedFiles = Array.from(e.dataTransfer.files);
+  renderFileList();
+});
+
+function renderFileList() {
+  const c = document.getElementById('uploadedFiles');
+  c.innerHTML = selectedFiles.map(f =>
+    `<div class="file-item"><span class="file-name">${f.name}</span><span style="font-size:11px;color:var(--muted)">${(f.size/1024).toFixed(0)} KB</span><span class="file-check">&#10003;</span></div>`
+  ).join('');
+  document.getElementById('btnUpload').disabled = selectedFiles.length === 0;
+}
+
+async function submitStep2() {
+  if (!selectedFiles.length) return showToast('Please upload at least one file', 'error');
+  showLoading('Scanning your credit report...');
+  const fd = new FormData();
+  selectedFiles.forEach((f, i) => fd.append('file' + i, f));
+  try {
+    const data = await api('/api/upload', {method:'POST', body: fd});
+    hideLoading();
+    disputeItems = data.dispute_items || [];
+    renderDisputeReview(data.parsed_disputes || {});
+    goToStep(3);
+  } catch(e) { hideLoading(); showToast(e.message, 'error'); }
+}
+
+// ─── STEP 3 ──────────────────────────────────────────────────────────────────
+const GILMORE_ORDER = ['wrong_addresses','unknown_accounts','collections','aged_debt','late_payments','mov_demand'];
+const GILMORE_PHASES = {wrong_addresses:'Phase 1: Personal Info',unknown_accounts:'Phase 2: Inquiries',collections:'Phase 3: Collections',aged_debt:'Phase 4: Charge-Offs',late_payments:'Phase 5: Late Payments',mov_demand:'Follow-Up: MOV'};
+
+function renderDisputeReview(parsed) {
+  const types = Object.keys(parsed).sort((a,b) => (GILMORE_ORDER.indexOf(a)===-1?99:GILMORE_ORDER.indexOf(a)) - (GILMORE_ORDER.indexOf(b)===-1?99:GILMORE_ORDER.indexOf(b)));
+  const totalItems = Object.values(parsed).reduce((s, v) => s + v.items.length, 0);
+
+  let summaryHtml = '<div class="parse-summary"><h3>Scan Complete — Gilmore Order</h3>';
+  if (types.length === 0) {
+    summaryHtml += '<p style="font-size:14px;color:var(--muted)">No issues auto-detected. You can add dispute items manually below.</p>';
+  } else {
+    summaryHtml += `<p style="font-size:14px;margin-bottom:10px">${totalItems} potential issue${totalItems!==1?'s':''} found across ${types.length} categor${types.length!==1?'ies':'y'}. Ordered for maximum impact.</p>`;
+    types.forEach(t => {
+      summaryHtml += `<span class="parse-stat">${GILMORE_PHASES[t]||parsed[t].label}: ${parsed[t].items.length}</span>`;
+    });
+  }
+  summaryHtml += '</div>';
+  document.getElementById('parseSummary').innerHTML = summaryHtml;
+
+  // Sort dispute items by Gilmore order
+  disputeItems.sort((a,b) => {
+    const ai = GILMORE_ORDER.indexOf(a.type); const bi = GILMORE_ORDER.indexOf(b.type);
+    return (ai===-1?99:ai) - (bi===-1?99:bi);
+  });
+  const listEl = document.getElementById('disputeItemsList');
+  listEl.innerHTML = '';
+  disputeItems.forEach((item, i) => {
+    const div = document.createElement('div');
+    div.className = 'dispute-item selected';
+    div.dataset.index = i;
+    div.innerHTML = `<div class="dispute-check">&#10003;</div><div class="dispute-text">${item.text || item}</div><div class="dispute-type-badge">${item.label || item.type || 'Unknown'}</div>`;
+    div.onclick = () => {
+      div.classList.toggle('selected');
+      div.querySelector('.dispute-check').innerHTML = div.classList.contains('selected') ? '&#10003;' : '';
+    };
+    listEl.appendChild(div);
+  });
+}
+
+function addCustomItem() {
+  const text = document.getElementById('addItemText').value.trim();
+  const type = document.getElementById('addItemType').value;
+  if (!text) return;
+  const labels = {collections:'Collection',late_payments:'Late Payment',wrong_addresses:'Wrong Address',unknown_accounts:'Unknown Account',aged_debt:'Aged Debt',mov_demand:'MOV Demand'};
+  const item = {type, label: labels[type], text};
+  customItems.push(item);
+
+  const listEl = document.getElementById('disputeItemsList');
+  const div = document.createElement('div');
+  div.className = 'dispute-item selected custom';
+  div.innerHTML = `<div class="dispute-check">&#10003;</div><div class="dispute-text">${text}</div><div class="dispute-type-badge">${labels[type]}</div>`;
+  div.onclick = () => {
+    div.classList.toggle('selected');
+    div.querySelector('.dispute-check').innerHTML = div.classList.contains('selected') ? '&#10003;' : '';
+  };
+  listEl.appendChild(div);
+  document.getElementById('addItemText').value = '';
+}
+
+async function submitStep3() {
+  const selected = [];
+  document.querySelectorAll('.dispute-item.selected').forEach(el => {
+    const idx = parseInt(el.dataset.index);
+    if (!isNaN(idx) && disputeItems[idx]) selected.push(disputeItems[idx]);
+  });
+  const selectedCustom = [];
+  document.querySelectorAll('.dispute-item.selected.custom').forEach(el => {
+    const text = el.querySelector('.dispute-text').textContent;
+    const badge = el.querySelector('.dispute-type-badge').textContent;
+    const typeMap = {'Collection':'collections','Late Payment':'late_payments','Wrong Address':'wrong_addresses','Unknown Account':'unknown_accounts','Aged Debt':'aged_debt'};
+    selectedCustom.push({type: typeMap[badge]||'unknown_accounts', label: badge, text});
+  });
+  if (selected.length === 0 && selectedCustom.length === 0) return showToast('Select at least one dispute item', 'error');
+  showLoading('Generating your dispute letters...');
+  try {
+    const data = await api('/api/review', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({items: selected, custom_items: selectedCustom})});
+    hideLoading();
+    document.getElementById('letterCountLabel').textContent = `${data.letter_count} personalized dispute letters generated`;
+    showToast(`${data.letter_count} letters ready!`, 'success');
+    goToStep(4);
+  } catch(e) { hideLoading(); showToast(e.message, 'error'); }
+}
+
+// ─── STEP 4 ──────────────────────────────────────────────────────────────────
+let selectedPayMethod = null;
+
+function selectPayMethod(method, el) {
+  selectedPayMethod = method;
+  document.querySelectorAll('.pay-method').forEach(m => m.classList.remove('selected'));
+  el.classList.add('selected');
+  const btnCard = document.getElementById('btnPay');
+  const btnManual = document.getElementById('btnManualPay');
+  const manualNote = document.getElementById('manualPayNote');
+  if (method === 'card') {
+    btnCard.style.display = '';
+    btnManual.style.display = 'none';
+    manualNote.classList.remove('show');
+  } else {
+    btnCard.style.display = 'none';
+    btnManual.style.display = '';
+    manualNote.classList.add('show');
+  }
+}
+
+function copyPayTag(input) {
+  navigator.clipboard.writeText(input.value).then(() => showToast('Copied: ' + input.value, 'success'));
+  input.select();
+}
+
+async function confirmManualPay() {
+  const btn = document.getElementById('btnManualPay');
+  btn.disabled = true;
+  showLoading('Verifying payment...');
+  try {
+    const data = await api('/api/manual-pay', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({method: selectedPayMethod})});
+    hideLoading();
+    showToast('Payment received! Loading your letters...', 'success');
+    await loadLetters();
+    goToStep(5);
+  } catch(e) { hideLoading(); showToast(e.message, 'error'); btn.disabled = false; }
+}
+
+async function submitStep4() {
+  const btn = document.getElementById('btnPay');
+  btn.disabled = true;
+  showLoading('Connecting to payment...');
+  try {
+    const data = await api('/api/create-checkout', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'});
+    hideLoading();
+    if (data.dev_mode) {
+      showToast('Dev mode: payment skipped', 'success');
+      await loadLetters();
+      goToStep(5);
+    } else if (data.checkout_url) {
+      window.location.href = data.checkout_url;
+    }
+  } catch(e) { hideLoading(); showToast(e.message, 'error'); btn.disabled = false; }
+}
+
+// ─── STEP 5 ──────────────────────────────────────────────────────────────────
+async function loadLetters() {
+  try {
+    const data = await api('/api/letters');
+    letterData = data.letters || [];
+    document.getElementById('confirmCode').textContent = data.confirmation || '---';
+    renderFilterTabs(data.dispute_types || []);
+    renderLetters(letterData);
+    startCountdown();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+// ─── 30-DAY COUNTDOWN TIMER ─────────────────────────────────────────────────
+let countdownInterval = null;
+function startCountdown() {
+  const card = document.getElementById('countdownCard');
+  card.style.display = '';
+  // Deadline = now + 30 days (when user should have mailed letters)
+  const now = new Date();
+  const deadline = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  // Save deadline to localStorage so it persists across page loads
+  const stored = localStorage.getItem('ae_countdown_deadline');
+  const dl = stored ? new Date(stored) : deadline;
+  if (!stored) localStorage.setItem('ae_countdown_deadline', deadline.toISOString());
+  const totalMs = 30 * 24 * 60 * 60 * 1000;
+
+  function tick() {
+    const remaining = dl.getTime() - Date.now();
+    if (remaining <= 0) {
+      document.getElementById('cdDays').textContent = '00';
+      document.getElementById('cdHours').textContent = '00';
+      document.getElementById('cdMins').textContent = '00';
+      document.getElementById('cdSecs').textContent = '00';
+      document.getElementById('cdBar').style.width = '0%';
+      document.getElementById('cdNote').textContent = 'Deadline reached. If the bureau has not responded, send your 30-day follow-up letter.';
+      document.getElementById('cdNote').style.color = 'var(--neon-pink)';
+      clearInterval(countdownInterval);
+      return;
+    }
+    const d = Math.floor(remaining / 86400000);
+    const h = Math.floor((remaining % 86400000) / 3600000);
+    const m = Math.floor((remaining % 3600000) / 60000);
+    const s = Math.floor((remaining % 60000) / 1000);
+    document.getElementById('cdDays').textContent = String(d).padStart(2,'0');
+    document.getElementById('cdHours').textContent = String(h).padStart(2,'0');
+    document.getElementById('cdMins').textContent = String(m).padStart(2,'0');
+    document.getElementById('cdSecs').textContent = String(s).padStart(2,'0');
+    const pct = Math.max(0, (remaining / totalMs) * 100);
+    document.getElementById('cdBar').style.width = pct + '%';
+    // Change note based on time remaining
+    if (d <= 5) {
+      document.getElementById('cdNote').textContent = 'Almost there. Bureau deadline is approaching. Prepare your follow-up letter.';
+      document.getElementById('cdNote').style.color = 'var(--neon-yellow)';
+    }
+  }
+  tick();
+  countdownInterval = setInterval(tick, 1000);
+}
+
+function renderFilterTabs(types) {
+  const labels = {collections:'Collections',late_payments:'Late Payments',wrong_addresses:'Wrong Addresses',unknown_accounts:'Unknown Accounts',aged_debt:'Aged Debt',mov_demand:'MOV Demands'};
+  let html = '<button class="filter-tab active" onclick="filterLetters(\'all\',this)">All</button>';
+  types.forEach(t => {
+    html += `<button class="filter-tab" onclick="filterLetters('${t}',this)">${labels[t]||t}</button>`;
+  });
+  document.getElementById('filterTabs').innerHTML = html;
+}
+
+function filterLetters(type, btn) {
+  activeFilter = type;
+  document.querySelectorAll('.filter-tab').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  const filtered = type === 'all' ? letterData : letterData.filter(l => l.type === type);
+  renderLetters(filtered);
+}
+
+function renderLetters(letters) {
+  const c = document.getElementById('lettersContainer');
+  if (!letters.length) { c.innerHTML = '<p style="color:var(--muted)">No letters to display.</p>'; return; }
+
+  // Group by type
+  const grouped = {};
+  letters.forEach(l => {
+    if (!grouped[l.type]) grouped[l.type] = {label: l.type_label, letters: []};
+    grouped[l.type].letters.push(l);
+  });
+
+  let html = '';
+  for (const [type, group] of Object.entries(grouped)) {
+    html += `<div class="letter-type-group"><div class="letter-type-title">${group.label}</div>`;
+    group.letters.forEach((l, i) => {
+      const id = `letter_${type}_${i}`;
+      html += `<div class="letter-card">
+        <div class="letter-header">
+          <div class="letter-bureau">${l.bureau}</div>
+          <div><span class="letter-variant">Variant ${l.variant}</span> <span style="font-size:11px;color:var(--muted);margin-left:8px">${l.title}</span></div>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Mail to: ${l.bureau_address}</div>
+        <div class="letter-body" id="${id}">${escHtml(l.body)}</div>
+        <div class="letter-actions">
+          <button class="btn btn-ghost" onclick="copyLetter('${id}')">Copy</button>
+          <button class="btn btn-ghost" onclick="printSingleLetter('${id}')">Print</button>
+        </div>
+      </div>`;
+    });
+    html += '</div>';
+  }
+  c.innerHTML = html;
+}
+
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function copyLetter(id) {
+  const text = document.getElementById(id).textContent;
+  navigator.clipboard.writeText(text).then(() => showToast('Letter copied!', 'success'));
+}
+
+function printSingleLetter(id) {
+  const text = document.getElementById(id).textContent;
+  const w = window.open('', '_blank');
+  w.document.write('<html><head><title>Dispute Letter</title><style>body{font-family:serif;font-size:14px;line-height:1.8;padding:40px;white-space:pre-wrap}</style></head><body>' + escHtml(text) + '</body></html>');
+  w.document.close();
+  w.print();
+}
+
+function downloadAllLetters() {
+  let text = '';
+  letterData.forEach((l, i) => {
+    text += '='.repeat(70) + '\n';
+    text += `LETTER ${i+1}: ${l.title}\n`;
+    text += `Bureau: ${l.bureau} | Address: ${l.bureau_address}\n`;
+    text += `Type: ${l.type_label} | Variant: ${l.variant}\n`;
+    text += '='.repeat(70) + '\n\n';
+    text += l.body + '\n\n\n';
+  });
+  const blob = new Blob([text], {type: 'text/plain'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'AE_Credit_Fix_Dispute_Letters.txt';
+  a.click();
+}
+
+// ─── STATUS CHECK ────────────────────────────────────────────────────────────
+async function checkStatus() {
+  const code = document.getElementById('statusInput').value.trim();
+  if (!code) return;
+  try {
+    const data = await api('/api/status/' + encodeURIComponent(code));
+    if (data.found) {
+      document.getElementById('statusResult').innerHTML =
+        `<span style="color:var(--green)">&#10003; Found</span> &mdash; Status: <strong>${data.status}</strong> | Disputes: ${data.dispute_count}`;
+    } else {
+      document.getElementById('statusResult').innerHTML = '<span style="color:var(--fire)">Not found</span>';
+    }
+  } catch(e) {
+    document.getElementById('statusResult').innerHTML = '<span style="color:var(--fire)">Not found</span>';
+  }
+}
+
+// ─── AUTO-LOAD IF RETURNING FROM STRIPE ──────────────────────────────────────
+if (window.location.hash === '#step-5') {
+  document.addEventListener('DOMContentLoaded', async () => {
+    goToStep(5);
+    await loadLetters();
+  });
+}
+
+// ─── BG ATOMS (purple/grey palette) ──────────────────────────────────────────
+(function(){
+  const c = document.getElementById('bgAtoms');
+  const colors = ['rgba(120,60,160,.5)','rgba(100,100,120,.4)','rgba(80,40,100,.5)'];
+  for (let i = 0; i < 12; i++) {
+    const d = document.createElement('div');
+    d.className = 'atom';
+    const size = Math.random() * 180 + 60;
+    d.style.cssText = `width:${size}px;height:${size}px;left:${Math.random()*100}%;background:${colors[i%3]};animation-duration:${Math.random()*18+18}s;animation-delay:${Math.random()*-20}s`;
+    c.appendChild(d);
+  }
+})();
+
+// ─── CHERRY BLOSSOM PETALS (Step 1) ─────────────────────────────────────────
+(function(){
+  const c = document.getElementById('petalContainer');
+  if (!c) return;
+  for (let i = 0; i < 20; i++) {
+    const p = document.createElement('div');
+    p.className = 'petal';
+    const size = Math.random() * 8 + 6;
+    const hue = Math.random() > 0.5 ? 'rgba(220,180,200,.6)' : 'rgba(240,200,210,.4)';
+    p.style.cssText = `width:${size}px;height:${size}px;left:${Math.random()*100}%;background:radial-gradient(ellipse,${hue},rgba(180,140,160,.2));animation-duration:${Math.random()*8+6}s;animation-delay:${Math.random()*-10}s`;
+    c.appendChild(p);
+  }
+})();
+</script>
+</body>
+</html>
