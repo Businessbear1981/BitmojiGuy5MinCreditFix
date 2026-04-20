@@ -16,6 +16,7 @@
 
 import os
 import json
+import hashlib
 import smtplib
 import sqlite3
 from datetime import datetime, timedelta
@@ -82,7 +83,31 @@ def init_ledger():
         );
         CREATE INDEX IF NOT EXISTS idx_alog_sid ON agent_log(session_id);
         CREATE INDEX IF NOT EXISTS idx_alog_agent ON agent_log(agent);
+
+        CREATE TABLE IF NOT EXISTS chain (
+            block_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            prev_hash TEXT NOT NULL,
+            timestamp TEXT NOT NULL,
+            session_id TEXT NOT NULL,
+            action TEXT NOT NULL,
+            data TEXT NOT NULL,
+            block_hash TEXT NOT NULL UNIQUE
+        );
+        CREATE INDEX IF NOT EXISTS idx_chain_sid ON chain(session_id);
     """)
+    # Genesis block if chain is empty
+    row = conn.execute("SELECT COUNT(*) as c FROM chain").fetchone()
+    if row['c'] == 0:
+        prev_hash = '0' * 64
+        timestamp = datetime.utcnow().isoformat()
+        genesis_data = json.dumps({'action': 'genesis', 'message': 'AE Labs Watcher Chain initialized'}, sort_keys=True)
+        raw = f"{prev_hash}|{timestamp}|SYSTEM|genesis|{genesis_data}"
+        genesis_hash = hashlib.sha256(raw.encode()).hexdigest()
+        conn.execute(
+            "INSERT INTO chain (prev_hash, timestamp, session_id, action, data, block_hash) VALUES (?, ?, ?, ?, ?, ?)",
+            (prev_hash, timestamp, 'SYSTEM', 'genesis', genesis_data, genesis_hash)
+        )
+        conn.commit()
     conn.close()
 
 
@@ -96,6 +121,14 @@ def enroll_client(profile):
         dispatch_dt = datetime.utcnow()
         dispatched = dispatch_dt.isoformat()
 
+    # Write enrollment to blockchain
+    _write_block(conn, profile['id'], 'enroll', {
+        'confirmation': profile.get('confirmation', ''),
+        'dispatched_at': dispatched,
+        'day_30_due': (dispatch_dt + timedelta(days=30)).isoformat(),
+        'day_60_due': (dispatch_dt + timedelta(days=60)).isoformat(),
+        'day_90_due': (dispatch_dt + timedelta(days=90)).isoformat(),
+    })
     conn.execute("""
         INSERT OR IGNORE INTO pipeline
         (session_id, confirmation, client_name, client_email, client_phone, state,
@@ -121,14 +154,68 @@ def enroll_client(profile):
     conn.close()
 
 
+def _write_block(conn, session_id, action, data_dict):
+    """Append a block to the hash chain. Each block references the previous block's hash."""
+    prev = conn.execute("SELECT block_hash FROM chain ORDER BY block_id DESC LIMIT 1").fetchone()
+    prev_hash = prev['block_hash'] if prev else '0' * 64
+    timestamp = datetime.utcnow().isoformat()
+    data_str = json.dumps(data_dict, sort_keys=True)
+    raw = f"{prev_hash}|{timestamp}|{session_id}|{action}|{data_str}"
+    block_hash = hashlib.sha256(raw.encode()).hexdigest()
+    conn.execute(
+        "INSERT INTO chain (prev_hash, timestamp, session_id, action, data, block_hash) VALUES (?, ?, ?, ?, ?, ?)",
+        (prev_hash, timestamp, session_id, action, data_str, block_hash)
+    )
+    return block_hash
+
+
 def log_action(session_id, agent, action, detail=''):
     conn = _get_ledger()
     conn.execute(
         "INSERT INTO agent_log (session_id, agent, action, detail, created_at) VALUES (?, ?, ?, ?, ?)",
         (session_id, agent, action, detail, datetime.utcnow().isoformat())
     )
+    # Write to blockchain
+    try:
+        data_dict = json.loads(detail) if detail else {}
+    except (json.JSONDecodeError, TypeError):
+        data_dict = {'detail': detail}
+    data_dict['agent'] = agent
+    _write_block(conn, session_id, action, data_dict)
     conn.commit()
     conn.close()
+
+
+def verify_chain():
+    """Verify the integrity of the entire hash chain. Returns (valid, block_count, errors)."""
+    conn = _get_ledger()
+    blocks = conn.execute("SELECT * FROM chain ORDER BY block_id ASC").fetchall()
+    conn.close()
+    errors = []
+    prev_hash = '0' * 64
+    for block in blocks:
+        b = dict(block)
+        # Verify prev_hash linkage
+        if b['prev_hash'] != prev_hash:
+            errors.append(f"Block {b['block_id']}: prev_hash mismatch — expected {prev_hash[:16]}..., got {b['prev_hash'][:16]}...")
+        # Verify block hash
+        raw = f"{b['prev_hash']}|{b['timestamp']}|{b['session_id']}|{b['action']}|{b['data']}"
+        expected = hashlib.sha256(raw.encode()).hexdigest()
+        if b['block_hash'] != expected:
+            errors.append(f"Block {b['block_id']}: hash mismatch — tampered")
+        prev_hash = b['block_hash']
+    return len(errors) == 0, len(blocks), errors
+
+
+def get_chain(session_id=None, limit=50):
+    """Get chain blocks, optionally filtered by session_id."""
+    conn = _get_ledger()
+    if session_id:
+        rows = conn.execute("SELECT * FROM chain WHERE session_id = ? ORDER BY block_id DESC LIMIT ?", (session_id, limit)).fetchall()
+    else:
+        rows = conn.execute("SELECT * FROM chain ORDER BY block_id DESC LIMIT ?", (limit,)).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
 
 
 def get_pipeline_stats():

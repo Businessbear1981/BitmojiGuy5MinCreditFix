@@ -25,6 +25,17 @@ from cryptography.fernet import Fernet
 import pdfplumber
 import pytesseract
 from PIL import Image
+
+# Configure Tesseract path for Windows
+_tesseract_paths = [
+    r'C:\Program Files\Tesseract-OCR\tesseract.exe',
+    r'C:\Users\sgill\AppData\Local\Programs\Tesseract-OCR\tesseract.exe',
+    os.environ.get('TESSERACT_CMD', ''),
+]
+for _tp in _tesseract_paths:
+    if _tp and os.path.isfile(_tp):
+        pytesseract.pytesseract.tesseract_cmd = _tp
+        break
 from docx import Document as DocxDocument
 from bs4 import BeautifulSoup
 import stripe
@@ -1951,6 +1962,27 @@ def admin_pipeline_queue():
         'agent_60': [dict(r) for r in agents.Agent60.get_queue()],
         'agent_90': [dict(r) for r in agents.Agent90.get_queue()],
     })
+
+
+@app.route('/admin/api/chain')
+@require_admin
+def admin_chain():
+    """View blockchain ledger and verify integrity."""
+    import agents
+    agents.init_ledger()
+    valid, count, errors = agents.verify_chain()
+    blocks = agents.get_chain(limit=50)
+    return jsonify(ok=True, valid=valid, block_count=count, errors=errors, blocks=blocks)
+
+
+@app.route('/admin/api/chain/<session_id>')
+@require_admin
+def admin_chain_by_session(session_id):
+    """View chain blocks for a specific client."""
+    import agents
+    agents.init_ledger()
+    blocks = agents.get_chain(session_id=session_id, limit=100)
+    return jsonify(ok=True, blocks=blocks)
 
 
 # --- Follow-up letters (after payment) ---
