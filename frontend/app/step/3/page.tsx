@@ -59,14 +59,13 @@ export default function Step3Page() {
         <div style={{ flex: 1, display: 'flex' }}>
           <WizardSidebar
             step={3}
-            accentColor="#7F77DD"
             mascotSpeech="The sage climbs every step to earn wisdom. Your 15 letters are aimed with surgical precision."
           />
 
           {/* Main panel */}
           <div style={{
             flex: 1, padding: '2rem',
-            background: 'rgba(8,6,18,0.55)', backdropFilter: 'blur(8px)',
+            background: 'rgba(8,6,18,0.25)',
           }}>
             {/* Step header */}
             <p style={{

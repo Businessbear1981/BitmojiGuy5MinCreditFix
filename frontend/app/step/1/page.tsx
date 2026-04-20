@@ -67,14 +67,13 @@ export default function Step1Page() {
     <SceneLayout preset="warrior">
         <TopNav currentStep={1} />
         <div style={{ flex: 1, display: 'flex' }}>
-          <WizardSidebar step={1} accentColor="#C9A84C" />
+          <WizardSidebar step={1} />
 
           {/* Main panel */}
           <div style={{
             flex: 1,
             padding: '2.5rem',
-            background: 'rgba(12,8,4,0.55)',
-            backdropFilter: 'blur(6px)',
+            background: 'rgba(12,8,4,0.25)',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',

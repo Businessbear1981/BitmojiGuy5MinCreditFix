@@ -53,6 +53,8 @@ def init_db():
             updated_at TEXT NOT NULL,
             name_enc BLOB,
             email_enc BLOB,
+            phone_enc BLOB,
+            referral_source TEXT DEFAULT '',
             profile_enc BLOB,
             follow_up_30_sent INTEGER DEFAULT 0,
             follow_up_60_sent INTEGER DEFAULT 0,
@@ -61,13 +63,24 @@ def init_db():
             follow_up_60_date TEXT,
             follow_up_90_date TEXT,
             purge_after TEXT,
-            initials TEXT
+            initials TEXT,
+            dispute_count INTEGER DEFAULT 0
         );
         CREATE INDEX IF NOT EXISTS idx_conf ON clients(confirmation);
         CREATE INDEX IF NOT EXISTS idx_purge ON clients(purge_after);
         CREATE INDEX IF NOT EXISTS idx_followup ON clients(paid, follow_up_30_sent, follow_up_60_sent, follow_up_90_sent);
         CREATE INDEX IF NOT EXISTS idx_session ON clients(session_id);
     """)
+    # Migrate existing tables — add columns if missing
+    for col, coldef in [('phone_enc', 'BLOB'), ('referral_source', "TEXT DEFAULT ''"),
+                         ('dispute_count', 'INTEGER DEFAULT 0'),
+                         ('dispatched_at', 'TEXT'), ('watcher_subscribed', 'INTEGER DEFAULT 0'),
+                         ('watcher_paid_at', 'TEXT'), ('notify_method', "TEXT DEFAULT ''"),
+                         ('notify_handle_enc', 'BLOB')]:
+        try:
+            conn.execute(f"ALTER TABLE clients ADD COLUMN {col} {coldef}")
+        except sqlite3.OperationalError:
+            pass  # column already exists
     conn.close()
 
 
@@ -90,29 +103,48 @@ def save_client(profile):
 
     name_enc = _encrypt(profile.get('name', ''))
     email_enc = _encrypt(profile.get('email', ''))
+    phone_enc = _encrypt(profile.get('phone', ''))
+    notify_handle_enc = _encrypt(profile.get('notify_handle', ''))
     profile_enc = _encrypt(profile)
+    dispute_count = len(profile.get('dispute_items', []))
 
     conn.execute("""
         INSERT INTO clients (session_id, confirmation, state, status, paid, paid_at,
-                             created_at, updated_at, name_enc, email_enc, profile_enc,
+                             created_at, updated_at, name_enc, email_enc, phone_enc,
+                             referral_source, profile_enc,
                              follow_up_30_date, follow_up_60_date, follow_up_90_date,
-                             purge_after, initials)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                             purge_after, initials, dispute_count,
+                             dispatched_at, watcher_subscribed, watcher_paid_at,
+                             notify_method, notify_handle_enc)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(session_id) DO UPDATE SET
             confirmation=excluded.confirmation, state=excluded.state,
             status=excluded.status, paid=excluded.paid, paid_at=excluded.paid_at,
             updated_at=excluded.updated_at, name_enc=excluded.name_enc,
-            email_enc=excluded.email_enc, profile_enc=excluded.profile_enc,
+            email_enc=excluded.email_enc, phone_enc=excluded.phone_enc,
+            referral_source=excluded.referral_source,
+            profile_enc=excluded.profile_enc,
             follow_up_30_date=excluded.follow_up_30_date,
             follow_up_60_date=excluded.follow_up_60_date,
             follow_up_90_date=excluded.follow_up_90_date,
-            purge_after=excluded.purge_after, initials=excluded.initials
+            purge_after=excluded.purge_after, initials=excluded.initials,
+            dispute_count=excluded.dispute_count,
+            dispatched_at=excluded.dispatched_at,
+            watcher_subscribed=excluded.watcher_subscribed,
+            watcher_paid_at=excluded.watcher_paid_at,
+            notify_method=excluded.notify_method,
+            notify_handle_enc=excluded.notify_handle_enc
     """, (
         profile['id'], profile.get('confirmation'), profile.get('state', ''),
         profile.get('status', 'started'), 1 if profile.get('paid') else 0,
         profile.get('paid_at'), profile.get('created_at', now), now,
-        name_enc, email_enc, profile_enc,
-        fu30, fu60, fu90, purge, (profile.get('name', '??')[:2]).upper()
+        name_enc, email_enc, phone_enc,
+        profile.get('referral_source', ''), profile_enc,
+        fu30, fu60, fu90, purge, (profile.get('name', '??')[:2]).upper(),
+        dispute_count,
+        profile.get('dispatched_at'), 1 if profile.get('watcher_subscribed') else 0,
+        profile.get('watcher_paid_at'), profile.get('notify_method', ''),
+        notify_handle_enc
     ))
     conn.commit()
     conn.close()
@@ -144,15 +176,27 @@ def load_client_by_confirmation(code):
 
 
 def get_all_clients_admin():
-    """Get all clients for admin dashboard (no PII)."""
+    """Get all clients for admin dashboard with decrypted PII."""
     conn = get_db()
     rows = conn.execute("""
         SELECT session_id, confirmation, state, status, paid, paid_at, created_at,
-               updated_at, initials, follow_up_30_sent, follow_up_60_sent, follow_up_90_sent
+               updated_at, initials, name_enc, email_enc, phone_enc, referral_source,
+               dispute_count, follow_up_30_sent, follow_up_60_sent, follow_up_90_sent
         FROM clients ORDER BY created_at DESC
     """).fetchall()
     conn.close()
-    return [dict(r) for r in rows]
+    results = []
+    for r in rows:
+        entry = dict(r)
+        # Decrypt PII for admin view
+        for field, enc_field in [('name', 'name_enc'), ('email', 'email_enc'), ('phone', 'phone_enc')]:
+            try:
+                entry[field] = _decrypt(r[enc_field]) if r[enc_field] else ''
+            except Exception:
+                entry[field] = ''
+            del entry[enc_field]
+        results.append(entry)
+    return results
 
 
 def get_due_followups(day):
@@ -222,13 +266,20 @@ def get_stats():
                SUM(CASE WHEN follow_up_90_sent = 1 THEN 1 ELSE 0 END) as fu90
         FROM clients
     """).fetchone()
+    # Referral source breakdown
+    ref_rows = conn.execute("""
+        SELECT referral_source, COUNT(*) as count
+        FROM clients WHERE referral_source IS NOT NULL AND referral_source != ''
+        GROUP BY referral_source ORDER BY count DESC
+    """).fetchall()
     conn.close()
     return {
         'total': row['total'] or 0,
         'paid': row['paid'] or 0,
         'pending': row['pending'] or 0,
-        'revenue': (row['paid'] or 0) * 19.99,
+        'revenue': (row['paid'] or 0) * 24.99,
         'fu30': row['fu30'] or 0,
         'fu60': row['fu60'] or 0,
         'fu90': row['fu90'] or 0,
+        'referral_sources': {r['referral_source']: r['count'] for r in ref_rows},
     }

@@ -55,14 +55,13 @@ export default function Step4Page() {
         <div style={{ flex: 1, display: 'flex' }}>
           <WizardSidebar
             step={4}
-            accentColor="#EF9F27"
             mascotSpeech="The raked sand holds the shape of your intention. One payment. The earth records it."
           />
 
           {/* Main panel */}
           <div style={{
             flex: 1, padding: '2rem',
-            background: 'rgba(14,10,4,0.55)', backdropFilter: 'blur(8px)',
+            background: 'rgba(14,10,4,0.25)',
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
           }}>
             {/* Payment card */}

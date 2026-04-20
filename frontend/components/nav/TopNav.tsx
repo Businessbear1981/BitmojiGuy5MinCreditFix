@@ -2,7 +2,8 @@
 
 import { useShojiNav } from '@/lib/shojiNav'
 
-const STEP_COLORS = ['#C9A84C', '#1D9E75', '#7F77DD', '#EF9F27', '#5DCAA5']
+const STEP_COLORS = ['#C9A84C', '#1D9E75', '#7F77DD', '#EF9F27', '#5DCAA5', '#D94A3B', '#8CB4FF']
+const STEP_ROUTES = ['/map', '/dojo', '/koi-pond', '/garden', '/stairway', '/gate', '/watcher']
 
 interface TopNavProps {
   currentStep?: number
@@ -59,7 +60,7 @@ export function TopNav({ currentStep }: TopNavProps) {
       {/* CENTER — step dots (only when currentStep exists) */}
       {currentStep != null && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {[1, 2, 3, 4, 5].map((n) => {
+          {[1, 2, 3, 4, 5, 6, 7].map((n) => {
             const isDone = n < currentStep
             const isCurrent = n === currentStep
             const color = STEP_COLORS[n - 1]
@@ -67,7 +68,7 @@ export function TopNav({ currentStep }: TopNavProps) {
             return (
               <button
                 key={n}
-                onClick={() => navigateTo(`/step/${n}`)}
+                onClick={() => navigateTo(STEP_ROUTES[n - 1])}
                 style={{
                   width: 28,
                   height: 28,

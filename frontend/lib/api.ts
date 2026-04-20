@@ -16,8 +16,16 @@ export async function uploadDocument(file: File, type: 'id' | 'address' | 'repor
   return fetch(`${FLASK}/api/upload`, { method: 'POST', credentials: 'include', body: fd })
 }
 
+export async function getDisputes() {
+  return fetch(`${FLASK}/api/disputes`, { credentials: 'include' })
+}
+
 export async function getLetters() {
   return fetch(`${FLASK}/api/letters`, { credentials: 'include' })
+}
+
+export async function getLetterById(index: number) {
+  return fetch(`${FLASK}/api/letters/${index}`, { credentials: 'include' })
 }
 
 export async function createCheckout() {
@@ -44,5 +52,22 @@ export async function manualPay(method: string) {
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
     body: JSON.stringify({ method }),
+  })
+}
+
+export async function getFollowupLetters(day: number) {
+  return fetch(`${FLASK}/api/followup-letters/${day}`, { credentials: 'include' })
+}
+
+export async function getWatcherStatus() {
+  return fetch(`${FLASK}/api/watcher/status`, { credentials: 'include' })
+}
+
+export async function subscribeWatcher(notify_method: string, notify_handle: string, payment_method: string) {
+  return fetch(`${FLASK}/api/watcher/subscribe`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ notify_method, notify_handle, payment_method }),
   })
 }

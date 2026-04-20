@@ -29,7 +29,7 @@ export const PRESETS: Record<ScenePresetKey, ScenePreset> = {
   landing: {
     bg: '/seascape.jpg',
     accent: '#C9A84C',
-    overlay: 0.55,
+    overlay: 0.25,
     lighting: {
       color: 'rgba(201,168,76,0.18)',
       position: '20% 18%',
@@ -41,7 +41,7 @@ export const PRESETS: Record<ScenePresetKey, ScenePreset> = {
     bg: '/maproom.jpg',
     accent: '#C9A84C',
     kanji: '武',
-    overlay: 0.65,
+    overlay: 0.3,
     lighting: {
       color: 'rgba(232,152,68,0.22)',
       position: '18% 15%',
@@ -51,10 +51,10 @@ export const PRESETS: Record<ScenePresetKey, ScenePreset> = {
     breathing: { color: 'rgba(232,152,68,0.08)', motif: 'embers' },
   },
   water: {
-    bg: '/koipond.jpg',
+    bg: '/koipond-meshy.png',
     accent: '#1D9E75',
     kanji: '水',
-    overlay: 0.6,
+    overlay: 0.28,
     lighting: {
       color: 'rgba(29,158,117,0.22)',
       position: '50% 85%',
@@ -67,7 +67,7 @@ export const PRESETS: Record<ScenePresetKey, ScenePreset> = {
     bg: '/scrollroom.jpg',
     accent: '#7F77DD',
     kanji: '智',
-    overlay: 0.65,
+    overlay: 0.3,
     lighting: {
       color: 'rgba(127,119,221,0.24)',
       position: '50% 45%',
@@ -80,7 +80,7 @@ export const PRESETS: Record<ScenePresetKey, ScenePreset> = {
     bg: '/sandgarden.jpg',
     accent: '#EF9F27',
     kanji: '金',
-    overlay: 0.6,
+    overlay: 0.28,
     lighting: {
       color: 'rgba(239,159,39,0.28)',
       position: '50% 75%',
@@ -90,22 +90,22 @@ export const PRESETS: Record<ScenePresetKey, ScenePreset> = {
     breathing: { color: 'rgba(239,159,39,0.12)', motif: 'embers' },
   },
   nirvana: {
-    bg: '/dragonsgate.jpg',
-    accent: '#5DCAA5',
-    kanji: '涅',
-    overlay: 0.5,
+    bg: '/dragon-gate.png',
+    accent: '#D94A3B',
+    kanji: '門',
+    overlay: 0.3,
     lighting: {
-      color: 'rgba(255,180,200,0.22)',
-      position: '30% 70%',
-      size: '1100px 600px',
-      intensity: 0.9,
+      color: 'rgba(255,160,100,0.28)',
+      position: '50% 40%',
+      size: '1200px 800px',
+      intensity: 1.0,
     },
-    breathing: { color: 'rgba(255,180,200,0.12)', motif: 'petals' },
+    breathing: { color: 'rgba(255,140,180,0.10)', motif: 'petals' },
   },
   interstitial: {
     bg: '/interstitial.jpg',
     accent: '#C9A84C',
-    overlay: 0.78,
+    overlay: 0.35,
     lighting: {
       color: 'rgba(201,168,76,0.25)',
       position: '50% 50%',
@@ -117,7 +117,7 @@ export const PRESETS: Record<ScenePresetKey, ScenePreset> = {
   command: {
     bg: '/wartable.jpg',
     accent: '#B0701C',
-    overlay: 0.7,
+    overlay: 0.32,
     lighting: {
       color: 'rgba(176,112,28,0.26)',
       position: '50% 50%',

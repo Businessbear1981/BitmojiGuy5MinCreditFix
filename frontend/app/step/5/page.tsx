@@ -21,7 +21,7 @@ export default function Step5Page() {
           padding: '8px 24px', textAlign: 'center',
           background: 'rgba(93,202,165,0.04)', borderBottom: '1px solid rgba(93,202,165,0.1)',
           fontFamily: 'var(--font-heading)', fontSize: 12, fontStyle: 'italic',
-          color: '#5DCAA5', letterSpacing: 2,
+          color: '#5CFFCC', letterSpacing: 2,
         }}>
           &ldquo;The petals fall through the gate. The journey is complete. Breathe.&rdquo;
         </div>
@@ -30,22 +30,21 @@ export default function Step5Page() {
         <div style={{ flex: 1, display: 'flex' }}>
           <WizardSidebar
             step={5}
-            accentColor="#5DCAA5"
             mascotSpeech="The cherry blossoms drift through the Dragon's Gate. Nirvana. The work is done. You are free."
           />
 
           {/* Main panel */}
           <div style={{
             flex: 1, padding: '2rem',
-            background: 'rgba(8,6,4,0.5)', backdropFilter: 'blur(8px)',
+            background: 'rgba(8,6,4,0.25)',
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
           }}>
             {/* Pulsing jade checkmark */}
             <div style={{
               width: 90, height: 90, borderRadius: '50%',
-              border: '2px solid #5DCAA5',
+              border: '2px solid #5CFFCC',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 40, color: '#5DCAA5',
+              fontSize: 40, color: '#5CFFCC',
               background: 'rgba(93,202,165,0.06)',
               boxShadow: '0 0 24px rgba(93,202,165,0.2)',
               animation: 'jadePulse 2.5s ease infinite',
@@ -58,7 +57,7 @@ export default function Step5Page() {
             <h1 style={{
               fontFamily: 'var(--font-cinzel-decorative), serif',
               fontSize: 'clamp(1.4rem, 3vw, 2rem)',
-              color: '#5DCAA5',
+              color: '#5CFFCC',
               textShadow: '0 0 20px rgba(93,202,165,0.25)',
               letterSpacing: 3,
               textAlign: 'center',
@@ -90,7 +89,7 @@ export default function Step5Page() {
                 style={{
                   fontFamily: 'var(--font-heading)', fontSize: 14, letterSpacing: 3,
                   textTransform: 'uppercase', color: '#050403',
-                  background: 'linear-gradient(135deg, #5DCAA5, #2A8A6A)',
+                  background: 'linear-gradient(135deg, #5CFFCC, #33FFB8)',
                   padding: '14px 36px', borderRadius: 4, border: 'none',
                   cursor: 'pointer',
                   boxShadow: '0 4px 20px rgba(93,202,165,0.3)',
@@ -109,7 +108,7 @@ export default function Step5Page() {
             }}>
               <p style={{
                 fontFamily: 'var(--font-cinzel), serif', fontSize: '0.72rem',
-                color: '#5DCAA5', letterSpacing: 1.5, marginBottom: 12,
+                color: '#5CFFCC', letterSpacing: 1.5, marginBottom: 12,
               }}>
                 ✉ Mail Options
               </p>
@@ -126,13 +125,13 @@ export default function Step5Page() {
                   type="radio" name="mailClass" value="first"
                   checked={mailClass === 'first'}
                   onChange={() => setMailClass('first')}
-                  style={{ accentColor: '#5DCAA5' }}
+                  style={{ accentColor: '#5CFFCC' }}
                 />
                 <div>
                   <span style={{ fontFamily: 'var(--font-body)', fontSize: 13, color: '#F0EBE0' }}>
                     Standard Mail with Tracking
                   </span>
-                  <span style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: '#5DCAA5', marginLeft: 8 }}>
+                  <span style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: '#5CFFCC', marginLeft: 8 }}>
                     $3/letter
                   </span>
                 </div>
@@ -150,13 +149,13 @@ export default function Step5Page() {
                   type="radio" name="mailClass" value="certified"
                   checked={mailClass === 'certified'}
                   onChange={() => setMailClass('certified')}
-                  style={{ accentColor: '#5DCAA5' }}
+                  style={{ accentColor: '#5CFFCC' }}
                 />
                 <div>
                   <span style={{ fontFamily: 'var(--font-body)', fontSize: 13, color: '#F0EBE0' }}>
                     Certified Mail
                   </span>
-                  <span style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: '#5DCAA5', marginLeft: 8 }}>
+                  <span style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: '#5CFFCC', marginLeft: 8 }}>
                     $8/letter
                   </span>
                   <span style={{ fontFamily: 'var(--font-body)', fontSize: 10, color: '#8A8278', display: 'block', marginTop: 2 }}>
@@ -194,7 +193,7 @@ export default function Step5Page() {
                 style={{
                   width: '100%', marginTop: 12,
                   fontFamily: 'var(--font-heading)', fontSize: 13, letterSpacing: 2,
-                  textTransform: 'uppercase', color: '#5DCAA5',
+                  textTransform: 'uppercase', color: '#5CFFCC',
                   background: 'transparent',
                   padding: '12px 0', borderRadius: 4,
                   border: '1px solid rgba(93,202,165,0.4)',
@@ -208,7 +207,7 @@ export default function Step5Page() {
               {mailResult && (
                 <p style={{
                   fontFamily: 'var(--font-body)', fontSize: 12,
-                  color: mailResult.startsWith('✓') ? '#5DCAA5' : '#FF4444',
+                  color: mailResult.startsWith('✓') ? '#5CFFCC' : '#FF4444',
                   textAlign: 'center', marginTop: 8,
                 }}>
                   {mailResult}
@@ -234,7 +233,7 @@ export default function Step5Page() {
                 }}>
                   <p style={{
                     fontFamily: 'var(--font-cinzel), serif',
-                    fontSize: '0.72rem', color: '#5DCAA5',
+                    fontSize: '0.72rem', color: '#5CFFCC',
                     letterSpacing: 1.5, marginBottom: 5,
                   }}>
                     {tip.title}

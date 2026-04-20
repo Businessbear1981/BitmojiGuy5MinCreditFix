@@ -4,30 +4,33 @@ import { useShojiNav } from '@/lib/shojiNav'
 import { MrBeeks } from '@/components/mascot/MrBeeks'
 
 const BEEKS_SIGNS: Record<number, string> = {
-  1: 'Name your enemy',
+  1: 'Chart the course',
   2: 'Armor up!',
   3: 'Read the scrolls',
-  4: 'Pay the toll',
-  5: 'You did it!',
+  4: 'Rake the sand',
+  5: 'Pay the toll',
+  6: 'Send the mail',
+  7: 'Watch & wait',
 }
 
 const STEPS = [
-  { n: 1, kanji: '武', label: 'Warrior' },
-  { n: 2, kanji: '水', label: 'Water' },
-  { n: 3, kanji: '智', label: 'Wisdom' },
-  { n: 4, kanji: '金', label: 'Gold' },
-  { n: 5, kanji: '涅', label: 'Nirvana' },
+  { n: 1, kanji: '地', label: 'Map',      route: '/map'       },
+  { n: 2, kanji: '武', label: 'Dojo',     route: '/dojo'      },
+  { n: 3, kanji: '水', label: 'Koi',      route: '/koi-pond'  },
+  { n: 4, kanji: '庭', label: 'Garden',   route: '/garden'    },
+  { n: 5, kanji: '階', label: 'Stairway', route: '/stairway'  },
+  { n: 6, kanji: '門', label: 'Gate',     route: '/gate'      },
+  { n: 7, kanji: '眼', label: 'Watcher',  route: '/watcher'   },
 ]
 
-const STEP_COLORS = ['#C9A84C', '#1D9E75', '#7F77DD', '#EF9F27', '#5DCAA5']
+const STEP_COLORS = ['#C9A84C', '#1D9E75', '#7F77DD', '#EF9F27', '#5DCAA5', '#D94A3B', '#8CB4FF']
 
 interface WizardSidebarProps {
   step: number
-  accentColor: string
   mascotSpeech?: string
 }
 
-export function WizardSidebar({ step, accentColor, mascotSpeech }: WizardSidebarProps) {
+export function WizardSidebar({ step, mascotSpeech }: WizardSidebarProps) {
   const { navigateTo } = useShojiNav()
 
   return (
@@ -70,7 +73,7 @@ export function WizardSidebar({ step, accentColor, mascotSpeech }: WizardSidebar
           return (
             <button
               key={s.n}
-              onClick={() => navigateTo(`/step/${s.n}`)}
+              onClick={() => navigateTo(s.route)}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -79,7 +82,16 @@ export function WizardSidebar({ step, accentColor, mascotSpeech }: WizardSidebar
                 borderRadius: 4,
                 border: 'none',
                 cursor: 'pointer',
-                background: isCurrent ? `rgba(${color === '#C9A84C' ? '201,168,76' : color === '#1D9E75' ? '29,158,117' : color === '#7F77DD' ? '127,119,221' : color === '#EF9F27' ? '239,159,39' : '93,202,165'},0.1)` : 'transparent',
+                background: isCurrent ? `rgba(${
+                  color === '#C9A84C' ? '201,168,76'
+                  : color === '#1D9E75' ? '29,158,117'
+                  : color === '#7F77DD' ? '127,119,221'
+                  : color === '#EF9F27' ? '239,159,39'
+                  : color === '#5DCAA5' ? '93,202,165'
+                  : color === '#D94A3B' ? '217,74,59'
+                  : color === '#8CB4FF' ? '140,180,255'
+                  : '201,168,76'
+                },0.1)` : 'transparent',
                 transition: 'background 0.2s',
               }}
             >

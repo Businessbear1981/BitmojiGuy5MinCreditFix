@@ -102,14 +102,13 @@ export default function Step1Page() {
         <div style={{ flex: 1, display: 'flex' }}>
           <WizardSidebar
             step={1}
-            accentColor="#C9A84C"
             mascotSpeech="Name your enemy. State your case. The warrior who knows himself cannot be defeated."
           />
 
           {/* Main panel */}
           <div style={{
             flex: 1, padding: '2rem',
-            background: 'rgba(20,14,8,0.55)', backdropFilter: 'blur(8px)',
+            background: 'rgba(20,14,8,0.25)',
           }}>
             {/* Step header */}
             <p style={{
