@@ -30,6 +30,12 @@ export default function Home() {
           0%, 100% { opacity: 0.07; text-shadow: 0 0 60px rgba(201,168,76,0.35); }
           50%      { opacity: 0.11; text-shadow: 0 0 120px rgba(240,208,128,0.5); }
         }
+        /* Mobile optimizations */
+        @media (max-width: 768px) {
+          .orbit-ring { animation-duration: 120s !important; }
+          .scene-button { min-width: 48px; min-height: 48px; }
+          .center-text { font-size: clamp(14px, 4vw, 24px); }
+        }
       `}</style>
 
       {/* Lone Cypress Seascape — full bleed */}
