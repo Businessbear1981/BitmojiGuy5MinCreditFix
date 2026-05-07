@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useShojiNav } from '@/lib/shojiNav'
+import { ReleaseQueue } from '@/components/admin/ReleaseQueue'
 
 const FLASK = process.env.NEXT_PUBLIC_FLASK_URL ?? 'http://localhost:5000'
 const GOLD = '#C9A84C'
@@ -86,7 +87,7 @@ export default function AdminPage() {
   const [pipeline, setPipeline] = useState<PipelineStats | null>(null)
   const [agentLog, setAgentLog] = useState<AgentLogEntry[]>([])
   const [pendingDMs, setPendingDMs] = useState<PendingNotification[]>([])
-  const [activeTab, setActiveTab] = useState<'cases' | 'pipeline' | 'notifications'>('cases')
+  const [activeTab, setActiveTab] = useState<'cases' | 'pipeline' | 'notifications' | 'release'>('cases')
 
   const fetchData = useCallback(async () => {
     try {
@@ -451,7 +452,7 @@ export default function AdminPage() {
 
         {/* Tabs */}
         <div style={{ display: 'flex', gap: 0, marginBottom: 20, borderBottom: `1px solid ${GOLD}22` }}>
-          {(['cases', 'pipeline', 'notifications'] as const).map((tab) => (
+          {(['cases', 'pipeline', 'notifications', 'release'] as const).map((tab) => (
             <button key={tab} onClick={() => setActiveTab(tab)} style={{
               fontFamily: 'var(--font-cinzel), serif', fontSize: 12, letterSpacing: 2,
               textTransform: 'uppercase', padding: '10px 24px', cursor: 'pointer',
@@ -733,6 +734,10 @@ export default function AdminPage() {
               </div>
             )}
           </div>
+        )}
+
+        {activeTab === 'release' && (
+          <ReleaseQueue />
         )}
       </div>
     </div>

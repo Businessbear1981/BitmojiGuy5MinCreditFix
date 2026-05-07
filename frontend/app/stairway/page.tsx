@@ -5,7 +5,7 @@ import { useShojiNav } from '@/lib/shojiNav'
 import { useWizardStore } from '@/store/wizardStore'
 import { TopNav } from '@/components/nav/TopNav'
 import { WizardSidebar } from '@/components/sidebar/WizardSidebar'
-import { createCheckout, manualPay } from '@/lib/api'
+import { createCheckout, manualPay, queueForRelease } from '@/lib/api'
 
 const ACCENT = '#5CFFCC'
 
@@ -22,6 +22,8 @@ export default function StairwayPage() {
       const data = await res.json()
       if (data.dev_mode) {
         setPaid(true)
+        // Queue for admin release
+        await queueForRelease()
         navigateTo('/gate')
       } else if (data.checkout_url) {
         window.location.href = data.checkout_url
@@ -44,6 +46,8 @@ export default function StairwayPage() {
       const data = await res.json()
       if (data.ok && !data.pending) {
         setPaid(true)
+        // Queue for admin release
+        await queueForRelease()
         navigateTo('/gate')
       } else if (data.pending) {
         setPendingConf(data.confirmation || '')

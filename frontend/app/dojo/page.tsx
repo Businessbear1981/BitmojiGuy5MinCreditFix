@@ -6,6 +6,7 @@ import { useWizardStore } from '@/store/wizardStore'
 import { TopNav } from '@/components/nav/TopNav'
 import { WizardSidebar } from '@/components/sidebar/WizardSidebar'
 import { ArmorWarrior } from '@/components/warrior/ArmorWarrior'
+import { CreditReportGuide } from '@/components/dojo/CreditReportGuide'
 import { uploadDocument } from '@/lib/api'
 
 const ACCENT = '#C9A84C'
@@ -219,6 +220,11 @@ export default function DojoPage() {
               >
                 {allArmored ? 'March to the Koi Pond →' : 'Forge all 3 to continue'}
               </button>
+            </div>
+
+            {/* Credit Report Guide */}
+            <div style={{ marginTop: '3rem', paddingTop: '2rem', borderTop: `1px solid ${ACCENT}33` }}>
+              <CreditReportGuide />
             </div>
           </div>
         </div>

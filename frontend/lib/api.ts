@@ -71,3 +71,50 @@ export async function subscribeWatcher(notify_method: string, notify_handle: str
     body: JSON.stringify({ notify_method, notify_handle, payment_method }),
   })
 }
+
+// ═════════════════════════════════════════════════════════════════════════════
+// CREDIT REPORT HOOK
+// ═════════════════════════════════════════════════════════════════════════════
+
+export async function getCreditReportGuide() {
+  return fetch(`${FLASK}/api/credit-report-guide`, { credentials: 'include' })
+}
+
+export async function getCreditReportBureaus() {
+  return fetch(`${FLASK}/api/credit-report-bureaus`, { credentials: 'include' })
+}
+
+export async function parseCreditReport() {
+  return fetch(`${FLASK}/api/parse-credit-report`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: '{}',
+  })
+}
+
+export async function getCreditReportStatus() {
+  return fetch(`${FLASK}/api/credit-report-status`, { credentials: 'include' })
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ADMIN RELEASE WORKFLOW
+// ═════════════════════════════════════════════════════════════════════════════
+
+export async function queueForRelease() {
+  return fetch(`${FLASK}/api/admin/queue-for-release`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: '{}',
+  })
+}
+
+export async function sendCertified(dayNumber: number = 0, mailClass: string = '') {
+  return fetch(`${FLASK}/api/send-certified`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ dayNumber, mailClass }),
+  })
+}

@@ -43,6 +43,26 @@ import requests as http_requests
 
 import database
 
+try:
+    from click2mail_integration import (
+        dispatch_certified_mail,
+        admin_release_manager,
+        click2mail_client,
+        generate_dispute_letter_pdf,
+    )
+except ImportError as e:
+    print(f"[WARNING] Click2Mail integration not available: {e}")
+    admin_release_manager = None
+
+try:
+    from credit_report_hook import (
+        credit_report_workflow,
+        CreditReportParser,
+    )
+except ImportError as e:
+    print(f"[WARNING] Credit Report Hook not available: {e}")
+    credit_report_workflow = None
+
 # ─── APP SETUP ────────────────────────────────────────────────────────────────
 
 app = Flask(__name__)
@@ -1506,129 +1526,51 @@ BUREAU_ADDRESSES = {
 
 @app.route('/api/send-certified', methods=['POST'])
 def api_send_certified():
+    """
+    Send dispute letters via Click2Mail (REQUIRES ADMIN RELEASE).
+    
+    WORKFLOW:
+    1. User completes payment → letters generated
+    2. Submission queued for admin review
+    3. Admin approves in dashboard
+    4. This endpoint called with admin_released flag
+    5. Click2Mail jobs created and dispatched
+    """
     sid = session.get('submission_id')
     sub = load_submission(sid) if sid else None
     if not sub:
         return jsonify(error='Session not found'), 400
     if not sub.get('paid'):
         return jsonify(error='Payment required'), 403
-    if not CLICK2MAIL_API_KEY:
-        return jsonify(error='Click2Mail not configured', sent=0), 503
-
-    letters = sub.get('letters', [])
-    if not letters:
-        return jsonify(error='No letters generated', sent=0), 400
+    if not admin_release_manager:
+        return jsonify(error='Click2Mail integration not available'), 503
 
     data = request.get_json(silent=True) or {}
     day_number = data.get('dayNumber', 0)
-    manual_class = data.get('mailClass', '')
+    manual_mail_class = data.get('mailClass', '')
 
-    # Escalating mail classes by follow-up day
-    if manual_class in ('First Class', 'Certified Mail'):
-        mail_class = manual_class
-        return_receipt = manual_class == 'Certified Mail'
-        cfpb_notice = False
-    elif day_number >= 90:
-        mail_class = 'Certified Mail'
-        return_receipt = True
-        cfpb_notice = True
-    elif day_number >= 60:
-        mail_class = 'Certified Mail'
-        return_receipt = True
-        cfpb_notice = False
-    elif day_number >= 30:
-        mail_class = 'Certified Mail'
-        return_receipt = False
-        cfpb_notice = False
-    else:
-        mail_class = 'First Class'
-        return_receipt = False
-        cfpb_notice = False
+    # Dispatch using the new Click2Mail integration
+    result = dispatch_certified_mail(
+        submission=sub,
+        day_number=day_number,
+        manual_mail_class=manual_mail_class,
+    )
 
-    sender_name = sub.get('name', '')
-    sender_address = sub.get('address', '')
-    sender_state = sub.get('state', '')
+    if result.get('error'):
+        status_code = 403 if 'not approved' in result.get('message', '') else 500
+        return jsonify(error=result.get('message'), sent=0), status_code
 
-    sent = 0
-    job_ids = []
-    errors = []
-
-    for letter in letters:
-        bureau = letter.get('bureau', '')
-        bureau_addr = BUREAU_ADDRESSES.get(bureau)
-        if not bureau_addr:
-            continue
-
-        # Append CFPB complaint notice for 90-day escalation
-        doc_body = letter.get('body', '')
-        if cfpb_notice and 'CFPB COMPLAINT NOTICE' not in doc_body:
-            doc_body += '\n\n--- CFPB COMPLAINT NOTICE ---\n'
-            doc_body += 'This letter is being sent simultaneously with a formal complaint '
-            doc_body += 'to the Consumer Financial Protection Bureau (CFPB) at '
-            doc_body += 'consumerfinance.gov/complaint, the Federal Trade Commission (FTC), '
-            doc_body += f'and the {STATE_LAWS.get(sender_state, {}).get("name", "state")} '
-            doc_body += 'Attorney General regarding your continued non-compliance with the '
-            doc_body += 'Fair Credit Reporting Act.\n'
-
-        try:
-            payload = {
-                'username': CLICK2MAIL_API_KEY,
-                'documentClass': 'Letter 8.5 x 11',
-                'layout': 'Address on Separate Page',
-                'productionTime': 'Next Day',
-                'envelope': 'Flat #10 pointed flap',
-                'color': 'Full Color',
-                'paperType': 'White 24#',
-                'printOption': 'Printing One side',
-                'mailClass': mail_class,
-                'mailTracking': mail_class,
-                'returnEnvelope': 'Return Envelope' if return_receipt else 'No',
-                'returnReceipt': 'Yes' if return_receipt else 'No',
-                'sender_name': sender_name,
-                'sender_address1': sender_address,
-                'sender_state': sender_state,
-                'recipient_name': bureau_addr['name'],
-                'recipient_address1': bureau_addr['address'],
-                'recipient_city': bureau_addr['city'],
-                'recipient_state': bureau_addr['state'],
-                'recipient_zip': bureau_addr['zip'],
-                'document': doc_body,
-            }
-
-            resp = http_requests.post(
-                CLICK2MAIL_URL,
-                json=payload,
-                headers={
-                    'Authorization': f'Bearer {CLICK2MAIL_API_KEY}',
-                    'Content-Type': 'application/json',
-                },
-                timeout=30,
-            )
-
-            if resp.status_code in (200, 201):
-                resp_data = resp.json() if resp.headers.get('content-type', '').startswith('application/json') else {}
-                job_id = resp_data.get('id', resp_data.get('jobId', f'job-{sent+1}'))
-                job_ids.append({'bureau': bureau, 'job_id': str(job_id), 'title': letter.get('title', '')})
-                sent += 1
-            else:
-                errors.append({'bureau': bureau, 'status': resp.status_code, 'detail': resp.text[:200]})
-
-        except Exception as e:
-            errors.append({'bureau': bureau, 'error': str(e)})
-
-    # Record dispatch time for watcher tracking — always set on dispatch attempt
-    now = datetime.utcnow()
-    sub['dispatched_at'] = now.isoformat()
-    sub['status'] = 'dispatched'
-    sub['follow_up_dates'] = {
-        'day_30': (now + timedelta(days=30)).isoformat(),
-        'day_60': (now + timedelta(days=60)).isoformat(),
-        'day_90': (now + timedelta(days=90)).isoformat(),
-    }
+    # Update submission with dispatch metadata
     store_submission(sid, sub)
     database.save_client(sub)
 
-    return jsonify(ok=True, sent=sent, job_ids=job_ids, errors=errors if errors else None)
+    return jsonify(
+        ok=True,
+        sent=result['sent'],
+        job_ids=result['job_ids'],
+        errors=result.get('errors'),
+        mail_class=result.get('mail_class'),
+    )
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -2040,3 +1982,181 @@ if __name__ == '__main__':
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# ADMIN RELEASE WORKFLOW — Queue, Approve, Reject
+# ═════════════════════════════════════════════════════════════════════════════
+
+@app.route('/api/admin/queue-for-release', methods=['POST'])
+def api_admin_queue_for_release():
+    """Queue a submission for admin review before mailing."""
+    if not admin_release_manager:
+        return jsonify(error='Admin system not available'), 503
+    
+    sid = session.get('submission_id')
+    sub = load_submission(sid) if sid else None
+    if not sub:
+        return jsonify(error='Session not found'), 400
+    if not sub.get('paid'):
+        return jsonify(error='Payment required'), 403
+
+    result = admin_release_manager.queue_for_release(sid, sub)
+    return jsonify(ok=result['ok'], status=result['status'])
+
+
+@app.route('/api/admin/approve-release', methods=['POST'])
+def api_admin_approve_release():
+    """Admin approves and releases submission for mailing."""
+    if not admin_release_manager:
+        return jsonify(error='Admin system not available'), 503
+    
+    # Verify admin credentials
+    admin_key = request.headers.get('X-Admin-Key', '')
+    if admin_key != ADMIN_KEY:
+        return jsonify(error='Unauthorized'), 401
+
+    data = request.get_json(silent=True) or {}
+    session_id = data.get('session_id', '')
+    admin_id = data.get('admin_id', 'unknown')
+
+    result = admin_release_manager.admin_approve_and_release(session_id, admin_id)
+    if result.get('error'):
+        return jsonify(error=result['message']), 400
+
+    return jsonify(ok=True, status=result['status'])
+
+
+@app.route('/api/admin/reject-release', methods=['POST'])
+def api_admin_reject_release():
+    """Admin rejects release (e.g., for review or corrections)."""
+    if not admin_release_manager:
+        return jsonify(error='Admin system not available'), 503
+    
+    # Verify admin credentials
+    admin_key = request.headers.get('X-Admin-Key', '')
+    if admin_key != ADMIN_KEY:
+        return jsonify(error='Unauthorized'), 401
+
+    data = request.get_json(silent=True) or {}
+    session_id = data.get('session_id', '')
+    admin_id = data.get('admin_id', 'unknown')
+    reason = data.get('reason', '')
+
+    result = admin_release_manager.admin_reject_release(session_id, admin_id, reason)
+    if result.get('error'):
+        return jsonify(error=result['message']), 400
+
+    return jsonify(ok=True, status=result['status'], reason=result.get('reason'))
+
+
+@app.route('/api/admin/pending-queue')
+def api_admin_pending_queue():
+    """Admin views all pending releases."""
+    if not admin_release_manager:
+        return jsonify(error='Admin system not available'), 503
+    
+    admin_key = request.headers.get('X-Admin-Key', '')
+    if admin_key != ADMIN_KEY:
+        return jsonify(error='Unauthorized'), 401
+
+    queue = admin_release_manager.get_pending_queue()
+    return jsonify(ok=True, pending=queue, count=len(queue))
+
+
+@app.route('/api/admin/release-log')
+def api_admin_release_log():
+    """Admin views release activity log."""
+    if not admin_release_manager:
+        return jsonify(error='Admin system not available'), 503
+    
+    admin_key = request.headers.get('X-Admin-Key', '')
+    if admin_key != ADMIN_KEY:
+        return jsonify(error='Unauthorized'), 401
+
+    limit = request.args.get('limit', 100, type=int)
+    log = admin_release_manager.get_release_log(limit)
+    return jsonify(ok=True, log=log, count=len(log))
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# FREE CREDIT REPORT HOOK — AnnualCreditReport.com Integration
+# ═════════════════════════════════════════════════════════════════════════════
+
+@app.route('/api/credit-report-guide')
+def api_credit_report_guide():
+    """Return step-by-step guide for obtaining free annual credit report."""
+    if not credit_report_workflow:
+        return jsonify(error='Credit report system not available'), 503
+    
+    guide = credit_report_workflow.get_initial_guide()
+    return jsonify(ok=True, guide=guide)
+
+
+@app.route('/api/credit-report-bureaus')
+def api_credit_report_bureaus():
+    """Return contact information for all credit bureaus."""
+    if not credit_report_workflow:
+        return jsonify(error='Credit report system not available'), 503
+    
+    bureaus = credit_report_workflow.get_bureau_contact_info()
+    return jsonify(ok=True, bureaus=bureaus)
+
+
+@app.route('/api/parse-credit-report', methods=['POST'])
+def api_parse_credit_report():
+    """
+    Parse uploaded credit report and extract disputable accounts.
+    
+    Accepts: PDF, CSV, TXT (via /api/upload)
+    Returns: Extracted disputes categorized by type
+    """
+    if not credit_report_workflow:
+        return jsonify(error='Credit report system not available'), 503
+    
+    sid = session.get('submission_id')
+    sub = load_submission(sid) if sid else None
+    if not sub:
+        return jsonify(error='Session not found'), 400
+
+    # Get raw text from parsed submission
+    raw_text = sub.get('raw_text', '')
+    if not raw_text:
+        return jsonify(error='No credit report uploaded'), 400
+
+    # Parse and extract disputes
+    result = credit_report_workflow.process_uploaded_report(raw_text)
+
+    # Store in submission
+    sub['credit_report_parsed'] = True
+    sub['credit_disputes'] = result['disputes']
+    store_submission(sid, sub)
+
+    # Generate summary
+    summary = credit_report_workflow.get_dispute_summary(result['disputes'])
+
+    return jsonify(
+        ok=True,
+        status=result['status'],
+        summary=result['summary'],
+        disputes=result['disputes'],
+        dispute_summary=summary,
+    )
+
+
+@app.route('/api/credit-report-status')
+def api_credit_report_status():
+    """Check if credit report has been uploaded and parsed."""
+    sid = session.get('submission_id')
+    sub = load_submission(sid) if sid else None
+    if not sub:
+        return jsonify(error='Session not found'), 400
+
+    return jsonify(
+        ok=True,
+        uploaded=bool(sub.get('files')),
+        parsed=sub.get('credit_report_parsed', False),
+        dispute_count=len(sub.get('credit_disputes', [])),
+        disputes=sub.get('credit_disputes', []),
+    )
+
