@@ -164,42 +164,69 @@ export default function Home() {
           gap: '1.25rem',
         }}
       >
-        <h1
-          style={{
-            fontFamily: 'var(--font-cinzel-decorative), serif',
-            fontSize: 'clamp(2rem, 5vw, 3.4rem)',
-            color: '#F0D080',
-            textShadow: '0 0 40px rgba(240,208,128,0.5), 0 2px 10px rgba(0,0,0,0.85)',
-            letterSpacing: 4,
-            lineHeight: 1.1,
-            margin: 0,
-          }}
-        >
-          BitmojiGuy 5 Min CreditFix
-        </h1>
+        {/* Stopwatch Logo */}
+        <div style={{ marginBottom: '1rem', animation: 'pulse 3s ease-in-out infinite' }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt="BitmojiGuy 5 Min Credit Fix" style={{ height: 80, width: 80, filter: 'drop-shadow(0 0 20px rgba(201,168,76,0.4))' }} />
+        </div>
 
-        <p
+        {/* Dark backdrop for text */}
+        <div
           style={{
-            fontFamily: 'var(--font-cinzel), serif',
-            fontSize: 'clamp(1rem, 2vw, 1.4rem)',
-            color: '#F5E6C8',
-            letterSpacing: 3,
-            textShadow: '0 2px 10px rgba(0,0,0,0.85)',
-            margin: 0,
+            background: 'linear-gradient(180deg, rgba(10,6,2,0.7), rgba(5,4,3,0.85))',
+            backdropFilter: 'blur(8px)',
+            padding: '2rem 2.5rem',
+            borderRadius: 8,
+            border: '1px solid rgba(201,168,76,0.2)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.6), inset 0 1px 0 rgba(201,168,76,0.1)',
           }}
         >
-          5 Min. 5 Clicks. It&apos;s Fixed.
-        </p>
+            <h1
+            style={{
+              fontFamily: 'var(--font-cinzel-decorative), serif',
+              fontSize: 'clamp(2rem, 5vw, 3.4rem)',
+              color: '#F0D080',
+              textShadow: '0 0 40px rgba(240,208,128,0.5), 0 0 20px rgba(201,168,76,0.3), 0 2px 10px rgba(0,0,0,0.9)',
+              letterSpacing: 4,
+              lineHeight: 1.1,
+              margin: 0,
+            }}
+          >
+            BitmojiGuy 5 Min CreditFix
+          </h1>
+
+          <p
+            style={{
+              fontFamily: 'var(--font-cinzel), serif',
+              fontSize: 'clamp(1rem, 2vw, 1.4rem)',
+              color: '#F5E6C8',
+              letterSpacing: 3,
+              textShadow: '0 0 20px rgba(201,168,76,0.3), 0 2px 10px rgba(0,0,0,0.9)',
+              margin: '0.5rem 0 0',
+            }}
+          >
+            5 Min. 5 Clicks. It&apos;s Fixed.
+          </p>
+        </div>
 
         <div
           style={{
-            marginTop: '1rem',
+            marginTop: '1.5rem',
             padding: '0.85rem 1.6rem',
             border: '1px solid #F0D080',
             borderRadius: 4,
             background: 'rgba(10,6,2,0.55)',
             backdropFilter: 'blur(3px)',
             boxShadow: '0 4px 24px rgba(0,0,0,0.6)',
+            transition: 'all 0.3s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.boxShadow = '0 8px 32px rgba(201,168,76,0.3), inset 0 1px 0 rgba(201,168,76,0.2)'
+            e.currentTarget.style.transform = 'translateY(-4px)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.boxShadow = '0 4px 24px rgba(0,0,0,0.6)'
+            e.currentTarget.style.transform = 'translateY(0)'
           }}
         >
           <p

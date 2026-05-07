@@ -10,11 +10,12 @@ interface ArmorWarriorProps {
   pieces?: string[]
 }
 
-const armorAppear = (visible: boolean): React.CSSProperties => ({
+const armorAppear = (visible: boolean, delay: number = 0): React.CSSProperties => ({
   opacity: visible ? 1 : 0,
-  transform: visible ? 'scale(1) translateY(0)' : 'scale(0.85) translateY(20px)',
-  transition: 'opacity 0.7s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.7s cubic-bezier(0.34, 1.56, 0.64, 1)',
+  transform: visible ? 'scale(1) translateY(0) rotateZ(0)' : 'scale(0.7) translateY(30px) rotateZ(-5deg)',
+  transition: `opacity 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) ${delay}ms, transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) ${delay}ms`,
   transformOrigin: 'center center',
+  filter: visible ? 'drop-shadow(0 12px 24px rgba(201,168,76,0.5))' : 'drop-shadow(0 0 0 rgba(201,168,76,0))',
 })
 
 export function ArmorWarrior({ idUploaded, addressUploaded, reportUploaded, swordUnsheathed, pieces = [] }: ArmorWarriorProps) {
@@ -139,8 +140,12 @@ export function ArmorWarrior({ idUploaded, addressUploaded, reportUploaded, swor
 
         {/* ─── ARMOR LAYER 1: DO (Chest Plate) — on ID upload ─── */}
         <motion.g
-          style={armorAppear(idUploaded)}
-          animate={{ filter: idUploaded ? 'drop-shadow(0 8px 16px rgba(201,168,76,0.4))' : 'drop-shadow(0 0 0 rgba(201,168,76,0))' }}
+          style={armorAppear(idUploaded, 0)}
+          animate={{
+            filter: idUploaded ? 'drop-shadow(0 12px 24px rgba(201,168,76,0.5))' : 'drop-shadow(0 0 0 rgba(201,168,76,0))',
+            scale: idUploaded ? 1 : 0.7,
+          }}
+          transition={{ duration: 0.8, delay: 0 }}
         >
           {/* Main chest plate */}
           <path
@@ -167,7 +172,14 @@ export function ArmorWarrior({ idUploaded, addressUploaded, reportUploaded, swor
         </motion.g>
 
         {/* ─── ARMOR LAYER 2: KABUTO (Helmet) — on Address upload ─── */}
-        <motion.g style={armorAppear(addressUploaded)}>
+        <motion.g
+          style={armorAppear(addressUploaded, 150)}
+          animate={{
+            filter: addressUploaded ? 'drop-shadow(0 12px 24px rgba(201,168,76,0.5))' : 'drop-shadow(0 0 0 rgba(201,168,76,0))',
+            scale: addressUploaded ? 1 : 0.7,
+          }}
+          transition={{ duration: 0.8, delay: 0.15 }}
+        >
           {/* Helmet bowl */}
           <ellipse cx="120" cy="48" rx="28" ry="24" fill="url(#steelGradient)" stroke="#8B6914" strokeWidth="2.5" />
 
@@ -189,7 +201,14 @@ export function ArmorWarrior({ idUploaded, addressUploaded, reportUploaded, swor
         </motion.g>
 
         {/* ─── ARMOR LAYER 3: KOTE (Arm & Shoulder Guards) — on Report upload ─── */}
-        <motion.g style={armorAppear(reportUploaded)}>
+        <motion.g
+          style={armorAppear(reportUploaded, 300)}
+          animate={{
+            filter: reportUploaded ? 'drop-shadow(0 12px 24px rgba(201,168,76,0.5))' : 'drop-shadow(0 0 0 rgba(201,168,76,0))',
+            scale: reportUploaded ? 1 : 0.7,
+          }}
+          transition={{ duration: 0.8, delay: 0.3 }}
+        >
           {/* Left shoulder guard */}
           <rect x="62" y="92" width="26" height="32" rx="3" fill="url(#steelGradient)" stroke="#8B6914" strokeWidth="2" />
           <line x1="66" y1="104" x2="84" y2="104" stroke="#C9A84C" opacity="0.3" strokeWidth="0.6" />
@@ -212,7 +231,14 @@ export function ArmorWarrior({ idUploaded, addressUploaded, reportUploaded, swor
         </motion.g>
 
         {/* ─── ARMOR LAYER 4: KUSAZURI (Leg Plates) — always visible when other armor present ─── */}
-        <motion.g style={armorAppear(addressUploaded || reportUploaded)}>
+        <motion.g
+          style={armorAppear(addressUploaded || reportUploaded, 150)}
+          animate={{
+            filter: addressUploaded || reportUploaded ? 'drop-shadow(0 12px 24px rgba(201,168,76,0.5))' : 'drop-shadow(0 0 0 rgba(201,168,76,0))',
+            scale: addressUploaded || reportUploaded ? 1 : 0.7,
+          }}
+          transition={{ duration: 0.8, delay: 0.15 }}
+        >
           {/* Left leg guard */}
           <rect x="82" y="170" width="28" height="88" rx="2" fill="url(#steelGradient)" stroke="#8B6914" strokeWidth="2" />
           <line x1="86" y1="188" x2="106" y2="188" stroke="#C9A84C" opacity="0.25" strokeWidth="0.6" />
@@ -230,13 +256,14 @@ export function ArmorWarrior({ idUploaded, addressUploaded, reportUploaded, swor
 
         {/* ─── ARMOR LAYER 5: KATANA (Sword) — on all armor complete ─── */}
         <motion.g
-          style={armorAppear(swordUnsheathed)}
+          style={armorAppear(swordUnsheathed, 450)}
           animate={{
             x: swordUnsheathed ? 0 : 20,
             y: swordUnsheathed ? 0 : 40,
             rotate: swordUnsheathed ? 0 : 45,
+            filter: swordUnsheathed ? 'drop-shadow(0 12px 24px rgba(201,168,76,0.6))' : 'drop-shadow(0 0 0 rgba(201,168,76,0))',
           }}
-          transition={{ duration: 0.8, ease: 'easeOut' }}
+          transition={{ duration: 0.9, ease: 'easeOut', delay: 0.45 }}
         >
           {/* Blade — layered for depth */}
           <line x1="168" y1="190" x2="185" y2="10" stroke="#1A1A1A" strokeWidth="5" strokeLinecap="round" />
