@@ -6,7 +6,7 @@ import { TopNav } from '@/components/nav/TopNav'
 import { WizardSidebar } from '@/components/sidebar/WizardSidebar'
 import { getWatcherStatus, subscribeWatcher, getFollowupLetters } from '@/lib/api'
 
-const ACCENT = '#8CB4FF'
+const ACCENT = '#FF4444' // Intense red for ninja sentinel vigilance
 
 interface Milestone {
   date: string
@@ -143,19 +143,20 @@ export default function WatcherPage() {
         <TopNav currentStep={7} />
 
         <div style={{
-          padding: '8px 24px', textAlign: 'center',
-          background: 'rgba(140,180,255,0.05)', borderBottom: '1px solid rgba(140,180,255,0.15)',
+          padding: '12px 24px', textAlign: 'center',
+          background: 'linear-gradient(90deg, rgba(255,68,68,0.08), rgba(0,0,0,0.3), rgba(255,68,68,0.08))',
+          borderBottom: '2px solid rgba(255,68,68,0.22)',
           fontFamily: 'var(--font-heading)', fontSize: 12, fontStyle: 'italic',
-          color: ACCENT, letterSpacing: 2,
-          textShadow: `0 0 12px ${ACCENT}88, 0 0 24px ${ACCENT}44`,
+          color: '#FF6B6B', letterSpacing: 2,
+          textShadow: `0 0 16px ${ACCENT}AA, 0 0 32px ${ACCENT}55, 0 2px 8px rgba(0,0,0,0.8)`,
         }}>
-          &ldquo;From the rooftop, you see everything. The bureaus have 30 days. You have patience.&rdquo;
+          &ldquo;From the rooftop, you see everything. The bureaus have 30 days. You have patience. I am watching.&rdquo;
         </div>
 
         <div style={{ flex: 1, display: 'flex' }}>
           <WizardSidebar step={7} mascotSpeech="The Watcher tracks every deadline. 30, 60, 90 days. Each milestone has a weapon." />
 
-          <div style={{ flex: 1, padding: '2rem', background: 'rgba(6,8,14,0.25)', display: 'flex', flexDirection: 'column', alignItems: 'center', overflowY: 'auto' }}>
+          <div style={{ flex: 1, padding: '2rem', background: 'linear-gradient(180deg, rgba(20,10,8,0.45), rgba(10,5,4,0.55))', backdropFilter: 'blur(6px)', display: 'flex', flexDirection: 'column', alignItems: 'center', overflowY: 'auto' }}>
             <div style={{ width: '100%', maxWidth: 720 }}>
               <p style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: ACCENT, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 4 }}>
                 Step 7 of 7 &middot; 眼 &middot; The Watcher
