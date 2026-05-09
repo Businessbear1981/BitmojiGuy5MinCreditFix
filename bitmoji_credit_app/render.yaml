@@ -1,0 +1,39 @@
+# 5 Minutes to Credit Wellness — Render Deploy Config
+
+services:
+  - type: web
+    name: bitmoji-credit-fix
+    env: python
+    buildCommand: pip install -r requirements-fastapi.txt
+    startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT --workers 2
+    disk:
+      name: creditfix-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: PYTHON_VERSION
+        value: "3.11.0"
+      - key: DATABASE_URL
+        value: "sqlite:////data/creditfix.db"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ADMIN_KEY
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_PUBLISHABLE_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: FROM_EMAIL
+        sync: false

@@ -1,0 +1,81 @@
+:root {
+  /* Core palette */
+  --black:       #050403;
+  --dark:        #0E0E14;
+  --dark2:       #161620;
+  --dark3:       #1E1E2A;
+  --ink:         #0A0806;
+  --white:       #F0EBE0;
+  --silver:      #8A8278;
+
+  /* Gold system */
+  --gold:        #C9A84C;
+  --gold-light:  #F0D080;
+  --gold-dark:   #8B6914;
+
+  /* Step accent colors */
+  --step1: #C9A84C;   /* 武 Warrior — Gold */
+  --step2: #1D9E75;   /* 水 Water — Teal */
+  --step3: #7F77DD;   /* 智 Wisdom — Purple */
+  --step4: #EF9F27;   /* 金 Earth — Amber */
+  --step5: #5DCAA5;   /* 涅 Nirvana — Jade */
+
+  /* Supporting */
+  --crimson:     #8B1A1A;
+  --jade:        #1A6B4A;
+  --jade-light:  #22A870;
+  --neon-red:    #FF2244;
+
+  /* Fonts */
+  --font-display: var(--font-cinzel-decorative);
+  --font-heading: var(--font-cinzel);
+  --font-body:    var(--font-rajdhani);
+
+  /* Transitions */
+  --shoji-duration: 1100ms;
+  --shoji-ease: cubic-bezier(0.77, 0, 0.175, 1);
+  --scene-fade: 150ms;
+}
+
+* {
+  margin: 0; padding: 0; box-sizing: border-box;
+  text-shadow: 0 0 8px currentColor, 0 0 20px currentColor !important;
+}
+body {
+  background: var(--black);
+  color: var(--white);
+  font-family: var(--font-body);
+  overflow-x: hidden;
+}
+
+/* Utility classes */
+.font-display { font-family: var(--font-display); }
+.font-heading { font-family: var(--font-heading); }
+.font-body { font-family: var(--font-body); }
+
+/* Animations */
+@keyframes jadePulse {
+  0%, 100% { box-shadow: 0 0 24px rgba(93,202,165,0.2); }
+  50%      { box-shadow: 0 0 40px rgba(93,202,165,0.4), 0 0 8px rgba(93,202,165,0.15); }
+}
+
+@keyframes fadeInGold {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes verseFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes goldPulse {
+  0%, 100% { box-shadow: 0 0 16px rgba(201,168,76,0.3); }
+  50%      { box-shadow: 0 0 28px rgba(201,168,76,0.55), 0 0 6px rgba(240,208,128,0.2); }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(201,168,76,0.2); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(201,168,76,0.4); }

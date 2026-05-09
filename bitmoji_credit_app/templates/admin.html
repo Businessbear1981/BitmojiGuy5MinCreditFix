@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — 5-Min Credit Fix</title>
+<link href="https://fonts.googleapis.com/css2?family=Bangers&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--neon-blue:#00F0FF;--neon-pink:#FF2D9B;--neon-yellow:#EEFF00;--dark:#000000;--dark2:#06060C;--card:#0A0A14;--border:rgba(0,240,255,0.18);--text:#E8ECF0;--muted:#666;--green:#00FF88;--blue:#00F0FF;--fire:#FF2D9B;--gold:#EEFF00;--r:12px}
+body{background:var(--dark);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh}
+
+.header{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.9);backdrop-filter:blur(16px);position:sticky;top:0;z-index:100}
+.logo-wrap{display:flex;align-items:center;gap:12px}
+.stopwatch{position:relative;width:48px;height:48px;flex-shrink:0}
+.stopwatch-face{width:44px;height:44px;border-radius:50%;border:2.5px solid var(--neon-blue);position:absolute;bottom:0;left:2px;background:rgba(0,240,255,.04);box-shadow:0 0 20px rgba(0,240,255,.3),inset 0 0 12px rgba(0,240,255,.06)}
+.stopwatch-btn{position:absolute;top:0;left:50%;transform:translateX(-50%);width:8px;height:8px;background:var(--neon-pink);border-radius:2px 2px 1px 1px;box-shadow:0 0 8px rgba(255,45,155,.6)}
+.stopwatch-btn::before{content:'';position:absolute;top:-3px;left:50%;transform:translateX(-50%);width:12px;height:3px;background:var(--neon-pink);border-radius:2px}
+.stopwatch-lug-l,.stopwatch-lug-r{position:absolute;top:3px;width:6px;height:3px;background:var(--neon-yellow);border-radius:1px}
+.stopwatch-lug-l{left:8px;transform:rotate(-35deg)}
+.stopwatch-lug-r{right:8px;transform:rotate(35deg)}
+.stopwatch-five{position:absolute;bottom:0;left:2px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-family:'Bangers',cursive;font-size:30px;color:var(--neon-blue);line-height:1;text-shadow:0 0 12px rgba(0,240,255,.5);padding-top:2px}
+.logo-text{display:flex;flex-direction:column;gap:0}
+.logo-main{font-family:'Bangers',cursive;font-size:22px;letter-spacing:2px;color:var(--neon-blue);text-shadow:0 0 14px rgba(0,240,255,.4);line-height:1.1}
+.logo-main span{color:var(--neon-yellow);text-shadow:0 0 14px rgba(238,255,0,.4)}
+.header-right{display:flex;align-items:center;gap:16px}
+.header-right a{color:var(--muted);font-size:13px;text-decoration:none}
+.header-right a:hover{color:var(--neon-blue);text-shadow:0 0 6px rgba(0,240,255,.3)}
+
+.container{max-width:1400px;margin:0 auto;padding:24px 20px}
+
+/* Stats */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:24px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:20px;text-align:center;box-shadow:0 0 20px rgba(0,240,255,.03)}
+.stat-value{font-family:'Bangers',cursive;font-size:36px;letter-spacing:2px;line-height:1}
+.stat-value.fire{color:var(--neon-pink);text-shadow:0 0 10px rgba(255,45,155,.3)}
+.stat-value.green{color:var(--green);text-shadow:0 0 10px rgba(0,255,136,.3)}
+.stat-value.gold{color:var(--neon-yellow);text-shadow:0 0 10px rgba(238,255,0,.3)}
+.stat-value.blue{color:var(--neon-blue);text-shadow:0 0 10px rgba(0,240,255,.3)}
+.stat-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-top:6px}
+
+/* Referral breakdown */
+.ref-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:24px}
+.ref-card{background:var(--card);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:14px;text-align:center}
+.ref-icon{font-size:20px;margin-bottom:4px}
+.ref-count{font-family:'Bangers',cursive;font-size:24px;color:var(--neon-blue)}
+.ref-label{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-top:2px}
+
+/* Search */
+.search-bar{margin-bottom:16px;display:flex;gap:10px}
+.search-bar input{flex:1;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 16px;color:var(--text);font-family:inherit;font-size:14px;outline:none}
+.search-bar input:focus{border-color:var(--neon-blue);box-shadow:0 0 10px rgba(0,240,255,.1)}
+.search-bar select{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 16px;color:var(--text);font-family:inherit;font-size:13px;outline:none;min-width:140px}
+
+/* Table */
+.table-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;box-shadow:0 0 30px rgba(0,240,255,.03)}
+.table-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)}
+.table-title{font-family:'Bangers',cursive;font-size:22px;color:var(--neon-blue);letter-spacing:1px;text-shadow:0 0 10px rgba(0,240,255,.3)}
+.table-count{font-size:12px;color:var(--muted)}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:1100px}
+th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);padding:10px 12px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.01);white-space:nowrap}
+td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.03);font-size:13px;white-space:nowrap}
+tr:hover td{background:rgba(0,240,255,.02)}
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.badge-paid{background:rgba(0,255,136,.08);color:var(--green);border:1px solid rgba(0,255,136,.2);box-shadow:0 0 6px rgba(0,255,136,.1)}
+.badge-started{background:rgba(255,45,155,.08);color:var(--neon-pink);border:1px solid rgba(255,45,155,.2)}
+.badge-parsed{background:rgba(0,240,255,.06);color:var(--neon-blue);border:1px solid rgba(0,240,255,.15)}
+.badge-reviewed{background:rgba(238,255,0,.06);color:var(--neon-yellow);border:1px solid rgba(238,255,0,.15)}
+.empty-state{text-align:center;padding:60px 20px;color:var(--muted)}
+.empty-state div{font-size:48px;margin-bottom:12px}
+
+.refresh-btn{background:transparent;border:1px solid rgba(0,240,255,.15);color:var(--muted);padding:7px 14px;border-radius:8px;font-size:11px;cursor:pointer;font-family:inherit;transition:all .2s}
+.refresh-btn:hover{border-color:var(--neon-blue);color:var(--neon-blue);box-shadow:0 0 10px rgba(0,240,255,.1)}
+
+.ref-tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;letter-spacing:.3px}
+.ref-snapchat{background:rgba(255,252,0,.08);color:#FFFC00;border:1px solid rgba(255,252,0,.2)}
+.ref-tiktok{background:rgba(0,242,234,.08);color:#00f2ea;border:1px solid rgba(0,242,234,.2)}
+.ref-instagram{background:rgba(225,48,108,.08);color:#E1306C;border:1px solid rgba(225,48,108,.2)}
+.ref-direct_email{background:rgba(0,240,255,.06);color:var(--neon-blue);border:1px solid rgba(0,240,255,.15)}
+.ref-other{background:rgba(255,255,255,.04);color:var(--muted);border:1px solid rgba(255,255,255,.1)}
+
+.actions-row{display:flex;gap:10px;margin-bottom:24px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="logo-wrap">
+    <div class="stopwatch">
+      <div class="stopwatch-btn"></div>
+      <div class="stopwatch-lug-l"></div>
+      <div class="stopwatch-lug-r"></div>
+      <div class="stopwatch-face"></div>
+      <div class="stopwatch-five">5</div>
+    </div>
+    <div class="logo-text">
+      <div class="logo-main">Admin <span>Dashboard</span></div>
+    </div>
+  </div>
+  <div class="header-right">
+    <a href="/">Back to App</a>
+    <span style="font-size:11px;color:var(--muted)">AE Labs</span>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- Row 1: Core stats -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-value fire">{{ stats.total }}</div>
+      <div class="stat-label">Total Cases</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value green">{{ stats.paid }}</div>
+      <div class="stat-label">Paid</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value blue">{{ stats.pending }}</div>
+      <div class="stat-label">Pending</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value gold">${{ '%.2f'|format(stats.revenue) }}</div>
+      <div class="stat-label">Revenue</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value blue">{{ stats.fu30 or 0 }}</div>
+      <div class="stat-label">30-Day Sent</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value gold">{{ stats.fu60 or 0 }}</div>
+      <div class="stat-label">60-Day Sent</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value fire">{{ stats.fu90 or 0 }}</div>
+      <div class="stat-label">90-Day Escalations</div>
+    </div>
+  </div>
+
+  <!-- Row 2: Referral source breakdown -->
+  {% if stats.referral_sources %}
+  <div class="ref-grid">
+    {% for src, count in stats.referral_sources.items() %}
+    <div class="ref-card">
+      <div class="ref-icon">
+        {% if src == 'snapchat' %}&#128123;{% elif src == 'tiktok' %}&#127925;{% elif src == 'instagram' %}&#128247;{% elif src == 'direct_email' %}&#9993;{% else %}&#127760;{% endif %}
+      </div>
+      <div class="ref-count">{{ count }}</div>
+      <div class="ref-label">{{ src | replace('_', ' ') | title }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Actions -->
+  <div class="actions-row">
+    <button class="refresh-btn" onclick="runFollowups()" id="btnFollowup">Run Follow-Ups</button>
+    <button class="refresh-btn" onclick="runPurge()" id="btnPurge">Run 90-Day Purge</button>
+    <button class="refresh-btn" onclick="exportCSV()">Export CSV</button>
+    <button class="refresh-btn" onclick="location.reload()">&#8635; Refresh</button>
+  </div>
+
+  <!-- Search & Filter -->
+  <div class="search-bar">
+    <input type="text" id="searchInput" placeholder="Search by name, email, phone, or confirmation..." oninput="filterTable()">
+    <select id="statusFilter" onchange="filterTable()">
+      <option value="">All Statuses</option>
+      <option value="started">Started</option>
+      <option value="parsed">Parsed</option>
+      <option value="reviewed">Reviewed</option>
+      <option value="paid">Paid</option>
+    </select>
+    <select id="sourceFilter" onchange="filterTable()">
+      <option value="">All Sources</option>
+      <option value="snapchat">Snapchat</option>
+      <option value="tiktok">TikTok</option>
+      <option value="instagram">Instagram</option>
+      <option value="direct_email">Direct Email</option>
+      <option value="other">Other</option>
+    </select>
+  </div>
+
+  <!-- Cases table -->
+  <div class="table-card">
+    <div class="table-header">
+      <div>
+        <div class="table-title">All Cases</div>
+        <div class="table-count" id="tableCount">{{ entries|length }} total</div>
+      </div>
+    </div>
+    <div class="table-wrap">
+      {% if entries %}
+      <table id="casesTable">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Phone</th>
+            <th>Email</th>
+            <th>State</th>
+            <th>Source</th>
+            <th>Confirmation</th>
+            <th>Status</th>
+            <th>Disputes</th>
+            <th>Follow-Ups</th>
+            <th>Created</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in entries %}
+          <tr data-name="{{ e.name or '' }}" data-email="{{ e.email or '' }}" data-phone="{{ e.phone or '' }}" data-conf="{{ e.confirmation or '' }}" data-status="{{ 'paid' if e.paid else e.status }}" data-source="{{ e.referral_source or '' }}">
+            <td style="font-weight:600">{{ e.name or '---' }}</td>
+            <td style="font-size:12px">
+              {% if e.phone %}
+                <a href="tel:{{ e.phone }}" style="color:var(--neon-blue);text-decoration:none">{{ e.phone }}</a>
+              {% else %}---{% endif %}
+            </td>
+            <td style="font-size:12px">
+              {% if e.email %}
+                <a href="mailto:{{ e.email }}" style="color:var(--neon-blue);text-decoration:none">{{ e.email }}</a>
+              {% else %}---{% endif %}
+            </td>
+            <td>{{ e.state or '---' }}</td>
+            <td>
+              {% if e.referral_source %}
+                <span class="ref-tag ref-{{ e.referral_source }}">{{ e.referral_source | replace('_', ' ') | title }}</span>
+              {% else %}---{% endif %}
+            </td>
+            <td style="font-family:monospace;font-size:12px;color:var(--neon-yellow)">{{ e.confirmation or '---' }}</td>
+            <td>
+              {% if e.paid %}
+                <span class="badge badge-paid">Paid</span>
+              {% elif e.status == 'reviewed' %}
+                <span class="badge badge-reviewed">Reviewed</span>
+              {% elif e.status == 'parsed' %}
+                <span class="badge badge-parsed">Parsed</span>
+              {% else %}
+                <span class="badge badge-started">{{ e.status or 'started' }}</span>
+              {% endif %}
+            </td>
+            <td style="text-align:center;font-family:'Bangers',cursive;font-size:16px;color:var(--neon-blue)">{{ e.dispute_count or 0 }}</td>
+            <td style="font-size:11px">
+              {% if e.follow_up_30_sent %}<span style="color:var(--neon-blue)">30d</span> {% endif %}
+              {% if e.follow_up_60_sent %}<span style="color:var(--neon-yellow)">60d</span> {% endif %}
+              {% if e.follow_up_90_sent %}<span style="color:var(--neon-pink)">90d</span>{% endif %}
+              {% if not e.follow_up_30_sent and not e.follow_up_60_sent and not e.follow_up_90_sent %}---{% endif %}
+            </td>
+            <td style="font-size:11px;color:var(--muted)">{{ e.created_at[:16] if e.created_at else '---' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty-state">
+        <div>&#128203;</div>
+        <p>No cases yet. They'll appear here when users submit through the app.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+
+<script>
+function filterTable() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  const statusF = document.getElementById('statusFilter').value;
+  const sourceF = document.getElementById('sourceFilter').value;
+  const rows = document.querySelectorAll('#casesTable tbody tr');
+  let visible = 0;
+  rows.forEach(row => {
+    const name = (row.dataset.name || '').toLowerCase();
+    const email = (row.dataset.email || '').toLowerCase();
+    const phone = (row.dataset.phone || '').toLowerCase();
+    const conf = (row.dataset.conf || '').toLowerCase();
+    const status = row.dataset.status || '';
+    const source = row.dataset.source || '';
+    const matchSearch = !q || name.includes(q) || email.includes(q) || phone.includes(q) || conf.includes(q);
+    const matchStatus = !statusF || status === statusF;
+    const matchSource = !sourceF || source === sourceF;
+    const show = matchSearch && matchStatus && matchSource;
+    row.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+  document.getElementById('tableCount').textContent = visible + ' of ' + rows.length + ' cases';
+}
+
+function exportCSV() {
+  const rows = document.querySelectorAll('#casesTable tbody tr');
+  if (!rows.length) return;
+  let csv = 'Name,Phone,Email,State,Source,Confirmation,Status,Disputes,Created\n';
+  rows.forEach(row => {
+    if (row.style.display === 'none') return;
+    const cells = row.querySelectorAll('td');
+    const vals = [
+      row.dataset.name, row.dataset.phone, row.dataset.email,
+      cells[3]?.textContent?.trim(), row.dataset.source, row.dataset.conf,
+      row.dataset.status, cells[7]?.textContent?.trim(), cells[9]?.textContent?.trim()
+    ];
+    csv += vals.map(v => '"' + (v||'').replace(/"/g,'""') + '"').join(',') + '\n';
+  });
+  const blob = new Blob([csv], {type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'creditfix_cases_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+}
+
+async function runFollowups() {
+  const btn = document.getElementById('btnFollowup');
+  btn.disabled = true; btn.textContent = 'Running...';
+  try {
+    const r = await fetch('/admin/api/run-followups', {method:'POST'});
+    const d = await r.json();
+    btn.textContent = d.processed ? 'Done (' + d.processed + ' processed)' : 'Done (none due)';
+    setTimeout(() => { btn.textContent = 'Run Follow-Ups'; btn.disabled = false; }, 3000);
+  } catch(e) { btn.textContent = 'Error'; btn.disabled = false; }
+}
+
+async function runPurge() {
+  const btn = document.getElementById('btnPurge');
+  btn.disabled = true; btn.textContent = 'Purging...';
+  try {
+    const r = await fetch('/admin/api/run-purge', {method:'POST'});
+    const d = await r.json();
+    btn.textContent = d.deleted ? 'Done (' + d.deleted + ' deleted)' : 'Done (none expired)';
+    setTimeout(() => { btn.textContent = 'Run 90-Day Purge'; btn.disabled = false; }, 3000);
+  } catch(e) { btn.textContent = 'Error'; btn.disabled = false; }
+}
+</script>
+</body>
+</html>
