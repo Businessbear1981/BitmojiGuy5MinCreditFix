@@ -1,52 +1,71 @@
-import uuid
-from datetime import datetime
-from pathlib import Path
-import sqlite3
+"""
+Cypher Security Module — AE 5-Min Credit Fix
 
-BASE_DIR = Path(__file__).resolve().parent
-DOCS_DIR = BASE_DIR / "generated_docs"
-DOCS_DIR.mkdir(exist_ok=True)
+Generates per-session encryption keys and provides AES-256 encryption
+for all user-uploaded files and generated documents. Nothing is ever
+written to disk unencrypted.
 
-def generate_cypher_token():
-    return uuid.uuid4().hex
+Key derivation:
+  SHA-256( timestamp_ms + client_ip + CYPHER_SERVER_SECRET )
 
-def create_letters(external_id: str, user_data: dict):
-    preview = {
-        "id_errors": 3,
-        "factual_errors": 5,
-        "obsolete_items": 2,
-        "unverifiable_items": 4,
-    }
+Encryption:
+  AES-256-GCM (authenticated encryption)
+"""
+import os
+import hashlib
+import time
+import secrets
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
-    session_folder = DOCS_DIR / external_id
-    session_folder.mkdir(exist_ok=True)
-    letters = session_folder / "dispute_letters.txt"
+CYPHER_SERVER_SECRET = os.environ.get("CYPHER_SERVER_SECRET", "ae-labs-default-dev-secret-change-in-prod")
 
-    content = [
-        "AE Impact—Dispute Letters",
-        f"Generated {datetime.utcnow().isoformat()}Z",
-        "",
-        "This is where the full letter packet goes.",
-        "User data:",
-        str(user_data),
-    ]
 
-    # write letters to file
-    letters.write_text("\n".join(content), encoding="utf-8")
+def generate_session_key(client_ip: str) -> tuple[str, bytes]:
+    """
+    Generate a unique per-session encryption key.
 
-    # store letters in sqlite
-    try:
-        letter_text = letters.read_text(encoding="utf-8", errors="replace")
+    Returns:
+        (key_id, raw_key_bytes)
+        key_id is a hex string for reference (never logged with PII).
+        raw_key_bytes is 32 bytes for AES-256.
+    """
+    timestamp_ms = str(int(time.time() * 1000))
+    material = f"{timestamp_ms}{client_ip}{CYPHER_SERVER_SECRET}"
+    key_hash = hashlib.sha256(material.encode("utf-8")).digest()  # 32 bytes
 
-        conn = sqlite3.connect(BASE_DIR / "bitmoji_credit.db")
-        cur = conn.cursor()
-        cur.execute(
-            "UPDATE sessions SET dispute_letters = ? WHERE session_id = ?",
-            (letter_text, external_id),
-        )
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        print("WARN: could not persist dispute_letters:", e)
+    # key_id is a short identifier derived from the key (not the key itself)
+    key_id = hashlib.sha256(key_hash + b"id").hexdigest()[:16]
 
-    return str(letters), str(preview)
+    return key_id, key_hash
+
+
+def encrypt(data: bytes, key: bytes) -> bytes:
+    """
+    Encrypt data with AES-256-GCM.
+    Returns: nonce (12 bytes) + ciphertext + tag
+    """
+    nonce = secrets.token_bytes(12)
+    aesgcm = AESGCM(key)
+    ciphertext = aesgcm.encrypt(nonce, data, None)
+    return nonce + ciphertext
+
+
+def decrypt(encrypted: bytes, key: bytes) -> bytes:
+    """
+    Decrypt AES-256-GCM encrypted data.
+    Input: nonce (12 bytes) + ciphertext + tag
+    """
+    nonce = encrypted[:12]
+    ciphertext = encrypted[12:]
+    aesgcm = AESGCM(key)
+    return aesgcm.decrypt(nonce, ciphertext, None)
+
+
+def encrypt_file_in_memory(file_bytes: bytes, key: bytes) -> bytes:
+    """Encrypt an uploaded file. Returns encrypted bytes to store on disk."""
+    return encrypt(file_bytes, key)
+
+
+def decrypt_file_in_memory(encrypted_bytes: bytes, key: bytes) -> bytes:
+    """Decrypt a stored file back to plaintext in memory."""
+    return decrypt(encrypted_bytes, key)

@@ -1,5 +1,14 @@
 fastapi
-uvicorn
+uvicorn[standard]
 pydantic
+python-multipart
 sqlalchemy
+psycopg2-binary
+stripe
+slowapi
+reportlab
+httpx
+PyMuPDF
+anthropic
+cryptography
 python-dotenv

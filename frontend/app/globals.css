@@ -1,0 +1,360 @@
+@import "tailwindcss";
+
+/* ─── BitmojiGuy Cinematic Chanbara Maximalism ─── */
+/* Design Spec: May 2026 — Shogun Warrior Quest      */
+
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Cinzel+Decorative:wght@400;700&family=Rajdhani:wght@400;500;600;700&display=swap');
+
+@theme {
+  /* Primary — sacred palette */
+  --color-lacquer: #050403;
+  --color-ivory: #EBE8E2;
+  --color-gold: #D4AF37;
+  --color-gold-light: #E8C96A;
+  --color-gold-dark: #A08838;
+  --color-mist: #3A4A5C;
+  --color-jade: #2D9D78;
+  --color-crimson: #C41E3A;
+
+  /* Secondary */
+  --color-card: rgba(26,24,21,0.82);
+  --color-muted: #B8B5B0;
+  --color-gold-border: rgba(212,175,55,0.24);
+
+  /* Fonts */
+  --font-display: 'Cinzel Decorative', serif;
+  --font-heading: 'Cinzel', serif;
+  --font-body: 'Rajdhani', sans-serif;
+
+  /* Cinematic easing */
+  --ease-cinematic: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+
+  /* Animations */
+  --animate-breathe: breathe 3s ease-in-out infinite;
+  --animate-glow-pulse: glow-pulse 2.5s ease-in-out infinite;
+  --animate-spark: spark 0.6s ease-out forwards;
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-kanji-rotate: kanji-rotate 12s linear infinite;
+  --animate-shimmer: shimmer 3s ease-in-out infinite;
+}
+
+@keyframes breathe {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.6; }
+}
+@keyframes spark {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0); }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  33% { transform: translateY(-8px) rotate(1deg); }
+  66% { transform: translateY(4px) rotate(-0.5deg); }
+}
+@keyframes kanji-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes shimmer {
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 0.35; }
+}
+@keyframes slide-in-right {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes armor-materialize {
+  0% { transform: translateX(-20px); opacity: 0; }
+  50% { filter: drop-shadow(0 0 10px #D4AF37); }
+  100% { transform: translateX(0); opacity: 1; }
+}
+
+/* ─── Base Styles ─── */
+body {
+  font-family: var(--font-body);
+  background: var(--color-lacquer);
+  color: var(--color-ivory);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1 {
+  font-family: var(--font-display);
+  font-size: 48px;
+  line-height: 1.2;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--color-ivory);
+}
+h2 {
+  font-family: var(--font-heading);
+  font-size: 32px;
+  line-height: 1.3;
+  letter-spacing: 1px;
+  color: var(--color-ivory);
+}
+h3 {
+  font-family: var(--font-heading);
+  font-size: 24px;
+  line-height: 1.4;
+  letter-spacing: 0.5px;
+  color: var(--color-ivory);
+}
+h4 {
+  font-family: var(--font-heading);
+  font-size: 20px;
+  line-height: 1.4;
+  color: var(--color-ivory);
+}
+
+/* ─── Step Headers — gold glow ─── */
+.step-header {
+  font-family: var(--font-heading);
+  color: var(--color-gold);
+  text-shadow: 0 0 12px rgba(212,175,55,0.35), 0 0 4px rgba(212,175,55,0.15);
+  letter-spacing: 1px;
+}
+.step-sub {
+  font-family: var(--font-heading);
+  color: var(--color-gold-light);
+  text-shadow: 0 0 8px rgba(212,175,55,0.25);
+}
+
+/* ─── Buttons — Chanbara Maximalism ─── */
+.btn-gold {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  background: var(--color-gold);
+  color: var(--color-lacquer);
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-radius: 0.5rem;
+  transition: all 0.2s var(--ease-cinematic);
+  cursor: pointer;
+  border: none;
+}
+.btn-gold:hover {
+  background: var(--color-gold-light);
+  box-shadow: 0 0 20px rgba(212,175,55,0.3);
+}
+.btn-gold:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  background: transparent;
+  color: var(--color-gold);
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1px solid rgba(212,175,55,0.4);
+  border-radius: 0.5rem;
+  transition: all 0.2s var(--ease-cinematic);
+  cursor: pointer;
+}
+.btn-outline:hover {
+  border-color: var(--color-gold);
+  box-shadow: 0 0 12px rgba(212,175,55,0.15);
+}
+
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  background: rgba(255,255,255,0.05);
+  color: var(--color-muted);
+  font-family: var(--font-body);
+  font-weight: 500;
+  border-radius: 0.5rem;
+  transition: all 0.2s var(--ease-cinematic);
+  cursor: pointer;
+  border: none;
+}
+.btn-ghost:hover {
+  background: rgba(255,255,255,0.1);
+}
+
+/* ─── Cards ─── */
+.card {
+  background: var(--color-card);
+  border: 1px solid var(--color-gold-border);
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+}
+
+/* ─── Form Inputs ─── */
+.input-field {
+  width: 100%;
+  padding: 0.625rem 1rem;
+  background: var(--color-lacquer);
+  border: 1px solid var(--color-gold-border);
+  border-radius: 0.5rem;
+  color: var(--color-ivory);
+  font-family: var(--font-body);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.input-field::placeholder {
+  color: rgba(184,181,176,0.6);
+}
+.input-field:focus {
+  outline: none;
+  border-color: var(--color-gold);
+  box-shadow: 0 0 0 1px var(--color-gold);
+}
+
+/* ─── Kanji Watermark ─── */
+.kanji-watermark {
+  position: fixed;
+  font-size: 120px;
+  color: rgba(212,175,55,0.04);
+  font-family: serif;
+  pointer-events: none;
+  z-index: 0;
+  animation: var(--animate-kanji-rotate);
+}
+.kanji-watermark.kanji-1 { top: 15%; left: 5%; }
+.kanji-watermark.kanji-2 { top: 60%; right: 8%; animation-direction: reverse; }
+.kanji-watermark.kanji-3 { bottom: 10%; left: 45%; animation-duration: 18s; }
+
+/* ─── Mr. Beeks Warrior ─── */
+.warrior-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.warrior-glow {
+  position: absolute;
+  inset: -20px;
+  background: radial-gradient(ellipse, rgba(212,175,55,0.08) 0%, transparent 70%);
+  border-radius: 50%;
+  animation: var(--animate-glow-pulse);
+}
+.warrior-figure {
+  position: relative;
+  z-index: 1;
+  animation: var(--animate-breathe);
+}
+
+/* ─── Spark Particles ─── */
+.spark {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  background: var(--color-gold);
+  border-radius: 50%;
+  animation: var(--animate-spark);
+}
+
+/* ─── Progress Path (Chanbara style) ─── */
+.path-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+}
+.path-circle {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border: 2px solid;
+  transition: all 0.3s var(--ease-cinematic);
+}
+.path-circle.completed {
+  background: var(--color-gold);
+  border-color: var(--color-gold);
+  color: var(--color-lacquer);
+}
+.path-circle.active {
+  border-color: var(--color-gold);
+  color: var(--color-gold);
+  box-shadow: 0 0 12px rgba(212,175,55,0.3);
+}
+.path-circle.pending {
+  border-color: rgba(212,175,55,0.2);
+  color: rgba(212,175,55,0.3);
+}
+
+/* ─── Atmospheric Particles ─── */
+.petal {
+  position: fixed;
+  width: 8px;
+  height: 8px;
+  background: rgba(212,175,55,0.15);
+  border-radius: 50% 0;
+  pointer-events: none;
+  z-index: 0;
+  animation: petal-drift linear infinite;
+}
+@keyframes petal-drift {
+  0% { transform: translateY(-10vh) rotate(0deg); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+}
+
+/* ─── Error/Success Messages ─── */
+.msg-error {
+  background: rgba(196,30,58,0.1);
+  border: 1px solid rgba(196,30,58,0.2);
+  color: #f87171;
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  font-size: 0.875rem;
+}
+.msg-success {
+  background: rgba(45,157,120,0.1);
+  border: 1px solid rgba(45,157,120,0.3);
+  color: var(--color-jade);
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  font-size: 0.875rem;
+}
+.msg-info {
+  background: rgba(212,175,55,0.1);
+  border: 1px solid rgba(212,175,55,0.2);
+  color: var(--color-gold);
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  font-size: 0.875rem;
+}
+
+/* ─── Reduced Motion ─── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ─── Responsive Typography ─── */
+@media (max-width: 768px) {
+  h1 { font-size: 32px; letter-spacing: 1.5px; }
+  h2 { font-size: 24px; letter-spacing: 0.75px; }
+  h3 { font-size: 18px; }
+}

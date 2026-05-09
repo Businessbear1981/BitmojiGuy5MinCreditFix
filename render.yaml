@@ -1,7 +1,14 @@
+databases:
+  - name: ae-creditfix-db
+    plan: free
+    databaseName: creditfix
+    user: creditfix
+
 services:
   - type: web
-    name: bitmojiguy-credit-fix
+    name: ae-5min-credit-fix
     runtime: python
+    plan: free
     buildCommand: ./build.sh
     startCommand: cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
@@ -9,3 +16,27 @@ services:
         value: "3.11"
       - key: NODE_VERSION
         value: "20"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ae-creditfix-db
+          property: connectionString
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: SENDGRID_API_KEY
+        sync: false
+      - key: FROM_EMAIL
+        value: noreply@ardanedgecapital.com
+      - key: LOB_API_KEY
+        sync: false
+      - key: LOB_WEBHOOK_SECRET
+        sync: false
+      - key: APP_URL
+        value: https://ae-5min-credit-fix.onrender.com
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ADMIN_KEY
+        sync: false
+      - key: CYPHER_SERVER_SECRET
+        sync: false

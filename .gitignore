@@ -1,7 +1,14 @@
 node_modules/
-dist/
+frontend/out/
+frontend/.next/
 __pycache__/
 *.pyc
 *.db
 *.zip
+session_data/
+uploads/
+creditfix_data/
 generated_docs/
+.claude/
+.env
+backend/.env
