@@ -6,7 +6,7 @@ import { TopNav } from '@/components/nav/TopNav'
 import { WizardSidebar } from '@/components/sidebar/WizardSidebar'
 import { getWatcherStatus, subscribeWatcher, getFollowupLetters } from '@/lib/api'
 
-const ACCENT = '#8CB4FF'
+const ACCENT = '#FF4444' // Intense red for ninja sentinel vigilance
 
 interface Milestone {
   date: string
@@ -143,19 +143,20 @@ export default function WatcherPage() {
         <TopNav currentStep={7} />
 
         <div style={{
-          padding: '8px 24px', textAlign: 'center',
-          background: 'rgba(140,180,255,0.05)', borderBottom: '1px solid rgba(140,180,255,0.15)',
+          padding: '12px 24px', textAlign: 'center',
+          background: 'linear-gradient(90deg, rgba(255,68,68,0.08), rgba(0,0,0,0.3), rgba(255,68,68,0.08))',
+          borderBottom: '2px solid rgba(255,68,68,0.22)',
           fontFamily: 'var(--font-heading)', fontSize: 12, fontStyle: 'italic',
-          color: ACCENT, letterSpacing: 2,
-          textShadow: `0 0 8px currentColor, 0 0 20px currentColor, 0 0 12px ${ACCENT}88, 0 0 24px ${ACCENT}44`,
+          color: '#FF6B6B', letterSpacing: 2,
+          textShadow: `0 0 16px ${ACCENT}AA, 0 0 32px ${ACCENT}55, 0 2px 8px rgba(0,0,0,0.8)`,
         }}>
-          &ldquo;From the rooftop, you see everything. The bureaus have 30 days. You have patience.&rdquo;
+          &ldquo;From the rooftop, you see everything. The bureaus have 30 days. You have patience. I am watching.&rdquo;
         </div>
 
         <div style={{ flex: 1, display: 'flex' }}>
           <WizardSidebar step={7} mascotSpeech="The Watcher tracks every deadline. 30, 60, 90 days. Each milestone has a weapon." />
 
-          <div style={{ flex: 1, padding: '2rem', background: 'rgba(6,8,14,0.25)', display: 'flex', flexDirection: 'column', alignItems: 'center', overflowY: 'auto' }}>
+          <div style={{ flex: 1, padding: '2rem', background: 'linear-gradient(180deg, rgba(20,10,8,0.45), rgba(10,5,4,0.55))', backdropFilter: 'blur(6px)', display: 'flex', flexDirection: 'column', alignItems: 'center', overflowY: 'auto' }}>
             <div style={{ width: '100%', maxWidth: 720 }}>
               <p style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: ACCENT, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 4 }}>
                 Step 7 of 7 &middot; 眼 &middot; The Watcher
@@ -164,7 +165,7 @@ export default function WatcherPage() {
                 fontFamily: 'var(--font-cinzel-decorative), serif',
                 fontSize: '1.6rem', color: '#F0EBE0', letterSpacing: 2,
                 marginTop: 0, marginBottom: 6,
-                textShadow: `0 0 8px currentColor, 0 0 20px currentColor, 0 0 24px ${ACCENT}88, 0 0 48px ${ACCENT}44`,
+                textShadow: `0 0 24px ${ACCENT}88, 0 0 48px ${ACCENT}44`,
               }}>
                 30 / 60 / 90 Day Tracker
               </h2>
@@ -180,7 +181,7 @@ export default function WatcherPage() {
                     border: `1px solid ${ACCENT}33`, borderRadius: 8,
                     boxShadow: `0 0 40px ${ACCENT}15`, marginBottom: 20,
                   }}>
-                    <p style={{ fontFamily: 'var(--font-cinzel-decorative), serif', fontSize: '2.2rem', color: ACCENT, textShadow: `0 0 8px currentColor, 0 0 20px currentColor, 0 0 20px ${ACCENT}AA, 0 0 40px ${ACCENT}55`, letterSpacing: 3, margin: 0 }}>
+                    <p style={{ fontFamily: 'var(--font-cinzel-decorative), serif', fontSize: '2.2rem', color: ACCENT, textShadow: `0 0 20px ${ACCENT}AA, 0 0 40px ${ACCENT}55`, letterSpacing: 3, margin: 0 }}>
                       $10.99
                     </p>
                     <p style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: '#A8A29A', marginTop: 10, lineHeight: 1.5 }}>
@@ -201,7 +202,7 @@ export default function WatcherPage() {
                         color: notifyMethod === opt.value ? ACCENT : '#8A8278',
                         fontFamily: 'var(--font-body)', fontSize: 11, textAlign: 'center',
                         transition: 'all 0.2s',
-                        textShadow: `0 0 8px currentColor, 0 0 20px currentColor${notifyMethod === opt.value ? `, 0 0 8px ${ACCENT}44` : ''}`,
+                        textShadow: notifyMethod === opt.value ? `0 0 8px ${ACCENT}44` : 'none',
                       }}>
                         <div style={{ fontSize: 18, marginBottom: 4 }}>{opt.icon}</div>
                         {opt.label}
@@ -336,7 +337,7 @@ export default function WatcherPage() {
                 <p style={{
                   fontFamily: 'var(--font-cinzel-decorative), serif', fontSize: '1.1rem',
                   color: '#F0EBE0', letterSpacing: 2, marginBottom: 4,
-                  textShadow: `0 0 8px currentColor, 0 0 20px currentColor, 0 0 16px ${ACCENT}55`,
+                  textShadow: `0 0 16px ${ACCENT}55`,
                 }}>
                   Rebuild Stronger
                 </p>
@@ -357,7 +358,7 @@ export default function WatcherPage() {
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         fontFamily: 'var(--font-cinzel), serif', fontSize: 11,
                         color: p.color, fontWeight: 700, letterSpacing: 1,
-                        textShadow: `0 0 8px currentColor, 0 0 20px currentColor, 0 0 8px ${p.color}44`,
+                        textShadow: `0 0 8px ${p.color}44`,
                       }}>
                         {p.name.slice(0, 2).toUpperCase()}
                       </div>
@@ -382,7 +383,7 @@ export default function WatcherPage() {
                           padding: '4px 10px', borderRadius: 4,
                           background: `${p.color}15`, border: `1px solid ${p.color}33`,
                           letterSpacing: 1.5,
-                          textShadow: `0 0 8px currentColor, 0 0 20px currentColor, 0 0 6px ${p.color}44`,
+                          textShadow: `0 0 6px ${p.color}44`,
                         }}>
                           {p.promo}
                         </span>

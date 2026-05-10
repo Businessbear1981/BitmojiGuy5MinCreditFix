@@ -21,31 +21,53 @@ export function SceneLayout({ preset, children }: SceneLayoutProps) {
         style={{
           position: 'absolute', inset: 0, width: '100%', height: '100%',
           objectFit: 'cover', zIndex: 0,
-          /* no filter — matches landing page reference */
+          filter: 'saturate(0.88) contrast(1.08)',
         }}
       />
 
-      {/* Layer 2 — accent radial lighting */}
+      {/* Layer 1 — dark base overlay */}
+      <div style={{
+        position: 'absolute', inset: 0, zIndex: 1,
+        background: `rgba(0,0,0,${p.overlay})`,
+      }} />
+
+      {/* Layer 2 — accent radial lighting with animation */}
       <div style={{
         position: 'absolute', inset: 0, zIndex: 2, pointerEvents: 'none',
         background: `radial-gradient(ellipse ${p.lighting.size} at ${p.lighting.position}, ${p.lighting.color} 0%, rgba(0,0,0,0) 65%)`,
         mixBlendMode: 'screen',
         opacity: p.lighting.intensity,
+        animation: 'lightRay 8s ease-in-out infinite',
       }} />
 
       {/* Layer 3 — demon slayer-style breathing motif */}
       {p.breathing && <BreathingMotif color={p.breathing.color} motif={p.breathing.motif} />}
 
-      {/* Layer 6 — giant kanji watermark (if present) */}
+      {/* Layer 4 — vignette corners with depth */}
+      <div style={{
+        position: 'absolute', inset: 0, zIndex: 4, pointerEvents: 'none',
+        background: 'radial-gradient(ellipse at center, rgba(0,0,0,0) 40%, rgba(0,0,0,0.8) 100%)',
+        boxShadow: 'inset 0 0 120px rgba(0,0,0,0.6)',
+      }} />
+
+      {/* Layer 5 — paper-noise grain */}
+      <div style={{
+        position: 'absolute', inset: 0, zIndex: 5, pointerEvents: 'none', opacity: 0.08,
+        backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.95' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.5 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>")`,
+        mixBlendMode: 'overlay',
+      }} />
+
+      {/* Layer 6 — giant kanji watermark (animated) */}
       {p.kanji && (
         <div style={{
           position: 'absolute', top: '50%', left: '50%',
           transform: 'translate(-50%,-50%)',
           fontSize: '44vw', fontFamily: 'serif',
           color: p.accent,
-          opacity: 0.045,
+          opacity: 0.06,
           lineHeight: 1, userSelect: 'none', pointerEvents: 'none', zIndex: 6,
-          textShadow: `0 0 8px currentColor, 0 0 20px currentColor, 0 0 80px ${p.accent}`,
+          textShadow: `0 0 120px ${p.accent}, 0 0 200px ${p.accent}`,
+          animation: 'shimmer 6s ease-in-out infinite',
         }}>
           {p.kanji}
         </div>

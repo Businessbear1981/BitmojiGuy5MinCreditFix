@@ -1,14 +1,40 @@
+# Node
 node_modules/
-frontend/out/
-frontend/.next/
+.next/
+out/
+dist/
+build/
+.turbo/
+.vercel/
+
+# Remotion
+remotion-video/node_modules/
+remotion-video/out/
+
+# Python
 __pycache__/
-*.pyc
-*.db
-*.zip
-session_data/
-uploads/
-creditfix_data/
-generated_docs/
-.claude/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.env.local
 .env
-backend/.env
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# Temp
+tmp/
+temp/
+.claude/worktrees/

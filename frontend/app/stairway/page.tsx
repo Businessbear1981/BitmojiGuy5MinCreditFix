@@ -5,7 +5,7 @@ import { useShojiNav } from '@/lib/shojiNav'
 import { useWizardStore } from '@/store/wizardStore'
 import { TopNav } from '@/components/nav/TopNav'
 import { WizardSidebar } from '@/components/sidebar/WizardSidebar'
-import { createCheckout, manualPay } from '@/lib/api'
+import { createCheckout, manualPay, queueForRelease } from '@/lib/api'
 
 const ACCENT = '#5CFFCC'
 
@@ -22,6 +22,8 @@ export default function StairwayPage() {
       const data = await res.json()
       if (data.dev_mode) {
         setPaid(true)
+        // Queue for admin release
+        await queueForRelease()
         navigateTo('/gate')
       } else if (data.checkout_url) {
         window.location.href = data.checkout_url
@@ -44,6 +46,8 @@ export default function StairwayPage() {
       const data = await res.json()
       if (data.ok && !data.pending) {
         setPaid(true)
+        // Queue for admin release
+        await queueForRelease()
         navigateTo('/gate')
       } else if (data.pending) {
         setPendingConf(data.confirmation || '')
@@ -73,6 +77,7 @@ export default function StairwayPage() {
           zIndex: 0,
         }}
       />
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.2)', zIndex: 1 }} />
       <div style={{ position: 'relative', zIndex: 2, minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <TopNav currentStep={5} />
 
@@ -81,7 +86,7 @@ export default function StairwayPage() {
         background: `${ACCENT}0A`, borderBottom: `1px solid ${ACCENT}22`,
         fontFamily: 'var(--font-heading)', fontSize: 12, fontStyle: 'italic',
         color: ACCENT, letterSpacing: 2,
-        textShadow: `0 0 8px currentColor, 0 0 20px currentColor, 0 0 12px ${ACCENT}88, 0 0 24px ${ACCENT}44`,
+        textShadow: `0 0 12px ${ACCENT}88, 0 0 24px ${ACCENT}44`,
       }}>
         &ldquo;At the top of the staircase, there is only one gate. One toll. One payment.&rdquo;
       </div>
@@ -108,7 +113,7 @@ export default function StairwayPage() {
               fontFamily: 'var(--font-cinzel-decorative), serif',
               fontSize: '1.8rem', color: '#F0EBE0', letterSpacing: 2,
               marginTop: 0, marginBottom: 6, textAlign: 'center',
-              textShadow: `0 0 8px currentColor, 0 0 20px currentColor, 0 0 24px ${ACCENT}66`,
+              textShadow: `0 0 24px ${ACCENT}66`,
             }}>
               Pay the Toll
             </h2>
@@ -132,7 +137,7 @@ export default function StairwayPage() {
               <p style={{
                 fontFamily: 'var(--font-cinzel-decorative), serif',
                 fontSize: '2.6rem', color: ACCENT,
-                textShadow: `0 0 8px currentColor, 0 0 20px currentColor, 0 0 20px ${ACCENT}AA, 0 0 40px ${ACCENT}66, 0 0 60px ${ACCENT}33`,
+                textShadow: `0 0 20px ${ACCENT}AA, 0 0 40px ${ACCENT}66, 0 0 60px ${ACCENT}33`,
                 letterSpacing: 3, lineHeight: 1,
                 margin: 0,
               }}>

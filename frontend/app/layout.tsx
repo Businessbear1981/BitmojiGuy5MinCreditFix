@@ -20,8 +20,8 @@ const rajdhani = Rajdhani({
 })
 
 export const metadata: Metadata = {
-  title: 'BitmojiGuy 5-Min Credit Tool — AE Labs',
-  description: '5 Min. 5 Clicks. Credit Improved. AI-powered credit dispute letters.',
+  title: 'BitmojiGuy 5-Min Credit Fix — AE Labs',
+  description: '5 Min. 5 Clicks. It\'s Fixed. AI-powered credit dispute letters.',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

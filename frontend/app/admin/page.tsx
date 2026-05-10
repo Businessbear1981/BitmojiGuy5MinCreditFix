@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useShojiNav } from '@/lib/shojiNav'
+import { ReleaseQueue } from '@/components/admin/ReleaseQueue'
 
 const FLASK = process.env.NEXT_PUBLIC_FLASK_URL ?? 'http://localhost:5000'
 const GOLD = '#C9A84C'
@@ -86,7 +87,7 @@ export default function AdminPage() {
   const [pipeline, setPipeline] = useState<PipelineStats | null>(null)
   const [agentLog, setAgentLog] = useState<AgentLogEntry[]>([])
   const [pendingDMs, setPendingDMs] = useState<PendingNotification[]>([])
-  const [activeTab, setActiveTab] = useState<'cases' | 'pipeline' | 'notifications'>('cases')
+  const [activeTab, setActiveTab] = useState<'cases' | 'pipeline' | 'notifications' | 'release'>('cases')
 
   const fetchData = useCallback(async () => {
     try {
@@ -192,7 +193,7 @@ export default function AdminPage() {
     const blob = new Blob([csv], { type: 'text/csv' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
-    a.download = `credit_tool_cases_${new Date().toISOString().slice(0, 10)}.csv`
+    a.download = `creditfix_cases_${new Date().toISOString().slice(0, 10)}.csv`
     a.click()
   }
 
@@ -231,7 +232,7 @@ export default function AdminPage() {
               fontFamily: 'var(--font-cinzel-decorative), serif',
               fontSize: '1.4rem', color: '#F0EBE0', letterSpacing: 2,
               textAlign: 'center', marginBottom: 6,
-              textShadow: `0 0 8px currentColor, 0 0 20px currentColor, 0 0 20px ${GOLD}55`,
+              textShadow: `0 0 20px ${GOLD}55`,
             }}>
               Admin Access
             </h2>
@@ -308,7 +309,7 @@ export default function AdminPage() {
         <h1 style={{
           fontFamily: 'var(--font-cinzel-decorative), serif',
           fontSize: '1.1rem', color: GOLD, letterSpacing: 3, margin: 0,
-          textShadow: `0 0 8px currentColor, 0 0 20px currentColor, 0 0 14px ${GOLD}55`,
+          textShadow: `0 0 14px ${GOLD}55`,
         }}>
           Admin Dashboard
         </h1>
@@ -344,7 +345,7 @@ export default function AdminPage() {
                 <div style={{
                   fontFamily: 'var(--font-cinzel-decorative), serif',
                   fontSize: '1.8rem', color: s.color, lineHeight: 1,
-                  textShadow: `0 0 8px currentColor, 0 0 20px currentColor, 0 0 12px ${s.color}55`,
+                  textShadow: `0 0 12px ${s.color}55`,
                 }}>
                   {s.value}
                 </div>
@@ -371,7 +372,7 @@ export default function AdminPage() {
                 <div style={{
                   fontFamily: 'var(--font-cinzel-decorative), serif',
                   fontSize: '1.4rem', color: REF_COLORS[src] || '#8A8278',
-                  textShadow: `0 0 8px currentColor, 0 0 20px currentColor, 0 0 10px ${REF_COLORS[src] || '#8A8278'}44`,
+                  textShadow: `0 0 10px ${REF_COLORS[src] || '#8A8278'}44`,
                 }}>
                   {count}
                 </div>
@@ -403,7 +404,7 @@ export default function AdminPage() {
                 background: 'rgba(10,8,4,0.6)', border: `1px solid ${s.color}15`,
                 borderRadius: 6, padding: '14px 10px', textAlign: 'center',
               }}>
-                <div style={{ fontFamily: 'var(--font-cinzel-decorative), serif', fontSize: '1.4rem', color: s.color, textShadow: `0 0 8px currentColor, 0 0 20px currentColor, 0 0 8px ${s.color}44` }}>{s.value}</div>
+                <div style={{ fontFamily: 'var(--font-cinzel-decorative), serif', fontSize: '1.4rem', color: s.color, textShadow: `0 0 8px ${s.color}44` }}>{s.value}</div>
                 <div style={{ fontFamily: 'var(--font-body)', fontSize: 8, color: '#8A8278', letterSpacing: 1, textTransform: 'uppercase', marginTop: 4 }}>{s.label}</div>
               </div>
             ))}
@@ -451,14 +452,14 @@ export default function AdminPage() {
 
         {/* Tabs */}
         <div style={{ display: 'flex', gap: 0, marginBottom: 20, borderBottom: `1px solid ${GOLD}22` }}>
-          {(['cases', 'pipeline', 'notifications'] as const).map((tab) => (
+          {(['cases', 'pipeline', 'notifications', 'release'] as const).map((tab) => (
             <button key={tab} onClick={() => setActiveTab(tab)} style={{
               fontFamily: 'var(--font-cinzel), serif', fontSize: 12, letterSpacing: 2,
               textTransform: 'uppercase', padding: '10px 24px', cursor: 'pointer',
               background: 'transparent', border: 'none',
               color: activeTab === tab ? GOLD : '#8A8278',
               borderBottom: activeTab === tab ? `2px solid ${GOLD}` : '2px solid transparent',
-              textShadow: `0 0 8px currentColor, 0 0 20px currentColor${activeTab === tab ? `, 0 0 8px ${GOLD}44` : ''}`,
+              textShadow: activeTab === tab ? `0 0 8px ${GOLD}44` : 'none',
             }}>
               {tab}{tab === 'notifications' && pendingDMs.length > 0 ? ` (${pendingDMs.length})` : ''}
             </button>
@@ -515,7 +516,7 @@ export default function AdminPage() {
             <span style={{
               fontFamily: 'var(--font-cinzel), serif', fontSize: 15,
               color: GOLD, letterSpacing: 2,
-              textShadow: `0 0 8px currentColor, 0 0 20px currentColor, 0 0 10px ${GOLD}44`,
+              textShadow: `0 0 10px ${GOLD}44`,
             }}>
               All Cases
             </span>
@@ -612,7 +613,7 @@ export default function AdminPage() {
                         padding: '10px 12px', textAlign: 'center',
                         fontFamily: 'var(--font-cinzel-decorative), serif',
                         fontSize: 16, color: GOLD,
-                        textShadow: `0 0 8px currentColor, 0 0 20px currentColor, 0 0 8px ${GOLD}44`,
+                        textShadow: `0 0 8px ${GOLD}44`,
                       }}>
                         {e.dispute_count || 0}
                       </td>
@@ -644,7 +645,7 @@ export default function AdminPage() {
             ) : (
               <div style={{ background: 'rgba(10,8,4,0.5)', border: `1px solid ${GOLD}15`, borderRadius: 8, overflow: 'hidden' }}>
                 <div style={{ padding: '16px 20px', borderBottom: `1px solid ${GOLD}15` }}>
-                  <span style={{ fontFamily: 'var(--font-cinzel), serif', fontSize: 15, color: GOLD, letterSpacing: 2, textShadow: `0 0 8px currentColor, 0 0 20px currentColor, 0 0 10px ${GOLD}44` }}>
+                  <span style={{ fontFamily: 'var(--font-cinzel), serif', fontSize: 15, color: GOLD, letterSpacing: 2, textShadow: `0 0 10px ${GOLD}44` }}>
                     Agent Activity Log
                   </span>
                 </div>
@@ -733,6 +734,10 @@ export default function AdminPage() {
               </div>
             )}
           </div>
+        )}
+
+        {activeTab === 'release' && (
+          <ReleaseQueue />
         )}
       </div>
     </div>

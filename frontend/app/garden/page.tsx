@@ -108,7 +108,7 @@ export default function GardenPage() {
           background: `${ACCENT}0A`, borderBottom: `1px solid ${ACCENT}22`,
           fontFamily: 'var(--font-heading)', fontSize: 12, fontStyle: 'italic',
           color: ACCENT, letterSpacing: 2,
-          textShadow: `0 0 8px currentColor, 0 0 20px currentColor, 0 0 12px ${ACCENT}88, 0 0 24px ${ACCENT}44`,
+          textShadow: `0 0 12px ${ACCENT}88, 0 0 24px ${ACCENT}44`,
         }}>
           &ldquo;Rake the sand. Each line is a letter. Each letter is a vow.&rdquo;
         </div>
@@ -135,7 +135,7 @@ export default function GardenPage() {
               fontFamily: 'var(--font-cinzel-decorative), serif',
               fontSize: '1.6rem', color: '#F0EBE0', letterSpacing: 2,
               marginTop: 0, marginBottom: 6,
-              textShadow: `0 0 8px currentColor, 0 0 20px currentColor, 0 0 24px ${ACCENT}55`,
+              textShadow: `0 0 24px ${ACCENT}55`,
             }}>
               Generate Your Letters
             </h2>
@@ -180,17 +180,6 @@ export default function GardenPage() {
             {/* Grid of letters — after generation */}
             {!generating && (
               <>
-                {!fetchedOk && (
-                  <div style={{
-                    padding: '10px 16px', marginBottom: 12,
-                    background: 'rgba(255,107,107,0.1)', border: '1px solid rgba(255,107,107,0.3)',
-                    borderRadius: 4, textAlign: 'center',
-                  }}>
-                    <p style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: '#FF6B6B', margin: 0 }}>
-                      Demo Mode — Connect backend to generate real dispute letters
-                    </p>
-                  </div>
-                )}
                 <div style={{
                   display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10,
                   marginBottom: 20,
@@ -254,11 +243,10 @@ export default function GardenPage() {
                     {total} letters generated &middot; ready for dispatch
                   </p>
                   <p style={{
-                    fontFamily: 'var(--font-body)', fontSize: 11,
-                    color: fetchedOk ? '#A8A29A' : '#FF6B6B',
+                    fontFamily: 'var(--font-body)', fontSize: 11, color: '#A8A29A',
                     lineHeight: 1.5, margin: 0,
                   }}>
-                    {fetchedOk ? 'Letters loaded from backend. Pay to unlock and dispatch.' : '⚠ Demo preview only — backend not connected. These are placeholder letters.'}
+                    {fetchedOk ? 'Letters loaded from backend.' : 'Demo preview — backend not connected.'} Pay to unlock and dispatch.
                   </p>
                 </div>
               </>

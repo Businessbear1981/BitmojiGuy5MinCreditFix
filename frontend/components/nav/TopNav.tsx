@@ -49,7 +49,7 @@ export function TopNav({ currentStep }: TopNavProps) {
             BitmojiGuy{' '}<span style={{ color: '#F0EBE0' }}>5 Min</span>
           </span>
           <span style={{ fontFamily: 'var(--font-cinzel-decorative), serif', fontSize: '0.65rem', color: '#C9A84C', letterSpacing: 2 }}>
-            Credit Tool&trade;
+            CreditFix&trade;
           </span>
           <span style={{ fontFamily: 'var(--font-rajdhani), sans-serif', fontSize: 7, color: '#8B6914', letterSpacing: 4, textTransform: 'uppercase' }}>
             Arden Edge Capital &middot; AE.CC.001
@@ -63,14 +63,12 @@ export function TopNav({ currentStep }: TopNavProps) {
           {[1, 2, 3, 4, 5, 6, 7].map((n) => {
             const isDone = n < currentStep
             const isCurrent = n === currentStep
-            const isFuture = n > currentStep
             const color = STEP_COLORS[n - 1]
 
             return (
               <button
                 key={n}
-                onClick={() => !isFuture && navigateTo(STEP_ROUTES[n - 1])}
-                disabled={isFuture}
+                onClick={() => navigateTo(STEP_ROUTES[n - 1])}
                 style={{
                   width: 28,
                   height: 28,
@@ -81,7 +79,7 @@ export function TopNav({ currentStep }: TopNavProps) {
                   fontSize: 12,
                   fontWeight: 700,
                   fontFamily: 'var(--font-heading)',
-                  cursor: isFuture ? 'not-allowed' : 'pointer',
+                  cursor: 'pointer',
                   transition: 'all 0.25s',
                   border: isDone
                     ? '2px solid #1A6B4A'
@@ -99,7 +97,6 @@ export function TopNav({ currentStep }: TopNavProps) {
                   boxShadow: isCurrent
                     ? `0 0 12px ${color}44`
                     : 'none',
-                  opacity: isFuture ? 0.4 : 1,
                 }}
               >
                 {isDone ? '✓' : n}
@@ -119,7 +116,7 @@ export function TopNav({ currentStep }: TopNavProps) {
           color: accentColor,
           transition: 'color 0.4s',
         }}>
-          5 Min &middot; 5 Clicks &middot; Credit Improved
+          5 Min &middot; 5 Clicks &middot; It&apos;s Fixed
         </span>
         <span style={{
           fontFamily: 'var(--font-body)',

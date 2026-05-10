@@ -20,19 +20,19 @@ export function useShojiNav() {
 }
 
 export function ShojiNavProvider({ children }: { children: ReactNode }) {
-  // Doors start OPEN so initial page is interactive immediately
-  const [shojiOpen, setShojiOpen] = useState(true)
+  // Doors start CLOSED so they can open on initial load
+  const [shojiOpen, setShojiOpen] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
   const isClosing = useRef(false)
 
   // Always open doors after any route change — regardless of how we got there
   useEffect(() => {
-    // Small delay so the new page has mounted
+    // Keep doors closed briefly to show the opening animation
     const t = setTimeout(() => {
       isClosing.current = false
       setShojiOpen(true)
-    }, 60)
+    }, 300)  // Increased delay to let doors stay closed longer
     return () => clearTimeout(t)
   }, [pathname])
 
@@ -44,10 +44,10 @@ export function ShojiNavProvider({ children }: { children: ReactNode }) {
     // Close doors
     setShojiOpen(false)
 
-    // Wait for close animation, then navigate
+    // Wait for close animation (1.1s from ShojiDoors DURATION), then navigate
     setTimeout(() => {
       router.push(path)
-    }, 700)
+    }, 1100)
   }, [router, pathname])
 
   return (

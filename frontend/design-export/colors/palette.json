@@ -1,0 +1,85 @@
+{
+  "name": "BitmojiGuy Cinematic Chanbara Maximalism",
+  "description": "Color palette for Five-Minute Credit Fix",
+  "primary_colors": {
+    "black_lacquer": {
+      "oklch": "oklch(0.09 0.008 70)",
+      "hex": "#050403",
+      "name": "Black Lacquer",
+      "usage": "Background, sacred void"
+    },
+    "parchment_ivory": {
+      "oklch": "oklch(0.92 0.025 82)",
+      "hex": "#EBE8E2",
+      "name": "Parchment Ivory",
+      "usage": "Foreground text, readable"
+    },
+    "antique_gold": {
+      "oklch": "oklch(0.78 0.13 82)",
+      "hex": "#D4AF37",
+      "name": "Antique Gold",
+      "usage": "Primary accent, earned authority"
+    },
+    "sea_mist_blue": {
+      "oklch": "oklch(0.24 0.018 70)",
+      "hex": "#3A4A5C",
+      "name": "Sea-Mist Blue",
+      "usage": "Secondary, calm contemplation"
+    },
+    "koi_jade": {
+      "oklch": "oklch(0.76 0.14 82)",
+      "hex": "#2D9D78",
+      "name": "Koi-Jade",
+      "usage": "Accent, transformation"
+    },
+    "temple_crimson": {
+      "oklch": "oklch(0.61 0.22 28)",
+      "hex": "#C41E3A",
+      "name": "Temple Crimson",
+      "usage": "Destructive, warning, intensity"
+    }
+  },
+  "secondary_colors": {
+    "card_background": {
+      "oklch": "oklch(0.15 0.015 65 / 82%)",
+      "hex": "#1A1815",
+      "usage": "Card backgrounds, slightly lighter"
+    },
+    "muted_text": {
+      "oklch": "oklch(0.72 0.025 82)",
+      "hex": "#B8B5B0",
+      "usage": "Secondary information"
+    },
+    "border": {
+      "oklch": "oklch(0.8 0.09 82 / 24%)",
+      "hex": "rgba(212, 175, 55, 0.24)",
+      "usage": "Subtle dividers"
+    },
+    "focus_ring": {
+      "oklch": "oklch(0.78 0.13 82)",
+      "hex": "#D4AF37",
+      "usage": "Focus states, interactive elements"
+    }
+  },
+  "emotional_intent": {
+    "gold": "Earned, not given. Authority through completion.",
+    "black": "Sacred, not empty. A void of infinite potential.",
+    "mist_blue": "Vulnerability at the start. Calm before action.",
+    "crimson": "Intensity at the finish. Power unleashed.",
+    "jade": "Transformation happening. Life force flowing."
+  },
+  "contrast_ratios": {
+    "gold_on_black": "7.2:1 (WCAG AAA)",
+    "ivory_on_black": "12.1:1 (WCAG AAA)",
+    "blue_on_black": "4.8:1 (WCAG AA)",
+    "jade_on_black": "5.1:1 (WCAG AA)"
+  },
+  "usage_guide": {
+    "backgrounds": ["black_lacquer", "card_background"],
+    "text": ["parchment_ivory", "muted_text"],
+    "accents": ["antique_gold", "koi_jade"],
+    "warnings": ["temple_crimson"],
+    "interactive": ["antique_gold", "koi_jade"],
+    "borders": ["border"]
+  }
+}

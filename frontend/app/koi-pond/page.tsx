@@ -2,13 +2,27 @@
 
 import { useState, useEffect } from 'react'
 import { useShojiNav } from '@/lib/shojiNav'
-import { useWizardStore } from '@/store/wizardStore'
 import { TopNav } from '@/components/nav/TopNav'
 import { WizardSidebar } from '@/components/sidebar/WizardSidebar'
-import { reviewDisputes, getDisputes } from '@/lib/api'
-import type { DisputeItem } from '@/lib/parseReport'
+import { getDisputes, reviewDisputes } from '@/lib/api'
 
 const ACCENT = '#33FFB8'
+
+interface DisputeItem {
+  creditor: string
+  account_number: string
+  type: string
+  amount: string
+  date: string
+  dispute: boolean
+  dispute_box: string
+  dispute_label: string
+  sol_expired?: boolean
+  account_age_years?: number
+  // fallback fields from regex parser
+  text?: string
+  label?: string
+}
 
 const BOX_COLORS: Record<string, string> = {
   collections: '#FF6B6B',
@@ -20,36 +34,32 @@ const BOX_COLORS: Record<string, string> = {
 
 export default function KoiPondPage() {
   const { navigateTo } = useShojiNav()
-  const storeItems = useWizardStore((s) => s.disputeItems)
   const [items, setItems] = useState<DisputeItem[]>([])
   const [loading, setLoading] = useState(true)
   const [fetchedReal, setFetchedReal] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
-  // Load disputes from store first, fall back to Flask
   useEffect(() => {
-    if (storeItems.length > 0) {
-      setItems(storeItems.map((d) => ({ ...d, dispute: true })))
-      setFetchedReal(true)
-      setLoading(false)
-    } else {
-      // Try Flask session as fallback
-      (async () => {
-        try {
-          const res = await getDisputes()
-          if (res.ok) {
-            const data = await res.json()
-            if (data.dispute_items?.length > 0) {
-              setItems(data.dispute_items.map((d: DisputeItem) => ({ ...d, dispute: true })))
-              setFetchedReal(true)
-            }
+    (async () => {
+      try {
+        const res = await getDisputes()
+        if (res.ok) {
+          const data = await res.json()
+          const disputeItems = data.dispute_items || []
+          if (disputeItems.length > 0) {
+            // Mark all as authorized by default (all negatives = disputed)
+            setItems(disputeItems.map((d: DisputeItem) => ({ ...d, dispute: true })))
+            setFetchedReal(true)
           }
-        } catch { /* Flask not running */ }
+        }
+      } catch {
+        // Flask not running
+      } finally {
         setLoading(false)
-      })()
-    }
-  }, [storeItems])
+      }
+    })()
+  }, [])
 
   function toggle(index: number) {
     setItems((prev) => prev.map((d, i) => i === index ? { ...d, dispute: !d.dispute } : d))
@@ -98,6 +108,10 @@ export default function KoiPondPage() {
         }}
       />
 
+      <div style={{
+        position: 'absolute', inset: 0, zIndex: 4, pointerEvents: 'none',
+        background: 'radial-gradient(ellipse at center, rgba(0,0,0,0) 45%, rgba(0,0,0,0.6) 100%)',
+      }} />
 
       <div style={{ position: 'relative', zIndex: 10, minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
         <TopNav currentStep={3} />
@@ -107,7 +121,7 @@ export default function KoiPondPage() {
           background: `${ACCENT}0A`, borderBottom: `1px solid ${ACCENT}22`,
           fontFamily: 'var(--font-heading)', fontSize: 12, fontStyle: 'italic',
           color: ACCENT, letterSpacing: 2,
-          textShadow: `0 0 8px currentColor, 0 0 20px currentColor, 0 0 12px ${ACCENT}88, 0 0 24px ${ACCENT}44`,
+          textShadow: `0 0 12px ${ACCENT}88, 0 0 24px ${ACCENT}44`,
         }}>
           &ldquo;The koi swims upstream. You decide which currents to fight.&rdquo;
         </div>
@@ -120,6 +134,7 @@ export default function KoiPondPage() {
 
           <div style={{
             flex: 1, padding: '2rem',
+            background: 'rgba(4,10,8,0.2)',
           }}>
             <div style={{ maxWidth: 760, margin: '0 auto' }}>
               <p style={{
@@ -132,7 +147,7 @@ export default function KoiPondPage() {
                 fontFamily: 'var(--font-cinzel-decorative), serif',
                 fontSize: '1.6rem', color: '#F0EBE0', letterSpacing: 2,
                 marginTop: 0, marginBottom: 6,
-                textShadow: `0 0 8px currentColor, 0 0 20px currentColor, 0 0 24px ${ACCENT}88, 0 0 48px ${ACCENT}44`,
+                textShadow: `0 0 24px ${ACCENT}88, 0 0 48px ${ACCENT}44`,
               }}>
                 Authorize Your Disputes
               </h2>
@@ -149,7 +164,7 @@ export default function KoiPondPage() {
               <div style={{
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                 padding: '12px 16px',
-                background: 'rgba(4,12,8,0.95)', borderLeft: `3px solid ${ACCENT}`,
+                background: `${ACCENT}11`, borderLeft: `3px solid ${ACCENT}`,
                 borderRadius: 4, marginBottom: 16,
               }}>
                 <span style={{
@@ -190,8 +205,8 @@ export default function KoiPondPage() {
                         display: 'grid', gridTemplateColumns: '36px 1fr auto',
                         alignItems: 'center', gap: 14,
                         padding: '14px 16px',
-                        background: d.dispute ? 'rgba(4,12,8,0.95)' : 'rgba(5,3,6,0.92)',
-                        border: `1px solid ${d.dispute ? ACCENT + '88' : 'rgba(138,130,120,0.25)'}`,
+                        background: d.dispute ? `${ACCENT}0F` : 'rgba(0,0,0,0.4)',
+                        border: `1px solid ${d.dispute ? ACCENT + '66' : 'rgba(138,130,120,0.15)'}`,
                         borderRadius: 6,
                         transition: 'all 0.2s',
                       }}
