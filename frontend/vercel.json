@@ -3,16 +3,6 @@
   "installCommand": "npm install",
   "outputDirectory": ".next",
   "framework": "nextjs",
-  "env": {
-    "NEXT_PUBLIC_FLASK_URL": {
-      "description": "Backend Flask API URL",
-      "required": true
-    },
-    "NEXT_PUBLIC_ADMIN_KEY": {
-      "description": "Admin authentication key",
-      "required": true
-    }
-  },
   "headers": [
     {
       "source": "/(.*)",
