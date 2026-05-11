@@ -42,6 +42,7 @@ const PARTNERS = [
     promo: 'AECREDITFIX',
     type: 'Secured Card',
     color: '#00D54B',
+    applyUrl: 'https://www.chime.com/apply-credit-builder/',
   },
   {
     name: 'Cleo',
@@ -49,6 +50,7 @@ const PARTNERS = [
     promo: 'AELABS2025',
     type: 'Credit Builder',
     color: '#5C6BC0',
+    applyUrl: 'https://www.meetcleo.com/',
   },
   {
     name: 'Amex Platinum',
@@ -56,6 +58,7 @@ const PARTNERS = [
     promo: 'AE-AMEX-PLAT',
     type: 'Unsecured',
     color: '#C0C0C0',
+    applyUrl: 'https://www.americanexpress.com/us/credit-cards/card/platinum/',
   },
   {
     name: 'Capital One Secured',
@@ -63,6 +66,7 @@ const PARTNERS = [
     promo: 'AE-CAPSECURE',
     type: 'Secured Card',
     color: '#D03027',
+    applyUrl: 'https://www.capitalone.com/credit-cards/secured-mastercard/',
   },
   {
     name: 'Capital One Quicksilver',
@@ -70,6 +74,7 @@ const PARTNERS = [
     promo: 'AE-CAPONE',
     type: 'Unsecured',
     color: '#D03027',
+    applyUrl: 'https://www.capitalone.com/credit-cards/quicksilver/',
   },
 ]
 
@@ -156,7 +161,7 @@ export default function WatcherPage() {
         <div style={{ flex: 1, display: 'flex' }}>
           <WizardSidebar step={7} mascotSpeech="The Watcher tracks every deadline. 30, 60, 90 days. Each milestone has a weapon." />
 
-          <div style={{ flex: 1, padding: '2rem', background: 'linear-gradient(180deg, rgba(20,10,8,0.45), rgba(10,5,4,0.55))', backdropFilter: 'blur(6px)', display: 'flex', flexDirection: 'column', alignItems: 'center', overflowY: 'auto' }}>
+          <div style={{ flex: 1, padding: '2rem', background: 'linear-gradient(180deg, rgba(20,10,8,0.45), rgba(10,5,4,0.55))', display: 'flex', flexDirection: 'column', alignItems: 'center', overflowY: 'auto' }}>
             <div style={{ width: '100%', maxWidth: 720 }}>
               <p style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: ACCENT, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 4 }}>
                 Step 7 of 7 &middot; 眼 &middot; The Watcher
@@ -376,11 +381,25 @@ export default function WatcherPage() {
                         </div>
                         <p style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: '#A8A29A', margin: 0, lineHeight: 1.4 }}>{p.desc}</p>
                       </div>
-                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                        <p style={{ fontFamily: 'var(--font-body)', fontSize: 9, color: '#8A8278', letterSpacing: 1, textTransform: 'uppercase', margin: '0 0 4px' }}>Promo Code</p>
+                      <div style={{ textAlign: 'right', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+                        <a
+                          href={p.applyUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            fontFamily: 'var(--font-heading)', fontSize: 11, letterSpacing: 2,
+                            textTransform: 'uppercase', textDecoration: 'none',
+                            color: '#050403', background: `linear-gradient(135deg, ${p.color}, ${p.color}CC)`,
+                            padding: '8px 18px', borderRadius: 4, cursor: 'pointer',
+                            boxShadow: `0 2px 12px ${p.color}44`,
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          Apply Now
+                        </a>
                         <span style={{
-                          fontFamily: 'monospace', fontSize: 12, color: p.color,
-                          padding: '4px 10px', borderRadius: 4,
+                          fontFamily: 'monospace', fontSize: 10, color: p.color,
+                          padding: '2px 8px', borderRadius: 3,
                           background: `${p.color}15`, border: `1px solid ${p.color}33`,
                           letterSpacing: 1.5,
                           textShadow: `0 0 6px ${p.color}44`,
