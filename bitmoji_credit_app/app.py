@@ -23,20 +23,34 @@ from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from cryptography.fernet import Fernet
 import pdfplumber
-import pytesseract
-from PIL import Image
 
-# Configure Tesseract path for Windows
-_tesseract_paths = [
-    r'C:\Program Files\Tesseract-OCR\tesseract.exe',
-    r'C:\Users\sgill\AppData\Local\Programs\Tesseract-OCR\tesseract.exe',
-    os.environ.get('TESSERACT_CMD', ''),
-]
-for _tp in _tesseract_paths:
-    if _tp and os.path.isfile(_tp):
-        pytesseract.pytesseract.tesseract_cmd = _tp
-        break
-from docx import Document as DocxDocument
+try:
+    import pytesseract
+    from PIL import Image
+    _tesseract_paths = [
+        r'C:\Program Files\Tesseract-OCR\tesseract.exe',
+        r'C:\Users\sgill\AppData\Local\Programs\Tesseract-OCR\tesseract.exe',
+        os.environ.get('TESSERACT_CMD', ''),
+    ]
+    for _tp in _tesseract_paths:
+        if _tp and os.path.isfile(_tp):
+            pytesseract.pytesseract.tesseract_cmd = _tp
+            break
+    HAS_OCR = True
+except ImportError:
+    pytesseract = None
+    Image = None
+    HAS_OCR = False
+    print("[INFO] pytesseract/Pillow not available — OCR disabled, PDF/text parsing still works")
+
+try:
+    from docx import Document as DocxDocument
+    HAS_DOCX = True
+except ImportError:
+    DocxDocument = None
+    HAS_DOCX = False
+    print("[INFO] python-docx not available — DOCX parsing disabled")
+
 from bs4 import BeautifulSoup
 import stripe
 import requests as http_requests
