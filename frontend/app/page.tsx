@@ -211,7 +211,20 @@ export default function Home() {
               margin: '0.5rem 0 0',
             }}
           >
-            5 Min. 5 Clicks. It&apos;s Fixed.
+            5 Min. 5 Clicks. Credit Tool.
+          </p>
+          <p
+            style={{
+              fontFamily: 'var(--font-cinzel), serif',
+              fontSize: 'clamp(0.7rem, 1.4vw, 0.95rem)',
+              fontStyle: 'italic',
+              color: '#C9A84C',
+              letterSpacing: 2,
+              textShadow: '0 0 14px rgba(201,168,76,0.2), 0 2px 8px rgba(0,0,0,0.8)',
+              margin: '0.6rem 0 0',
+            }}
+          >
+            Your first step towards financial wellness
           </p>
         </div>
 
