@@ -6,6 +6,7 @@
 
 import os
 import json
+import requests
 from datetime import datetime
 from typing import Dict, List, Optional
 
@@ -72,34 +73,54 @@ class TripleSageAdmin:
             'state': state,
             'model': self.grok_model,
         })
-        
-        # PLACEHOLDER: In production, call Grok API
-        # For now, return structured template with statute references
-        
-        return {
-            'federal_statutes': [
-                'FCRA § 611 (Dispute Procedures)',
-                'FDCPA § 809 (Debt Validation)',
-                '15 U.S.C. § 1681 (Fair Credit Reporting)',
-            ],
-            'state_statutes': [
-                f'{state} Consumer Protection Code',
-                f'{state} Fair Debt Collection Practices Act',
-            ],
-            'ucc_sections': [
-                'UCC § 3-308 (Burden of Establishing Signatures)',
-                'UCC § 4-406 (Customer Duties)',
-            ],
-            'credit_statutes': [
-                'Regulation V (Credit Reporting)',
-                'Regulation Z (Truth in Lending)',
-            ],
-            'legal_precedent': [
-                'Spokeo, Inc. v. Robins (standing requirements)',
-                'Transunion LLC v. Ramirez (damages)',
-            ],
-            'reasoning': f'Grok analysis for {dispute_type} in {state}: Statute citations and legal precedent.',
+
+        fallback = {
+            'federal_statutes': ['FCRA § 611', 'FDCPA § 809', '15 U.S.C. § 1681'],
+            'state_statutes': [f'{state} Consumer Protection Code'],
+            'ucc_sections': ['UCC § 3-308', 'UCC § 4-406'],
+            'credit_statutes': ['Regulation V', 'Regulation Z'],
+            'legal_precedent': ['Spokeo v. Robins', 'TransUnion v. Ramirez'],
+            'reasoning': f'Fallback analysis for {dispute_type} in {state}.',
         }
+
+        if not self.grok_api_key:
+            return fallback
+
+        try:
+            resp = requests.post(
+                'https://api.x.ai/v1/chat/completions',
+                headers={'Authorization': f'Bearer {self.grok_api_key}', 'Content-Type': 'application/json'},
+                json={
+                    'model': self.grok_model,
+                    'messages': [
+                        {'role': 'system', 'content': 'You are a legal research assistant specializing in U.S. consumer credit law (FCRA, FDCPA, UCC, CROA, Regulation V/Z, state consumer protection). Return ONLY valid JSON.'},
+                        {'role': 'user', 'content': json.dumps({
+                            'task': 'legal_analysis',
+                            'dispute_type': dispute_type,
+                            'state': state,
+                            'output_schema': {
+                                'federal_statutes': ['list of specific U.S.C. citations'],
+                                'state_statutes': ['list of state-specific statutes'],
+                                'ucc_sections': ['UCC sections applicable to credit disputes'],
+                                'credit_statutes': ['Regulation V, Z, CROA, TILA citations'],
+                                'legal_precedent': ['case name, citation, and holding'],
+                                'reasoning': 'analysis paragraph',
+                            },
+                        })},
+                    ],
+                    'temperature': 0.2,
+                },
+                timeout=30,
+            )
+            if resp.status_code == 200:
+                content = resp.json()['choices'][0]['message']['content']
+                parsed = json.loads(content)
+                self.log_admin_action('GROK_SUCCESS', {'dispute_type': dispute_type, 'state': state})
+                return parsed
+        except Exception as e:
+            self.log_admin_action('GROK_ERROR', {'error': str(e)})
+
+        return fallback
     
     # ─────────────────────────────────────────────────────────────────────────
     # PHASE 2: CLAUDE — Narrative Crafting & Proofreading
@@ -123,35 +144,47 @@ class TripleSageAdmin:
             'dispute_type': dispute_type,
             'model': self.claude_model,
         })
-        
-        # PLACEHOLDER: In production, call Claude API
-        # For now, return structured narrative template
-        
-        return {
-            'narrative': f'''
-Dear Credit Reporting Agency,
 
-I am writing to formally dispute the {dispute_type} account on my credit report.
-This account is inaccurate and violates my rights under the Fair Credit Reporting Act.
-
-Legal Basis:
-- {legal_analysis['federal_statutes'][0]}
-- {legal_analysis['state_statutes'][0]}
-
-I demand immediate investigation and removal of this inaccuracy.
-
-Sincerely,
-[Consumer Name]
-            '''.strip(),
+        fallback = {
+            'narrative': f'Dear Credit Reporting Agency,\n\nI formally dispute the {dispute_type} items on my credit report under FCRA § 611.\n\nLegal Basis:\n- {legal_analysis["federal_statutes"][0]}\n- {legal_analysis["state_statutes"][0]}\n\nI demand immediate investigation and removal.\n\nSincerely,\n[Consumer Name]',
             'tone': 'professional, urgent, legally grounded',
-            'key_phrases': [
-                'formal dispute',
-                'Fair Credit Reporting Act',
-                'inaccurate',
-                'immediate investigation',
-            ],
-            'proofreading_notes': 'Narrative is clear, concise, and legally sound.',
+            'key_phrases': ['formal dispute', 'FCRA', 'immediate investigation'],
+            'proofreading_notes': 'Fallback template — Claude API not called.',
         }
+
+        if not self.claude_api_key:
+            return fallback
+
+        try:
+            resp = requests.post(
+                'https://api.anthropic.com/v1/messages',
+                headers={
+                    'x-api-key': self.claude_api_key,
+                    'anthropic-version': '2023-06-01',
+                    'content-type': 'application/json',
+                },
+                json={
+                    'model': self.claude_model,
+                    'max_tokens': 2000,
+                    'messages': [{'role': 'user', 'content': json.dumps({
+                        'task': 'craft_dispute_letter_template',
+                        'dispute_type': dispute_type,
+                        'legal_analysis': legal_analysis,
+                        'instructions': 'Write a compelling, legally-sound dispute letter template for a credit bureau. Cite specific statutes from the legal analysis. Use placeholders {bureau}, {name}, {items}, {confirmation}, {date}, {state_law}. Tone: professional but firm. Return JSON with keys: narrative, tone, key_phrases (list), proofreading_notes.',
+                    })}],
+                    'system': 'You are a consumer credit dispute letter writer. Write templates that cite specific FCRA/FDCPA statutes, are professionally assertive, and demand action within 30 days. Return ONLY valid JSON.',
+                },
+                timeout=30,
+            )
+            if resp.status_code == 200:
+                content = resp.json()['content'][0]['text']
+                parsed = json.loads(content)
+                self.log_admin_action('CLAUDE_SUCCESS', {'dispute_type': dispute_type})
+                return parsed
+        except Exception as e:
+            self.log_admin_action('CLAUDE_ERROR', {'error': str(e)})
+
+        return fallback
     
     # ─────────────────────────────────────────────────────────────────────────
     # PHASE 3: MANUS — Orchestration & Template Update

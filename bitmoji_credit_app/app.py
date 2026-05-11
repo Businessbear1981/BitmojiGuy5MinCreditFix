@@ -149,13 +149,15 @@ def load_submission(sid):
 # GILMORE DISPUTE ORDER — enforced sequence for maximum impact
 # ═════════════════════════════════════════════════════════════════════════════
 
-GILMORE_ORDER = ['wrong_addresses', 'unknown_accounts', 'collections', 'aged_debt', 'late_payments', 'mov_demand']
+GILMORE_ORDER = ['wrong_addresses', 'identity_theft', 'inquiries', 'unknown_accounts', 'collections', 'aged_debt', 'late_payments', 'mov_demand']
 GILMORE_LABELS = {
     'wrong_addresses': 'Phase 1: Personal Info',
-    'unknown_accounts': 'Phase 2: Inquiries & Unknown Accounts',
-    'collections': 'Phase 3: Collections',
-    'aged_debt': 'Phase 4: Charge-Offs & Aged Debt',
-    'late_payments': 'Phase 5: Late Payments',
+    'identity_theft': 'Phase 2: Identity Theft & Fraud',
+    'inquiries': 'Phase 3: Unauthorized Inquiries',
+    'unknown_accounts': 'Phase 4: Unknown Accounts',
+    'collections': 'Phase 5: Collections',
+    'aged_debt': 'Phase 6: Charge-Offs & Aged Debt',
+    'late_payments': 'Phase 7: Late Payments',
     'mov_demand': 'Follow-Up: Method of Verification',
 }
 
@@ -240,11 +242,29 @@ DISPUTE_PATTERNS = {
         'label': 'Unknown / Unrecognized Account',
         'patterns': [
             r'(?i)(?:authorized\s+user|au\s+account)',
-            r'(?i)inquir(?:y|ies)',
-            r'(?i)(?:hard|soft)\s+(?:pull|inquiry)',
             r'(?i)account\s+(?:number|#|no)[\s.:]*\w{4,}',
         ],
         'extract': r'(?i)((?:account|acct)[\s#.:]*\w*.{0,80})',
+    },
+    'inquiries': {
+        'label': 'Hard / Soft Inquiry',
+        'patterns': [
+            r'(?i)inquir(?:y|ies)',
+            r'(?i)(?:hard|soft)\s+(?:pull|inquiry)',
+            r'(?i)promotional\s+inquiry',
+            r'(?i)(?:unauthorized|unknown)\s+inquiry',
+        ],
+        'extract': r'(?i)((?:inquir|pull)\w*.{0,80}(?:\d{1,2}/\d{2,4}|\w+\s+\d{4}))',
+    },
+    'identity_theft': {
+        'label': 'Identity Theft / Fraud',
+        'patterns': [
+            r'(?i)(?:identity|id)\s+theft',
+            r'(?i)fraud\s+(?:alert|victim|report)',
+            r'(?i)(?:not\s+mine|did\s+not\s+open|unauthorized\s+account)',
+            r'(?i)mixed\s+file',
+        ],
+        'extract': r'(?i)((?:fraud|identity|theft|unauthorized|mixed).{0,100})',
     },
     'aged_debt': {
         'label': 'Aged / Time-Barred Debt',
@@ -295,6 +315,8 @@ NEGATIVE_MARKS = {
     'bankruptcy': r'(?i)bankrupt',
     'judgment': r'(?i)judg(?:e)?ment',
     'settled': r'(?i)settled?\s+(?:for\s+)?less',
+    'inquiry': r'(?i)inquir(?:y|ies)|hard\s+pull',
+    'fraud': r'(?i)(?:identity|id)\s+theft|fraud',
 }
 
 
@@ -343,9 +365,11 @@ MARK_TO_DISPUTE_BOX = {
     'foreclosure':   'collections',
     'judgment':      'collections',
     'late_payment':  'late_payments',
-    'bankruptcy':    'unknown_accounts',
+    'bankruptcy':    'identity_theft',
     'settled':       'aged_debt',
     'negative_item': 'unknown_accounts',
+    'inquiry':       'inquiries',
+    'fraud':         'identity_theft',
 }
 
 DISPUTE_BOX_LABELS = {
@@ -354,6 +378,9 @@ DISPUTE_BOX_LABELS = {
     'wrong_addresses':   'Incorrect Address',
     'unknown_accounts':  'Unknown / Unrecognized Account',
     'aged_debt':         'Aged / Time-Barred Debt',
+    'inquiries':         'Hard / Soft Inquiry',
+    'identity_theft':    'Identity Theft / Fraud',
+    'mov_demand':        'Method of Verification Demand',
 }
 
 
@@ -888,6 +915,148 @@ Sincerely,
 {name}
 Date: {date}"""},
     ],
+    'inquiries': [
+        {'variant': 'A', 'title': 'Unauthorized Hard Inquiry Removal',
+         'body': """Dear {bureau},
+
+I dispute the following hard inquiries on my credit report. I did not authorize these creditors to access my file.
+
+Disputed Item(s):
+{items}
+
+Consumer: {name} | Ref: {confirmation}
+
+Under FCRA Section 604, a permissible purpose is required to pull a consumer's credit report. I did not apply for credit with these companies. I request:
+1. Verification that a valid permissible purpose existed
+2. Copy of the authorization I allegedly provided
+3. Immediate removal of all unauthorized inquiries
+4. Written confirmation within 30 days
+
+Unauthorized access to my credit file is a federal violation.
+
+{state_law}
+
+Sincerely,
+{name}
+Date: {date}"""},
+        {'variant': 'B', 'title': 'Promotional / Soft Inquiry Challenge',
+         'body': """Dear {bureau},
+
+I dispute the following inquiries which appear to be promotional or unauthorized soft pulls improperly reported as hard inquiries.
+
+Disputed Item(s):
+{items}
+
+Consumer: {name} | Ref: {confirmation}
+
+I did not initiate these inquiries. Under FCRA Section 604(c), soft inquiries for pre-approved offers should not appear as hard pulls. I request:
+1. Reclassification as soft inquiries if promotional
+2. Complete removal if no permissible purpose exists
+3. Documentation of the inquiry source
+4. Written confirmation within 30 days
+
+{state_law}
+
+Sincerely,
+{name}
+Date: {date}"""},
+        {'variant': 'C', 'title': 'Inquiry Dispute -- FCRA 604 Violation',
+         'body': """Dear {bureau},
+
+I formally dispute the inquiries listed below under FCRA Section 604 (permissible purposes) and Section 611 (dispute procedures).
+
+Disputed Item(s):
+{items}
+
+Consumer: {name} | Ref: {confirmation}
+
+No permissible purpose existed for these credit pulls. I demand:
+1. Proof of written authorization from me for each inquiry
+2. If no authorization exists, immediate deletion
+3. Notification to the inquiring party of the dispute
+4. Written results within 30 days
+
+Failure to remove unauthorized inquiries will result in a CFPB complaint.
+
+{state_law}
+
+Sincerely,
+{name}
+Date: {date}"""},
+    ],
+    'identity_theft': [
+        {'variant': 'A', 'title': 'Identity Theft Dispute -- FCRA 605B Block',
+         'body': """Dear {bureau},
+
+I am a victim of identity theft. I dispute the following accounts and information that were placed on my credit report fraudulently.
+
+Disputed Item(s):
+{items}
+
+Consumer: {name} | Ref: {confirmation}
+
+Under FCRA Section 605B, I request that you block all information resulting from identity theft within 4 business days. I request:
+1. Immediate blocking of all fraudulent accounts
+2. Notification to all furnishers that these accounts are disputed as fraud
+3. Removal of all associated inquiries
+4. Written confirmation of blocking within 4 business days
+
+I am prepared to provide an FTC Identity Theft Report and police report if required.
+
+{state_law}
+
+Sincerely,
+{name}
+Date: {date}"""},
+        {'variant': 'B', 'title': 'Fraud Alert & Account Freeze Request',
+         'body': """Dear {bureau},
+
+I dispute the following items as the result of identity theft or fraud. I request an extended fraud alert on my file.
+
+Disputed Item(s):
+{items}
+
+Consumer: {name} | Ref: {confirmation}
+
+Under FCRA Section 605A, I request:
+1. Extended fraud alert (7 years) placed on my file
+2. Removal of all accounts I did not open
+3. Removal of all inquiries I did not authorize
+4. A copy of my file with the fraudulent items flagged
+5. Written confirmation within 30 days
+
+I will provide an identity theft affidavit upon request.
+
+{state_law}
+
+Sincerely,
+{name}
+Date: {date}"""},
+        {'variant': 'C', 'title': 'Mixed File / Wrong Consumer Dispute',
+         'body': """Dear {bureau},
+
+I dispute the following accounts and information which belong to another consumer and have been incorrectly placed on my file.
+
+Disputed Item(s):
+{items}
+
+Consumer: {name} | Ref: {confirmation}
+
+Under FCRA Section 607(b), you are required to follow reasonable procedures to ensure maximum possible accuracy. My file contains information belonging to another person with a similar name or SSN. I request:
+1. Separation of my file from any incorrectly merged consumer
+2. Removal of all tradelines, inquiries, and addresses not belonging to me
+3. Investigation into how the merge occurred
+4. Corrected copy of my report
+5. Written confirmation within 30 days
+
+Mixed files are a well-documented FCRA violation. I will escalate if unresolved.
+
+{state_law}
+
+Sincerely,
+{name}
+Date: {date}"""},
+    ],
 
     'mov_demand': [
         {'variant': 'A', 'title': 'Method of Verification Demand -- Initial',
@@ -1011,6 +1180,17 @@ FEDERAL_CASE_LAW = {
         'Johnson v. MBNA America Bank, 357 F.3d 426 (4th Cir. 2004) — furnisher has independent duty to investigate consumer disputes.',
         'Dennis v. BEH-1, LLC, 520 F.3d 1066 (9th Cir. 2008) — failure to provide method of verification is actionable under FCRA 611.',
     ],
+    'inquiries': [
+        'Pinner v. Schmidt, 805 F.2d 1258 (5th Cir. 1986) — accessing credit report without permissible purpose violates FCRA § 604.',
+        'Phillips v. Grendahl, 312 F.3d 357 (8th Cir. 2002) — impermissible purpose to pull credit report; consumer entitled to damages.',
+        'Yohay v. City of Alexandria, 407 F.3d 248 (4th Cir. 2005) — unauthorized access to credit reports actionable under § 1681n.',
+    ],
+    'identity_theft': [
+        'Sloane v. Equifax, 510 F.3d 495 (4th Cir. 2007) — CRA must block fraudulent tradelines upon receipt of identity theft report under FCRA 605B.',
+        'Cortez v. Trans Union LLC, 617 F.3d 688 (3d Cir. 2010) — mixed files violate the duty of maximum possible accuracy.',
+        'Nelson v. Chase Manhattan Mortgage, 282 F.3d 1057 (9th Cir. 2002) — furnisher cannot ignore consumer notice of identity theft.',
+        'Robins v. Spokeo Inc., 578 U.S. 330 (2016) — concrete injury from inaccurate credit reporting satisfies Article III standing.',
+    ],
 }
 
 # ── FCRA / FDCPA specific statutory citations per dispute type ─────────────
@@ -1052,6 +1232,22 @@ STATUTORY_CITATIONS = {
 - 15 U.S.C. § 1681i(a)(7) (FCRA § 611(a)(7)) — description of reinvestigation procedure must be provided
 - 15 U.S.C. § 1681n (FCRA § 616) — willful noncompliance: $100-$1,000 statutory damages per violation plus punitive damages and attorney fees
 - 15 U.S.C. § 1681o (FCRA § 617) — negligent noncompliance: actual damages plus attorney fees""",
+
+    'inquiries': """LEGAL AUTHORITY:
+- 15 U.S.C. § 1681b (FCRA § 604) — permissible purposes required for any credit inquiry; unauthorized access is a federal violation
+- 15 U.S.C. § 1681b(f) (FCRA § 604(f)) — prohibition on unauthorized access to consumer reports
+- 15 U.S.C. § 1681i (FCRA § 611) — duty to reinvestigate and remove unverifiable inquiries
+- 15 U.S.C. § 1681n (FCRA § 616) — statutory damages of $100-$1,000 per willful violation (unauthorized pull)
+- 12 C.F.R. § 1022.54 — Regulation V: duties regarding accuracy of furnished information""",
+
+    'identity_theft': """LEGAL AUTHORITY:
+- 15 U.S.C. § 1681c-2 (FCRA § 605B) — mandatory blocking of information resulting from identity theft within 4 business days
+- 15 U.S.C. § 1681c-1 (FCRA § 605A) — fraud alerts (initial 1-year and extended 7-year)
+- 15 U.S.C. § 1681i (FCRA § 611) — reinvestigation of disputed information
+- 15 U.S.C. § 1681e(b) (FCRA § 607(b)) — duty to maintain maximum possible accuracy (mixed file liability)
+- 18 U.S.C. § 1028 — federal identity theft criminal statute
+- 18 U.S.C. § 1028A — aggravated identity theft (mandatory 2-year consecutive sentence)
+- 15 U.S.C. § 1681s-2(b) (FCRA § 623(b)) — furnisher investigation obligations upon notice of identity theft""",
 }
 
 # ── State-specific case precedent database ────────────────────────────────────
@@ -1138,56 +1334,109 @@ def build_state_law_block(state_code, dispute_type):
 
 
 def generate_letters(dispute_types, items_by_type, client_data):
-    """Generate 1 letter per bureau with all disputes combined. Split if disputes exceed 5."""
+    """Generate exactly 1 combined letter per bureau (3 total). All disputes in one letter."""
     letters = []
     date_str = datetime.utcnow().strftime('%B %d, %Y')
     state_code = client_data.get('state', '')
-    
-    # Collect all disputes for this session
-    all_disputes = []
+    name = client_data.get('name', '[YOUR NAME]')
+    confirmation = client_data.get('confirmation', 'N/A')
+
+    # Collect all disputes sorted by Gilmore Order
     ordered_types = sorted(dispute_types, key=lambda t: GILMORE_ORDER.index(t) if t in GILMORE_ORDER else 99)
-    
+
+    # Build the combined dispute items section, grouped by category
+    sections = []
     for dtype in ordered_types:
         items_list = items_by_type.get(dtype, [])
         if isinstance(items_list, dict):
             items_list = items_list.get('items', [])
+        if not items_list:
+            continue
+        label = DISPUTE_PATTERNS.get(dtype, {}).get('label', dtype)
+        sections.append(f'{label}:')
         for item in items_list:
-            all_disputes.append({'type': dtype, 'label': DISPUTE_PATTERNS[dtype]['label'], 'item': item})
-    
-    # Split disputes if more than 5 (max 2 letters per bureau)
-    dispute_chunks = [all_disputes[i:i+5] for i in range(0, len(all_disputes), 5)]
-    
-    # Generate 1 letter per bureau per chunk
+            text = item if isinstance(item, str) else (item.get('text') or item.get('creditor', '') + ' ' + item.get('account_number', '')).strip()
+            sections.append(f'  - {text}')
+
+    items_fmt = '\n'.join(sections) if sections else '  - [See attached documentation]'
+
+    # Build comprehensive legal block citing ALL relevant statutes across dispute types
+    law_parts = []
+    cited_fed = set()
+    cited_cases = set()
+    for dtype in ordered_types:
+        fed_cite = STATUTORY_CITATIONS.get(dtype)
+        if fed_cite and fed_cite not in cited_fed:
+            cited_fed.add(fed_cite)
+            law_parts.append(fed_cite)
+        for case in FEDERAL_CASE_LAW.get(dtype, []):
+            if case not in cited_cases:
+                cited_cases.add(case)
+    if cited_cases:
+        law_parts.append('\nFEDERAL CASE PRECEDENT:')
+        for case in cited_cases:
+            law_parts.append(f'- {case}')
+
+    # State-specific law
+    law = STATE_LAWS.get(state_code)
+    if law:
+        sol = law['sol_written']
+        law_parts.append(f'\nSTATE LAW ({law["name"].upper()}):')
+        law_parts.append(f'- Statute of limitations for written contracts: {sol} year{"s" if sol != 1 else ""} ({law["statute"]})')
+        law_parts.append(f'- Consumer protection: {law["consumer_act"]}')
+        if law.get('extra'):
+            law_parts.append(f'- {law["extra"]}')
+        state_cases = STATE_CASE_LAW.get(state_code, {})
+        for dtype in ordered_types:
+            case_text = state_cases.get(dtype)
+            if case_text:
+                law_parts.append(f'- {case_text}')
+        default_case = state_cases.get('default')
+        if default_case:
+            law_parts.append(f'- {default_case}')
+
+    state_law = '\n'.join(law_parts)
+
+    # Generate exactly 1 letter per bureau
     for bureau in BUREAUS:
-        for chunk_idx, chunk in enumerate(dispute_chunks):
-            if not chunk:
-                continue
-            
-            # Format disputes for this letter
-            items_fmt = '\n'.join(f'  - {d["item"]} ({d["label"]})' for d in chunk)
-            state_law = build_state_law_block(state_code, 'multi_dispute')
-            
-            # Use first template variant for multi-dispute letter
-            first_type = chunk[0]['type']
-            templates = LETTER_TEMPLATES.get(first_type, [])
-            template = templates[0] if templates else {'variant': 'A', 'title': 'Dispute Letter', 'body': 'Dear {bureau},\n\nI dispute the following items:\n{items}\n\nPlease investigate and respond within 30 days.\n\n{state_law}\n\nSincerely,\n{name}\nDate: {date}'}
-            
-            letter_title = f'Dispute Letter (Part {chunk_idx + 1})' if len(dispute_chunks) > 1 else 'Dispute Letter'
-            
-            letters.append({
-                'bureau': bureau['name'],
-                'bureau_address': bureau['address'],
-                'type': 'multi_dispute',
-                'type_label': 'Multi-Dispute Letter',
-                'variant': template.get('variant', 'A'),
-                'title': letter_title,
-                'body': template.get('body', '').format(
-                    bureau=bureau['name'], items=items_fmt,
-                    name=client_data.get('name', '[YOUR NAME]'),
-                    confirmation=client_data.get('confirmation', 'N/A'),
-                    date=date_str, state_law=state_law),
-            })
-    
+        body = f"""Dear {bureau['name']},
+
+I am writing to formally dispute the following items on my credit report under the Fair Credit Reporting Act (15 U.S.C. § 1681 et seq.) and the Fair Debt Collection Practices Act (15 U.S.C. § 1692 et seq.).
+
+Consumer: {name} | Ref: {confirmation}
+
+DISPUTED ITEMS:
+{items_fmt}
+
+I dispute the accuracy, completeness, and verifiability of every item listed above. Under FCRA Section 611 (15 U.S.C. § 1681i), you are required to conduct a reasonable reinvestigation within 30 days of receipt.
+
+I demand that you:
+1. Conduct a thorough reinvestigation of each disputed item — not merely an automated e-OSCAR verification
+2. Contact each furnisher and require documentation proving the accuracy of the reported information
+3. Provide me with the method of verification used for each item per FCRA § 611(a)(6)(B)(iii)
+4. Delete or correct any item that cannot be independently verified with documentation
+5. Send me a written report of the results and a corrected copy of my credit report within 30 days
+
+If any item cannot be verified, it must be permanently deleted from my file per FCRA § 611(a)(5)(A).
+
+{state_law}
+
+I reserve all rights under federal and state law, including the right to seek statutory damages of $100–$1,000 per violation (15 U.S.C. § 1681n), actual damages (15 U.S.C. § 1681o), punitive damages, and attorney fees. Failure to respond within 30 days will result in a complaint to the Consumer Financial Protection Bureau (CFPB) and my state Attorney General.
+
+Sincerely,
+{name}
+Date: {date_str}"""
+
+        letters.append({
+            'bureau': bureau['name'],
+            'bureau_address': bureau['address'],
+            'type': 'multi_dispute',
+            'type_label': 'Combined Dispute Letter',
+            'variant': 'A',
+            'title': 'Dispute Letter',
+            'body': body,
+        })
+
     return letters
 
 
@@ -1903,6 +2152,19 @@ def admin_run_agents():
     enrolled = agents.enroll_from_db()
     results = agents.run_all_agents()
     return jsonify(ok=True, enrolled=enrolled, agent_results=results)
+
+
+@app.route('/admin/api/run-sage', methods=['POST'])
+@require_admin
+def admin_run_sage():
+    """Trigger Triple Sage AI template refresh (Grok + Claude)."""
+    from triple_sage_admin import TripleSageAdmin
+    sage = TripleSageAdmin()
+    data = request.get_json(silent=True) or {}
+    dispute_types = data.get('dispute_types', list(LETTER_TEMPLATES.keys()))
+    states = data.get('states', ['TX', 'CA', 'WA'])
+    results = sage.admin_trigger_template_refresh(dispute_types, states)
+    return jsonify(ok=True, results=results, log=sage.admin_view_activity_log(20))
 
 
 @app.route('/admin/api/pipeline')

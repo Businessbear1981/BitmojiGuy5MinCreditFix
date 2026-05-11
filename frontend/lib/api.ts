@@ -118,3 +118,59 @@ export async function sendCertified(dayNumber: number = 0, mailClass: string = '
     body: JSON.stringify({ dayNumber, mailClass }),
   })
 }
+
+export function getLettersUrl() {
+  return `${FLASK}/api/letters`
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ADMIN DASHBOARD
+// ═════════════════════════════════════════════════════════════════════════════
+
+export async function adminAuth(key: string) {
+  return fetch(`${FLASK}/admin/auth`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `key=${encodeURIComponent(key)}`,
+  })
+}
+
+export async function adminGetSubmissions() {
+  return fetch(`${FLASK}/admin/api/submissions`, { credentials: 'include' })
+}
+
+export async function adminGetPipeline() {
+  return fetch(`${FLASK}/admin/api/pipeline`, { credentials: 'include' })
+}
+
+export async function adminGetPendingNotifications() {
+  return fetch(`${FLASK}/admin/api/pending-notifications`, { credentials: 'include' })
+}
+
+export async function adminApprovePayment(sessionId: string) {
+  return fetch(`${FLASK}/admin/api/approve-payment`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ session_id: sessionId }),
+  })
+}
+
+export async function adminNotifyClient(sessionId: string, day: number) {
+  return fetch(`${FLASK}/api/watcher/notify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ session_id: sessionId, day }),
+  })
+}
+
+export async function adminRunAction(endpoint: string) {
+  return fetch(`${FLASK}${endpoint}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: '{}',
+  })
+}

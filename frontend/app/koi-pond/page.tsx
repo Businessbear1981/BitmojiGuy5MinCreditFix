@@ -30,6 +30,9 @@ const BOX_COLORS: Record<string, string> = {
   wrong_addresses: '#8CB4FF',
   unknown_accounts: '#C9A84C',
   aged_debt: '#D94A3B',
+  inquiries: '#7F77DD',
+  identity_theft: '#FF4444',
+  mov_demand: '#5CFFCC',
 }
 
 export default function KoiPondPage() {
@@ -99,7 +102,7 @@ export default function KoiPondPage() {
     <div style={{ minHeight: '100vh', position: 'relative', overflow: 'hidden', background: '#050306' }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/koipond-meshy.png"
+        src="https://d2xsxph8kpxj0f.cloudfront.net/310519663623353486/TFHGKZ8eZeQPrrYUXjWpCv/koi_pond_enlightenment-j45X68iQC5xBUQURxbyhjs.webp"
         alt=""
         style={{
           position: 'fixed', top: 0, left: 0,
@@ -307,7 +310,7 @@ export default function KoiPondPage() {
                     opacity: authorizedCount === 0 ? 0.5 : 1,
                   }}
                 >
-                  {submitting ? 'Generating Letters...' : `Generate ${authorizedCount * 3} Letters \u2192`}
+                  {submitting ? 'Generating Letters...' : `Generate 3 Letters (1 per bureau) \u2192`}
                 </button>
               </div>
             </div>

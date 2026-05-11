@@ -2,25 +2,43 @@ services:
   - type: web
     name: bitmoji-creditfix-api
     env: python
-    plan: standard
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn -w 4 -b 0.0.0.0:$PORT bitmoji_credit_app.app:app
+    plan: starter
+    buildCommand: pip install -r bitmoji_credit_app/requirements.txt
+    startCommand: cd bitmoji_credit_app && gunicorn -w 2 -b 0.0.0.0:$PORT --timeout 120 app:app
     envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.0"
       - key: FLASK_ENV
         value: production
       - key: SECRET_KEY
-        sync: false
+        generateValue: true
       - key: ADMIN_KEY
         sync: false
       - key: STRIPE_SECRET_KEY
         sync: false
+      - key: STRIPE_PUBLISHABLE_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
       - key: CLICK2MAIL_API_KEY
         sync: false
       - key: FRONTEND_URL
-        value: https://bitmojiguy.vercel.app
-      - key: DATABASE_URL
+        value: https://bitmoji-guy5-min-credit-fix.vercel.app
+      - key: DB_PATH
+        value: /data/creditfix.db
+      - key: LEDGER_DB
+        value: /data/watcher_ledger.db
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: FROM_EMAIL
         sync: false
     disk:
-      name: bitmoji-data
-      mountPath: /var/data
-      sizeGB: 10
+      name: creditfix-data
+      mountPath: /data
+      sizeGB: 1

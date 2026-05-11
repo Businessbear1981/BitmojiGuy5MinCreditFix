@@ -61,15 +61,8 @@ export default function DojoPage() {
       if (!ok) throw new Error(`Upload failed (${res.status})`)
       setSlots((s) => ({ ...s, [key]: { ...s[key], uploading: false, armored: true, error: '' } }))
       setUpload(`${key}Uploaded` as 'idUploaded' | 'addressUploaded' | 'reportUploaded', true)
-    } catch (e) {
-      // Dev fallback — still mark armored so flow continues locally
-      const devOk = !(process.env.NEXT_PUBLIC_FLASK_URL) || e instanceof TypeError
-      if (devOk) {
-        setSlots((s) => ({ ...s, [key]: { ...s[key], uploading: false, armored: true, error: '' } }))
-        setUpload(`${key}Uploaded` as 'idUploaded' | 'addressUploaded' | 'reportUploaded', true)
-      } else {
-        setSlots((s) => ({ ...s, [key]: { ...s[key], uploading: false, armored: false, error: e instanceof Error ? e.message : 'Upload failed' } }))
-      }
+    } catch {
+      setSlots((s) => ({ ...s, [key]: { ...s[key], uploading: false, armored: false, error: 'Upload failed \u2014 please try again' } }))
     }
   }
 
@@ -77,7 +70,7 @@ export default function DojoPage() {
     <>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/dojo.png"
+        src="https://d2xsxph8kpxj0f.cloudfront.net/310519663623353486/TFHGKZ8eZeQPrrYUXjWpCv/dojo_armament_chamber-LwbeaVELoEunDtbgDdwxbA.webp"
         alt=""
         style={{
           position: 'fixed',
