@@ -70,9 +70,33 @@ class _ConnectionPool:
             self._pool.put_nowait(conn)
         except queue.Full:
             try:
-                release_db(conn)
+                conn.close()
             except Exception:
                 pass
+
+    def health_check(self):
+        """Check all pooled connections, replace dead ones."""
+        checked = []
+        replaced = 0
+        while not self._pool.empty():
+            try:
+                conn = self._pool.get_nowait()
+                try:
+                    conn.execute("SELECT 1")
+                    checked.append(conn)
+                except (sqlite3.OperationalError, sqlite3.ProgrammingError):
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
+                    checked.append(_create_connection())
+                    replaced += 1
+            except queue.Empty:
+                break
+        for conn in checked:
+            self.put(conn)
+        if replaced:
+            print(f"[DB HEALTH] Replaced {replaced} dead connection(s)")
 
 
 _pool = None
@@ -91,6 +115,20 @@ def get_db():
 
 def release_db(conn):
     _get_pool().put(conn)
+
+
+def start_health_check_loop(interval=60):
+    """Run health checks every `interval` seconds in a daemon thread."""
+    def _loop():
+        import time
+        while True:
+            time.sleep(interval)
+            try:
+                _get_pool().health_check()
+            except Exception as e:
+                print(f"[DB HEALTH ERROR] {e}")
+    t = threading.Thread(target=_loop, daemon=True)
+    t.start()
 
 
 def init_db():
