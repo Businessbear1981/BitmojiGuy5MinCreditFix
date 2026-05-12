@@ -92,6 +92,27 @@ UPLOAD_FOLDER = tempfile.mkdtemp(prefix='aecf_')
 ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg', 'txt', 'csv', 'docx', 'html', 'htm'}
 ADMIN_KEY = os.environ.get('ADMIN_KEY', 'ae-admin-2025')
 
+# Simple in-memory rate limiter
+_rate_store = {}
+
+def rate_limit(max_requests=10, window=60):
+    """Decorator: max_requests per window (seconds) per IP."""
+    def decorator(f):
+        @wraps(f)
+        def decorated(*args, **kwargs):
+            ip = get_client_ip()
+            key = f'{ip}:{f.__name__}'
+            now = time.time()
+            hits = _rate_store.get(key, [])
+            hits = [t for t in hits if t > now - window]
+            if len(hits) >= max_requests:
+                return jsonify(error='Too many requests. Please try again later.'), 429
+            hits.append(now)
+            _rate_store[key] = hits
+            return f(*args, **kwargs)
+        return decorated
+    return decorator
+
 stripe.api_key = os.environ.get('STRIPE_SECRET_KEY', '')
 STRIPE_PUB_KEY = os.environ.get('STRIPE_PUBLISHABLE_KEY', '')
 STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
@@ -1548,6 +1569,7 @@ def health():
 
 # Step 1 — Start
 @app.route('/api/start', methods=['POST'])
+@rate_limit(max_requests=10, window=60)
 def api_start():
     data = request.get_json()
     name = data.get('name', '').strip()
@@ -1576,6 +1598,7 @@ def api_start():
 
 # Step 2 — Upload & Parse
 @app.route('/api/upload', methods=['POST'])
+@rate_limit(max_requests=20, window=60)
 def api_upload():
     sid = session.get('submission_id')
     sub = load_submission(sid) if sid else None
@@ -1636,6 +1659,7 @@ def api_disputes():
 
 # Step 3 — Review & Generate Letters
 @app.route('/api/review', methods=['POST'])
+@rate_limit(max_requests=5, window=60)
 def api_review():
     sid = session.get('submission_id')
     sub = load_submission(sid) if sid else None
