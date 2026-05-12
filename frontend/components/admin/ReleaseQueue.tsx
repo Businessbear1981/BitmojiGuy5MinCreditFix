@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { AlertCircle, CheckCircle, XCircle, Clock, Mail } from 'lucide-react'
 
 const FLASK = process.env.NEXT_PUBLIC_FLASK_URL ?? 'http://localhost:5000'
-const ADMIN_KEY = process.env.NEXT_PUBLIC_ADMIN_KEY ?? 'ae-admin-2025'
 const GOLD = '#C9A84C'
 
 interface PendingSubmission {
@@ -35,7 +34,7 @@ export function ReleaseQueue() {
   const fetchPendingQueue = async () => {
     try {
       const res = await fetch(`${FLASK}/api/admin/pending-queue`, {
-        headers: { 'X-Admin-Key': ADMIN_KEY },
+        credentials: 'include',
       })
       if (res.ok) {
         const data = await res.json()
@@ -50,7 +49,7 @@ export function ReleaseQueue() {
   const fetchReleaseLog = async () => {
     try {
       const res = await fetch(`${FLASK}/api/admin/release-log?limit=50`, {
-        headers: { 'X-Admin-Key': ADMIN_KEY },
+        credentials: 'include',
       })
       if (res.ok) {
         const data = await res.json()
@@ -67,10 +66,8 @@ export function ReleaseQueue() {
     try {
       const res = await fetch(`${FLASK}/api/admin/approve-release`, {
         method: 'POST',
-        headers: {
-          'X-Admin-Key': ADMIN_KEY,
-          'Content-Type': 'application/json',
-        },
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           session_id: sessionId,
           admin_id: 'admin-user',
@@ -93,10 +90,8 @@ export function ReleaseQueue() {
     try {
       const res = await fetch(`${FLASK}/api/admin/reject-release`, {
         method: 'POST',
-        headers: {
-          'X-Admin-Key': ADMIN_KEY,
-          'Content-Type': 'application/json',
-        },
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           session_id: sessionId,
           admin_id: 'admin-user',
