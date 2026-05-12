@@ -87,7 +87,7 @@ export default function GardenPage() {
     <>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="https://d2xsxph8kpxj0f.cloudfront.net/310519663623353486/TFHGKZ8eZeQPrrYUXjWpCv/zen_sand_garden_trial-dhftkszT88966hXbVqVuz5.webp"
+        src="/garden.webp"
         alt=""
         style={{
           position: 'fixed',

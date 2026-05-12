@@ -46,10 +46,10 @@ export function TopNav({ currentStep }: TopNavProps) {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 0, lineHeight: 1.15 }}>
           <span style={{ fontFamily: 'var(--font-cinzel-decorative), serif', fontSize: '0.85rem', color: '#F0D080', letterSpacing: 1.5 }}>
-            BitmojiGuy{' '}<span style={{ color: '#F0EBE0' }}>5 Min</span>
+            5 Min, 5 Click{' '}<span style={{ color: '#F0EBE0' }}>Credit Tool</span>
           </span>
           <span style={{ fontFamily: 'var(--font-cinzel-decorative), serif', fontSize: '0.65rem', color: '#C9A84C', letterSpacing: 2 }}>
-            CreditFix&trade;
+            by Arden Edge&trade;
           </span>
           <span style={{ fontFamily: 'var(--font-rajdhani), sans-serif', fontSize: 7, color: '#8B6914', letterSpacing: 4, textTransform: 'uppercase' }}>
             Arden Edge Capital &middot; AE.CC.001

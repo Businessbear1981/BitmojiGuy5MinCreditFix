@@ -70,7 +70,7 @@ export default function DojoPage() {
     <>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="https://d2xsxph8kpxj0f.cloudfront.net/310519663623353486/TFHGKZ8eZeQPrrYUXjWpCv/dojo_armament_chamber-LwbeaVELoEunDtbgDdwxbA.webp"
+        src="/dojo.png"
         alt=""
         style={{
           position: 'fixed',

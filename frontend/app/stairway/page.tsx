@@ -65,7 +65,7 @@ export default function StairwayPage() {
     <>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="https://d2xsxph8kpxj0f.cloudfront.net/310519663623353486/TFHGKZ8eZeQPrrYUXjWpCv/stairway_to_heaven_temple-YFPGZiVmoxRsi99bAXXNaA.webp"
+        src="/stairway.png"
         alt=""
         style={{
           position: 'fixed',
@@ -147,7 +147,7 @@ export default function StairwayPage() {
                 fontFamily: 'var(--font-body)', fontSize: 12, color: '#8A8278',
                 letterSpacing: 1, marginTop: 10, lineHeight: 1.5,
               }}>
-                Full dispute package &middot; 3 letters &middot; All three bureaus &middot; Certified mail ready
+                Full dispute package &middot; 3 letters &middot; All three bureaus &middot; $24.99 + postage
               </p>
             </div>
 
@@ -160,65 +160,67 @@ export default function StairwayPage() {
               </p>
             )}
 
-            {/* Card pay */}
-            <button
-              onClick={handleCard}
-              disabled={loading !== null}
-              style={{
-                width: '100%',
-                fontFamily: 'var(--font-heading)', fontSize: 15, letterSpacing: 3,
-                textTransform: 'uppercase', color: '#050403',
-                background: `linear-gradient(135deg, ${ACCENT}, #33FFB8)`,
-                padding: '14px 0', borderRadius: 4, border: 'none',
-                cursor: loading ? 'wait' : 'pointer',
-                boxShadow: `0 4px 24px ${ACCENT}55`,
-                opacity: loading === 'card' ? 0.7 : 1,
-                marginBottom: 12,
-              }}
-            >
-              {loading === 'card' ? 'Connecting to Stripe...' : '💳 Pay with Card — Stripe Secure'}
-            </button>
-
-            {/* Divider */}
-            <p style={{
-              textAlign: 'center', color: '#8A8278', fontSize: 11, letterSpacing: 2,
-              textTransform: 'uppercase', margin: '14px 0',
-            }}>
-              &mdash; or manual pay &mdash;
-            </p>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            {/* Cash App & Chime — RECOMMENDED */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
               <button
                 onClick={() => handleManual('cashapp')}
                 disabled={loading !== null}
                 style={{
                   fontFamily: 'var(--font-heading)', fontSize: 13, letterSpacing: 2,
-                  textTransform: 'uppercase', color: ACCENT,
-                  background: 'rgba(0,0,0,0.4)',
-                  padding: '12px 16px', borderRadius: 4,
-                  border: `1px solid ${ACCENT}55`,
+                  textTransform: 'uppercase', color: '#050403',
+                  background: `linear-gradient(135deg, #00D54B, #33FFB8)`,
+                  padding: '14px 16px', borderRadius: 4, border: 'none',
                   cursor: loading ? 'wait' : 'pointer',
                   opacity: loading === 'cashapp' ? 0.7 : 1,
+                  position: 'relative',
                 }}
               >
-                Cash App · $AELabsCreditFix
+                <span style={{ position: 'absolute', top: -8, right: 8, fontSize: 9, background: '#00D54B', color: '#050403', padding: '2px 6px', borderRadius: 3, letterSpacing: 1 }}>RECOMMENDED</span>
+                {loading === 'cashapp' ? 'Processing...' : 'Cash App · $AELabsCreditFix'}
               </button>
               <button
                 onClick={() => handleManual('chime')}
                 disabled={loading !== null}
                 style={{
                   fontFamily: 'var(--font-heading)', fontSize: 13, letterSpacing: 2,
-                  textTransform: 'uppercase', color: ACCENT,
-                  background: 'rgba(0,0,0,0.4)',
-                  padding: '12px 16px', borderRadius: 4,
-                  border: `1px solid ${ACCENT}55`,
+                  textTransform: 'uppercase', color: '#050403',
+                  background: `linear-gradient(135deg, #00D54B, #33FFB8)`,
+                  padding: '14px 16px', borderRadius: 4, border: 'none',
                   cursor: loading ? 'wait' : 'pointer',
                   opacity: loading === 'chime' ? 0.7 : 1,
+                  position: 'relative',
                 }}
               >
-                Chime · $AELabsPay
+                <span style={{ position: 'absolute', top: -8, right: 8, fontSize: 9, background: '#00D54B', color: '#050403', padding: '2px 6px', borderRadius: 3, letterSpacing: 1 }}>RECOMMENDED</span>
+                {loading === 'chime' ? 'Processing...' : 'Chime · $AELabsPay'}
               </button>
             </div>
+
+            {/* Divider */}
+            <p style={{
+              textAlign: 'center', color: '#8A8278', fontSize: 11, letterSpacing: 2,
+              textTransform: 'uppercase', margin: '14px 0',
+            }}>
+              &mdash; or pay with card &mdash;
+            </p>
+
+            {/* Card pay */}
+            <button
+              onClick={handleCard}
+              disabled={loading !== null}
+              style={{
+                width: '100%',
+                fontFamily: 'var(--font-heading)', fontSize: 13, letterSpacing: 2,
+                textTransform: 'uppercase', color: ACCENT,
+                background: 'rgba(0,0,0,0.4)',
+                padding: '12px 0', borderRadius: 4,
+                border: `1px solid ${ACCENT}55`,
+                cursor: loading ? 'wait' : 'pointer',
+                opacity: loading === 'card' ? 0.7 : 1,
+              }}
+            >
+              {loading === 'card' ? 'Connecting to Stripe...' : 'Pay with Card (Stripe)'}
+            </button>
 
             {pendingConf && (
               <div style={{
@@ -234,7 +236,7 @@ export default function StairwayPage() {
                   {pendingConf}
                 </p>
                 <p style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: '#A8A29A', lineHeight: 1.5, margin: 0 }}>
-                  Send $24.99 to the address above. Include this confirmation number in the memo. Admin will verify and unlock your letters within 24 hours.
+                  Send $24.99 + postage to the address above. Include this confirmation number in the memo. Admin will verify and unlock your letters within 24 hours.
                 </p>
               </div>
             )}

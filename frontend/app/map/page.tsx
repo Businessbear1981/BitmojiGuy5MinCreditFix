@@ -107,7 +107,7 @@ export default function Step1Page() {
                 fontFamily: 'var(--font-body)', fontSize: 12, color: '#C9A84C',
                 letterSpacing: 2, textTransform: 'uppercase', marginBottom: 4,
               }}>
-                Step 1 of 5 &middot; The Adventurer&rsquo;s Intake
+                Step 1 of 7 &middot; 地 &middot; The Adventurer&rsquo;s Intake
               </p>
               <h2 style={{
                 fontFamily: 'var(--font-cinzel-decorative), serif',

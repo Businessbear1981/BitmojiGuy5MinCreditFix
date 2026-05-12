@@ -102,7 +102,7 @@ export default function KoiPondPage() {
     <div style={{ minHeight: '100vh', position: 'relative', overflow: 'hidden', background: '#050306' }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="https://d2xsxph8kpxj0f.cloudfront.net/310519663623353486/TFHGKZ8eZeQPrrYUXjWpCv/koi_pond_enlightenment-j45X68iQC5xBUQURxbyhjs.webp"
+        src="/koipond.jpg"
         alt=""
         style={{
           position: 'fixed', top: 0, left: 0,
