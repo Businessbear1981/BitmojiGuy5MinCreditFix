@@ -33,6 +33,7 @@ export function ArmorWarrior({ idUploaded, addressUploaded, reportUploaded, swor
   ]
 
   useEffect(() => {
+    if (armoredCount === prevCount.current) return
     if (armoredCount > prevCount.current) {
       setFlash(true)
       setShake(true)
