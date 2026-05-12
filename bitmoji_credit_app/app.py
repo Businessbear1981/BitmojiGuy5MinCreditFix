@@ -2279,6 +2279,21 @@ def api_followup_letters(day):
 # BACKGROUND JOBS — follow-up engine + auto-delete
 # ═════════════════════════════════════════════════════════════════════════════
 
+def _keep_alive():
+    """Ping self every 14 minutes to prevent Render free tier from sleeping."""
+    app_url = os.environ.get('APP_URL', os.environ.get('RENDER_EXTERNAL_URL', ''))
+    if not app_url:
+        print("[KEEP-ALIVE] No APP_URL set — skipping self-ping")
+        return
+    while True:
+        time.sleep(840)  # 14 minutes
+        try:
+            http_requests.get(f'{app_url}/health', timeout=10)
+            print(f"[KEEP-ALIVE] Pinged {app_url}/health")
+        except Exception:
+            pass
+
+
 def _background_jobs():
     """Background loop: enroll watcher clients, run agents, purge expired."""
     while True:
@@ -2304,9 +2319,11 @@ def _background_jobs():
 
 database.init_db()
 
-# Start background job thread (daemon = dies with main process)
+# Start background threads (daemon = dies with main process)
 _bg_thread = threading.Thread(target=_background_jobs, daemon=True)
 _bg_thread.start()
+_ka_thread = threading.Thread(target=_keep_alive, daemon=True)
+_ka_thread.start()
 
 if __name__ == '__main__':
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
