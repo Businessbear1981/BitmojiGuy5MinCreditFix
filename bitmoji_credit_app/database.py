@@ -76,7 +76,8 @@ def init_db():
                          ('dispute_count', 'INTEGER DEFAULT 0'),
                          ('dispatched_at', 'TEXT'), ('watcher_subscribed', 'INTEGER DEFAULT 0'),
                          ('watcher_paid_at', 'TEXT'), ('notify_method', "TEXT DEFAULT ''"),
-                         ('notify_handle_enc', 'BLOB')]:
+                         ('notify_handle_enc', 'BLOB'),
+                         ('reference_number', 'TEXT')]:
         try:
             conn.execute(f"ALTER TABLE clients ADD COLUMN {col} {coldef}")
         except sqlite3.OperationalError:
@@ -115,8 +116,8 @@ def save_client(profile):
                              follow_up_30_date, follow_up_60_date, follow_up_90_date,
                              purge_after, initials, dispute_count,
                              dispatched_at, watcher_subscribed, watcher_paid_at,
-                             notify_method, notify_handle_enc)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                             notify_method, notify_handle_enc, reference_number)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(session_id) DO UPDATE SET
             confirmation=excluded.confirmation, state=excluded.state,
             status=excluded.status, paid=excluded.paid, paid_at=excluded.paid_at,
@@ -133,7 +134,8 @@ def save_client(profile):
             watcher_subscribed=excluded.watcher_subscribed,
             watcher_paid_at=excluded.watcher_paid_at,
             notify_method=excluded.notify_method,
-            notify_handle_enc=excluded.notify_handle_enc
+            notify_handle_enc=excluded.notify_handle_enc,
+            reference_number=excluded.reference_number
     """, (
         profile['id'], profile.get('confirmation'), profile.get('state', ''),
         profile.get('status', 'started'), 1 if profile.get('paid') else 0,
@@ -144,7 +146,7 @@ def save_client(profile):
         dispute_count,
         profile.get('dispatched_at'), 1 if profile.get('watcher_subscribed') else 0,
         profile.get('watcher_paid_at'), profile.get('notify_method', ''),
-        notify_handle_enc
+        notify_handle_enc, profile.get('confirmation')
     ))
     conn.commit()
     conn.close()
