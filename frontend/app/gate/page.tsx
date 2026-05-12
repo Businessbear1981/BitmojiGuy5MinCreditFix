@@ -5,6 +5,7 @@ import { useShojiNav } from '@/lib/shojiNav'
 import { SceneLayout } from '@/components/scene/SceneLayout'
 import { TopNav } from '@/components/nav/TopNav'
 import { WizardSidebar } from '@/components/sidebar/WizardSidebar'
+import { sendCertified } from '@/lib/api'
 
 const ACCENT = '#D94A3B'
 
@@ -19,24 +20,15 @@ export default function GatePage() {
     setError('')
     setSending(true)
     try {
-      const flask = process.env.NEXT_PUBLIC_FLASK_URL ?? 'http://localhost:5000'
-      const res = await fetch(`${flask}/api/send-certified`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mailClass: postage === 'certified' ? 'Certified Mail' : 'First Class' }),
-      })
+      const res = await sendCertified(0, postage === 'certified' ? 'Certified Mail' : 'First Class')
       const data = await res.json()
-      if (data.confirmation_code || data.sent > 0) {
-        const code = data.confirmation_code
-          ?? `AE-${Math.random().toString(36).slice(2, 8).toUpperCase()}-${Date.now().toString(36).slice(-4).toUpperCase()}`
-        setConfirmation(code)
+      if (data.ok && (data.confirmation_code || data.sent > 0)) {
+        setConfirmation(data.confirmation_code || data.confirmation || '')
       } else {
-        setError(data.error || 'No letters dispatched')
+        setError(data.error || 'Dispatch failed. Please try again or contact support.')
       }
     } catch {
-      const code = `AE-${Math.random().toString(36).slice(2, 8).toUpperCase()}-${Date.now().toString(36).slice(-4).toUpperCase()}`
-      setConfirmation(code)
+      setError('Could not connect to server. Please try again.')
     } finally {
       setSending(false)
     }
