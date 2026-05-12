@@ -24,9 +24,9 @@ except ImportError:
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────────────
 
-CLICK2MAIL_API_URL = 'https://rest.click2mail.com/v1'
-CLICK2MAIL_API_KEY = os.environ.get('CLICK2MAIL_API_KEY', '')
-CLICK2MAIL_API_SECRET = os.environ.get('CLICK2MAIL_API_SECRET', '')
+CLICK2MAIL_API_URL = 'https://rest.click2mail.com/molpro'
+CLICK2MAIL_USERNAME = os.environ.get('CLICK2MAIL_USERNAME', os.environ.get('CLICK2MAIL_API_KEY', ''))
+CLICK2MAIL_PASSWORD = os.environ.get('CLICK2MAIL_PASSWORD', os.environ.get('CLICK2MAIL_API_SECRET', ''))
 
 # Credit bureau mailing addresses (USPS verified)
 BUREAU_ADDRESSES = {
@@ -166,15 +166,15 @@ class Click2MailClient:
     Docs: https://www.click2mail.com/api/documentation
     """
     
-    def __init__(self, api_key: str = '', api_secret: str = ''):
-        self.api_key = api_key or CLICK2MAIL_API_KEY
-        self.api_secret = api_secret or CLICK2MAIL_API_SECRET
+    def __init__(self, username: str = '', password: str = ''):
+        self.username = username or CLICK2MAIL_USERNAME
+        self.password = password or CLICK2MAIL_PASSWORD
         self.base_url = CLICK2MAIL_API_URL
         self.session = requests.Session()
-        
-        # Set up basic auth
-        if self.api_key:
-            self.session.auth = (self.api_key, self.api_secret or '')
+
+        # Click2Mail uses HTTP Basic Auth (username + password)
+        if self.username:
+            self.session.auth = (self.username, self.password)
     
     def _make_request(self, method: str, endpoint: str, **kwargs) -> Dict:
         """Make authenticated request to Click2Mail API."""
