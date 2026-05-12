@@ -62,6 +62,7 @@ export default function Step1Page() {
   })
 
   const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState('')
 
   const update = (k: keyof typeof formData, v: string) =>
     setFormData((prev) => ({ ...prev, [k]: v }))
@@ -77,7 +78,11 @@ export default function Step1Page() {
         address: formData.address,
         state: formData.state,
       })
-    } catch { /* backend may be down — continue anyway for demo */ }
+    } catch {
+      setSubmitError('Could not connect to server. Please try again.')
+      setSubmitting(false)
+      return
+    }
     setSubmitting(false)
     navigateTo('/dojo')
   }
@@ -173,6 +178,7 @@ export default function Step1Page() {
                 </div>
               </div>
 
+              {submitError && <p style={{ color: '#FF5A5A', fontFamily: 'var(--font-body)', fontSize: 13, textAlign: 'center', marginTop: 12 }}>{submitError}</p>}
               <div style={{ marginTop: 28, display: 'flex', justifyContent: 'center' }}>
                 <button
                   onClick={handleSubmit}
