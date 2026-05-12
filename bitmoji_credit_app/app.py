@@ -83,6 +83,8 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'ae-labs-credit-fix-dev-key-change-me')
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=2)
+app.config['SESSION_COOKIE_SAMESITE'] = 'None'
+app.config['SESSION_COOKIE_SECURE'] = True
 CORS(app, supports_credentials=True, origins=[
     'http://localhost:3000', 'http://localhost:3001',
     os.environ.get('FRONTEND_URL', 'http://localhost:3000'),
