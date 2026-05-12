@@ -5,6 +5,7 @@ import { useShojiNav } from '@/lib/shojiNav'
 import { TopNav } from '@/components/nav/TopNav'
 import { WizardSidebar } from '@/components/sidebar/WizardSidebar'
 import { SceneLayout } from '@/components/scene/SceneLayout'
+import { submitIntake } from '@/lib/api'
 
 const STATES = ['CA', 'TX', 'WA', 'Other']
 const BUREAUS = ['All Three', 'Equifax', 'TransUnion', 'Experian']
@@ -60,8 +61,26 @@ export default function Step1Page() {
     disputeReason: 'Identity theft',
   })
 
+  const [submitting, setSubmitting] = useState(false)
+
   const update = (k: keyof typeof formData, v: string) =>
     setFormData((prev) => ({ ...prev, [k]: v }))
+
+  async function handleSubmit() {
+    if (!formData.firstName || !formData.email) return
+    setSubmitting(true)
+    try {
+      await submitIntake({
+        name: `${formData.firstName} ${formData.lastName}`.trim(),
+        email: formData.email,
+        phone: formData.phone,
+        address: formData.address,
+        state: formData.state,
+      })
+    } catch { /* backend may be down — continue anyway for demo */ }
+    setSubmitting(false)
+    navigateTo('/dojo')
+  }
 
   return (
     <SceneLayout preset="warrior">
@@ -156,7 +175,8 @@ export default function Step1Page() {
 
               <div style={{ marginTop: 28, display: 'flex', justifyContent: 'center' }}>
                 <button
-                  onClick={() => navigateTo('/step/2')}
+                  onClick={handleSubmit}
+                  disabled={submitting || !formData.firstName || !formData.email}
                   style={{
                     fontFamily: 'var(--font-cinzel), serif',
                     fontSize: 14,
@@ -168,11 +188,12 @@ export default function Step1Page() {
                     padding: '0.95rem 2.5rem',
                     borderRadius: 4,
                     border: '1px solid #8B5A20',
-                    cursor: 'pointer',
+                    cursor: submitting ? 'wait' : 'pointer',
                     boxShadow: '0 4px 30px rgba(201,168,76,0.4), inset 0 1px 0 rgba(255,255,255,0.2)',
+                    opacity: submitting ? 0.7 : 1,
                   }}
                 >
-                  Continue &rarr;
+                  {submitting ? 'Submitting...' : 'Continue \u2192'}
                 </button>
               </div>
             </div>
