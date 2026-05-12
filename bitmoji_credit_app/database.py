@@ -7,10 +7,13 @@ import json
 import sqlite3
 import hashlib
 import base64
+import queue
+import threading
 from datetime import datetime, timedelta
 from cryptography.fernet import Fernet
 
 DB_PATH = os.environ.get('DB_PATH', 'creditfix.db')
+POOL_SIZE = int(os.environ.get('DB_POOL_SIZE', '10'))
 
 # App-level encryption key (not per-session — used for persistent storage)
 def _app_fernet():
@@ -31,11 +34,63 @@ def _decrypt_json(token):
     return json.loads(_app_fernet().decrypt(token).decode())
 
 
-def get_db():
+def _create_connection():
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")
+    conn.execute("PRAGMA cache_size=-64000")
+    conn.execute("PRAGMA temp_store=MEMORY")
+    conn.execute("PRAGMA busy_timeout=30000")
+    conn.execute("PRAGMA foreign_keys=ON")
     return conn
+
+
+class _ConnectionPool:
+    def __init__(self, size=POOL_SIZE):
+        self._pool = queue.Queue(maxsize=size)
+        self._size = size
+        self._lock = threading.Lock()
+        for _ in range(size):
+            self._pool.put(_create_connection())
+
+    def get(self):
+        try:
+            conn = self._pool.get(timeout=10)
+            try:
+                conn.execute("SELECT 1")
+            except (sqlite3.OperationalError, sqlite3.ProgrammingError):
+                conn = _create_connection()
+            return conn
+        except queue.Empty:
+            return _create_connection()
+
+    def put(self, conn):
+        try:
+            self._pool.put_nowait(conn)
+        except queue.Full:
+            try:
+                release_db(conn)
+            except Exception:
+                pass
+
+
+_pool = None
+
+
+def _get_pool():
+    global _pool
+    if _pool is None:
+        _pool = _ConnectionPool()
+    return _pool
+
+
+def get_db():
+    return _get_pool().get()
+
+
+def release_db(conn):
+    _get_pool().put(conn)
 
 
 def init_db():
@@ -82,7 +137,7 @@ def init_db():
             conn.execute(f"ALTER TABLE clients ADD COLUMN {col} {coldef}")
         except sqlite3.OperationalError:
             pass  # column already exists
-    conn.close()
+    release_db(conn)
 
 
 def save_client(profile):
@@ -149,14 +204,14 @@ def save_client(profile):
         notify_handle_enc, profile.get('confirmation')
     ))
     conn.commit()
-    conn.close()
+    release_db(conn)
 
 
 def load_client_by_session(sid):
     """Load and decrypt a client profile by session_id."""
     conn = get_db()
     row = conn.execute("SELECT profile_enc FROM clients WHERE session_id = ?", (sid,)).fetchone()
-    conn.close()
+    release_db(conn)
     if row and row['profile_enc']:
         try:
             return _decrypt_json(row['profile_enc'])
@@ -173,7 +228,7 @@ def load_client_by_confirmation(code):
                updated_at, initials, follow_up_30_sent, follow_up_60_sent, follow_up_90_sent
         FROM clients WHERE confirmation = ?
     """, (code,)).fetchone()
-    conn.close()
+    release_db(conn)
     return dict(row) if row else None
 
 
@@ -186,7 +241,7 @@ def get_all_clients_admin():
                dispute_count, follow_up_30_sent, follow_up_60_sent, follow_up_90_sent
         FROM clients ORDER BY created_at DESC
     """).fetchall()
-    conn.close()
+    release_db(conn)
     results = []
     for r in rows:
         entry = dict(r)
@@ -222,7 +277,7 @@ def get_due_followups(day):
         """, (now,)).fetchall()
     else:
         rows = []
-    conn.close()
+    release_db(conn)
 
     results = []
     for r in rows:
@@ -240,7 +295,7 @@ def mark_followup_sent(session_id, day):
     conn.execute(f"UPDATE clients SET {col} = 1, updated_at = ? WHERE session_id = ?",
                  (datetime.utcnow().isoformat(), session_id))
     conn.commit()
-    conn.close()
+    release_db(conn)
 
 
 def delete_expired_clients():
@@ -250,7 +305,7 @@ def delete_expired_clients():
     cursor = conn.execute("DELETE FROM clients WHERE purge_after <= ?", (cutoff,))
     deleted = cursor.rowcount
     conn.commit()
-    conn.close()
+    release_db(conn)
     if deleted:
         print(f"[PURGE] Deleted {deleted} expired client records")
     return deleted
@@ -274,7 +329,7 @@ def get_stats():
         FROM clients WHERE referral_source IS NOT NULL AND referral_source != ''
         GROUP BY referral_source ORDER BY count DESC
     """).fetchall()
-    conn.close()
+    release_db(conn)
     return {
         'total': row['total'] or 0,
         'paid': row['paid'] or 0,
