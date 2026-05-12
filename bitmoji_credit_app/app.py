@@ -1491,6 +1491,13 @@ def require_admin(f):
         key = request.args.get('key', '') or session.get('admin_key', '')
         if key == ADMIN_KEY:
             session['admin_key'] = key
+            admin_log.append({
+                'action': f'admin:{f.__name__}',
+                'method': request.method,
+                'path': request.path,
+                'ip': get_client_ip(),
+                'at': datetime.utcnow().isoformat(),
+            })
             return f(*args, **kwargs)
         return redirect(url_for('admin_login'))
     return decorated
