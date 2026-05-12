@@ -86,7 +86,7 @@ export default function Step4Page() {
                   fontFamily: 'var(--font-body)', fontSize: 12, color: '#8A8278',
                   letterSpacing: 1, marginTop: 8, lineHeight: 1.5,
                 }}>
-                  Full dispute package &middot; 15 letters &middot; All bureaus &middot; Certified mail ready
+                  Full dispute package &middot; 3 letters &middot; All bureaus &middot; Certified mail ready
                 </p>
               </div>
 

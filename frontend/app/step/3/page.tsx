@@ -59,7 +59,7 @@ export default function Step3Page() {
         <div style={{ flex: 1, display: 'flex' }}>
           <WizardSidebar
             step={3}
-            mascotSpeech="The sage climbs every step to earn wisdom. Your 15 letters are aimed with surgical precision."
+            mascotSpeech="The sage climbs every step to earn wisdom. Your 3 letters are aimed with surgical precision."
           />
 
           {/* Main panel */}

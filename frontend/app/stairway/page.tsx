@@ -65,7 +65,7 @@ export default function StairwayPage() {
     <>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/stairway.png"
+        src="https://d2xsxph8kpxj0f.cloudfront.net/310519663623353486/TFHGKZ8eZeQPrrYUXjWpCv/stairway_to_heaven_temple-YFPGZiVmoxRsi99bAXXNaA.webp"
         alt=""
         style={{
           position: 'fixed',
@@ -121,7 +121,7 @@ export default function StairwayPage() {
               fontFamily: 'var(--font-body)', fontSize: 13, color: '#8A8278',
               fontStyle: 'italic', marginBottom: 28, textAlign: 'center',
             }}>
-              One payment unlocks the Dragon&apos;s Gate &middot; 15 letters shipped
+              One payment unlocks the Dragon&apos;s Gate &middot; 3 Official Letters (One Per Bureau)
             </p>
 
             {/* Price banner */}
@@ -147,7 +147,7 @@ export default function StairwayPage() {
                 fontFamily: 'var(--font-body)', fontSize: 12, color: '#8A8278',
                 letterSpacing: 1, marginTop: 10, lineHeight: 1.5,
               }}>
-                Full dispute package &middot; 15 letters &middot; All three bureaus &middot; Certified mail ready
+                Full dispute package &middot; 3 letters &middot; All three bureaus &middot; Certified mail ready
               </p>
             </div>
 

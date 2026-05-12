@@ -67,7 +67,7 @@ export default function GardenPage() {
   // Rake animation — counts 0 → 15
   useEffect(() => {
     if (!generating) return
-    const target = letters.length > 0 ? letters.length : 15
+    const target = letters.length > 0 ? letters.length : 3
     const interval = setInterval(() => {
       setProgress((p) => {
         if (p >= target) {
@@ -81,13 +81,13 @@ export default function GardenPage() {
     return () => clearInterval(interval)
   }, [generating, letters.length])
 
-  const total = letters.length > 0 ? letters.length : 15
+  const total = letters.length > 0 ? letters.length : 3
 
   return (
     <>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/garden.webp"
+        src="https://d2xsxph8kpxj0f.cloudfront.net/310519663623353486/TFHGKZ8eZeQPrrYUXjWpCv/zen_sand_garden_trial-dhftkszT88966hXbVqVuz5.webp"
         alt=""
         style={{
           position: 'fixed',
@@ -184,9 +184,9 @@ export default function GardenPage() {
                   display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10,
                   marginBottom: 20,
                 }}>
-                  {(fetchedOk && letters.length > 0 ? letters : Array.from({ length: 15 }).map((_, i) => ({
-                    bureau: ['Equifax', 'TransUnion', 'Experian'][i % 3],
-                    type_label: ['Collections', 'Late Pay', 'Identity', 'Obsolete', 'Inquiry'][i % 5],
+                  {(fetchedOk && letters.length > 0 ? letters : Array.from({ length: 3 }).map((_, i) => ({
+                    bureau: ['Equifax', 'TransUnion', 'Experian'][i],
+                    type_label: 'Combined Dispute Letter',
                     variant: 'A',
                     title: `Dispute Letter #${i + 1}`,
                   }))).map((l, i) => (

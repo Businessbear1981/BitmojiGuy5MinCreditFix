@@ -75,7 +75,7 @@ export default function Step5Page() {
               lineHeight: 1.6,
               maxWidth: 420,
             }}>
-              15 dispute letters generated. The bureaus have been warned.<br />
+              3 Official Letters generated (One Per Bureau). The bureaus have been warned.<br />
               Download or send certified mail now.
             </p>
 
