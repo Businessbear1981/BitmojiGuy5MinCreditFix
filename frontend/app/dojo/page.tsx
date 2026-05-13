@@ -61,8 +61,9 @@ export default function DojoPage() {
       if (!ok) throw new Error(`Upload failed (${res.status})`)
       setSlots((s) => ({ ...s, [key]: { ...s[key], uploading: false, armored: true, error: '' } }))
       setUpload(`${key}Uploaded` as 'idUploaded' | 'addressUploaded' | 'reportUploaded', true)
-    } catch {
-      setSlots((s) => ({ ...s, [key]: { ...s[key], uploading: false, armored: false, error: 'Upload failed \u2014 please try again' } }))
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      setSlots((s) => ({ ...s, [key]: { ...s[key], uploading: false, armored: false, error: `Error: ${msg}` } }))
     }
   }
 
