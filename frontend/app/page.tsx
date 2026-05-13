@@ -198,7 +198,7 @@ export default function Home() {
               margin: 0,
             }}
           >
-            BitmojiGuy 5 Min CreditFix
+            BitmojiGuy 5Min Credit Tool
           </h1>
 
           <p
@@ -224,7 +224,7 @@ export default function Home() {
               margin: '0.6rem 0 0',
             }}
           >
-            Your first step towards financial wellness
+            Your first step to understanding and improving your path to financial wellness
           </p>
         </div>
 
@@ -372,6 +372,19 @@ export default function Home() {
         >
           Admin Dashboard
         </button>
+
+        <p style={{
+          maxWidth: 520,
+          marginTop: '2rem',
+          fontFamily: 'var(--font-rajdhani), sans-serif',
+          fontSize: 10,
+          color: '#5A5A5A',
+          lineHeight: 1.6,
+          textAlign: 'center',
+          letterSpacing: 0.5,
+        }}>
+          This is a fintech tool only. We are not legal counsel, credit counselors, or credit repair organizations. We do not store your data in any way &mdash; everything runs locally on your device. No personal information is retained after your session ends. Use of this tool does not establish any professional relationship. Consult a licensed professional for legal or financial advice.
+        </p>
       </div>
     </>
   )

@@ -217,6 +217,25 @@ export default function DojoPage() {
 
             {/* Credit Report Guide */}
             <div style={{ marginTop: '3rem', paddingTop: '2rem', borderTop: `1px solid ${ACCENT}33` }}>
+              <div style={{ textAlign: 'center', marginBottom: 16 }}>
+                <a
+                  href="https://www.annualcreditreport.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    fontFamily: 'var(--font-heading)', fontSize: 13, letterSpacing: 2,
+                    textTransform: 'uppercase', textDecoration: 'none',
+                    color: '#050403', background: `linear-gradient(135deg, #C9A84C, #8B6914)`,
+                    padding: '10px 24px', borderRadius: 4, display: 'inline-block',
+                    boxShadow: '0 2px 12px rgba(201,168,76,0.4)',
+                  }}
+                >
+                  Get Your Free Credit Report
+                </a>
+                <p style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: '#8A8278', marginTop: 6 }}>
+                  annualcreditreport.com &middot; Free from all 3 bureaus &middot; No credit card required
+                </p>
+              </div>
               <CreditReportGuide />
             </div>
           </div>

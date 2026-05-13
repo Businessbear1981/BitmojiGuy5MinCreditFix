@@ -65,7 +65,7 @@ export default function StairwayPage() {
     <>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/stairway.png"
+        src="https://d2xsxph8kpxj0f.cloudfront.net/310519663623353486/TFHGKZ8eZeQPrrYUXjWpCv/stairway_to_heaven_temple-YFPGZiVmoxRsi99bAXXNaA.webp"
         alt=""
         style={{
           position: 'fixed',
