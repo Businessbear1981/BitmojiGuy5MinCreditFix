@@ -30,9 +30,9 @@ interface SlotConfig {
 }
 
 const SLOTS: SlotConfig[] = [
-  { key: 'id',      kanji: '面', armor: 'Helm',      title: 'Photo ID',         hint: 'Driver license or state ID · Photo · PDF' },
-  { key: 'address', kanji: '鎧', armor: 'Breastplate', title: 'Proof of Address', hint: 'Utility bill · Bank statement · Lease' },
-  { key: 'report',  kanji: '剣', armor: 'Sword',     title: 'Credit Report',    hint: 'Annualcreditreport.com PDF · CSV · TXT' },
+  { key: 'id',      kanji: '面', armor: 'Helm',      title: 'Photo ID',         hint: 'Upload a picture of your ID · Driver license or state ID · Required for dispute mailing' },
+  { key: 'address', kanji: '鎧', armor: 'Breastplate', title: 'Proof of Residence', hint: 'Utility bill · Bank statement · Lease · Required for dispute mailing' },
+  { key: 'report',  kanji: '剣', armor: 'Sword',     title: 'Credit Report',    hint: 'Annualcreditreport.com PDF · CSV · TXT · All documents mailed with your dispute package' },
 ]
 
 export default function DojoPage() {

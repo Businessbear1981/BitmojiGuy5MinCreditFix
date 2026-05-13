@@ -5,7 +5,7 @@ import { useShojiNav } from '@/lib/shojiNav'
 import { TopNav } from '@/components/nav/TopNav'
 import { WizardSidebar } from '@/components/sidebar/WizardSidebar'
 import { SceneLayout } from '@/components/scene/SceneLayout'
-import { submitIntake } from '@/lib/api'
+import { submitIntake, setApiSessionId } from '@/lib/api'
 
 const STATES = ['CA', 'TX', 'WA', 'Other']
 const BUREAUS = ['All Three', 'Equifax', 'TransUnion', 'Experian']
@@ -71,13 +71,15 @@ export default function Step1Page() {
     if (!formData.firstName || !formData.email) return
     setSubmitting(true)
     try {
-      await submitIntake({
+      const res = await submitIntake({
         name: `${formData.firstName} ${formData.lastName}`.trim(),
         email: formData.email,
         phone: formData.phone,
         address: formData.address,
         state: formData.state,
       })
+      const data = await res.json()
+      if (data.session_id) setApiSessionId(data.session_id)
     } catch {
       setSubmitError('Could not connect to server. Please try again.')
       setSubmitting(false)

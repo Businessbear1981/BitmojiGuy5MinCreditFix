@@ -149,6 +149,11 @@ def get_client_ip():
     return request.headers.get('X-Forwarded-For', request.remote_addr or '0.0.0.0').split(',')[0].strip()
 
 
+def get_session_id():
+    """Get session_id from X-Session-ID header (cross-origin) or Flask session cookie (same-origin)."""
+    return request.headers.get('X-Session-ID', '') or session.get('submission_id', '')
+
+
 def store_submission(sid, data):
     ts = session.get('enc_ts', datetime.utcnow().isoformat())
     session['enc_ts'] = ts
@@ -1601,7 +1606,7 @@ def api_start():
 @app.route('/api/upload', methods=['POST'])
 @rate_limit(max_requests=20, window=60)
 def api_upload():
-    sid = session.get('submission_id')
+    sid = get_session_id()
     sub = load_submission(sid) if sid else None
     if not sub:
         return jsonify(error='Session not found. Please start over.'), 400
@@ -1650,7 +1655,7 @@ def api_upload():
 # Step 2.5 — Get parsed disputes (for koi-pond to display)
 @app.route('/api/disputes')
 def api_disputes():
-    sid = session.get('submission_id')
+    sid = get_session_id()
     sub = load_submission(sid) if sid else None
     if not sub:
         return jsonify(error='Session not found'), 400
@@ -1662,7 +1667,7 @@ def api_disputes():
 @app.route('/api/review', methods=['POST'])
 @rate_limit(max_requests=5, window=60)
 def api_review():
-    sid = session.get('submission_id')
+    sid = get_session_id()
     sub = load_submission(sid) if sid else None
     if not sub:
         return jsonify(error='Session not found'), 400
@@ -1702,7 +1707,7 @@ def api_review():
 # Step 4 — Stripe Checkout
 @app.route('/api/create-checkout', methods=['POST'])
 def api_create_checkout():
-    sid = session.get('submission_id')
+    sid = get_session_id()
     sub = load_submission(sid) if sid else None
     if not sub:
         return jsonify(error='Session not found'), 400
@@ -1732,7 +1737,7 @@ def api_create_checkout():
 @app.route('/api/manual-pay', methods=['POST'])
 def api_manual_pay():
     """Cash App / Chime manual payment — marks as pending-verify until admin approves."""
-    sid = session.get('submission_id')
+    sid = get_session_id()
     sub = load_submission(sid) if sid else None
     if not sub:
         return jsonify(error='Session not found'), 400
@@ -1766,7 +1771,7 @@ def admin_approve_payment():
 
 @app.route('/api/payment-success')
 def api_payment_success():
-    sid = request.args.get('sid', session.get('submission_id'))
+    sid = request.args.get('sid', get_session_id())
     if sid:
         session['submission_id'] = sid
         sub = load_submission(sid)
@@ -1801,7 +1806,7 @@ def stripe_webhook():
 # Letters (requires payment)
 @app.route('/api/letters')
 def api_letters():
-    sid = session.get('submission_id')
+    sid = get_session_id()
     sub = load_submission(sid) if sid else None
     if not sub:
         return jsonify(error='Session not found'), 400
@@ -1813,7 +1818,7 @@ def api_letters():
 
 @app.route('/api/letters/<int:index>')
 def api_letter_by_id(index):
-    sid = session.get('submission_id')
+    sid = get_session_id()
     sub = load_submission(sid) if sid else None
     if not sub:
         return jsonify(error='Session not found'), 400
@@ -1854,7 +1859,7 @@ def api_send_certified():
     4. This endpoint called with admin_released flag
     5. Click2Mail jobs created and dispatched
     """
-    sid = session.get('submission_id')
+    sid = get_session_id()
     sub = load_submission(sid) if sid else None
     if not sub:
         return jsonify(error='Session not found'), 400
@@ -1898,7 +1903,7 @@ def api_send_certified():
 @app.route('/api/watcher/subscribe', methods=['POST'])
 def api_watcher_subscribe():
     """Subscribe to Watcher tracking for $10.99."""
-    sid = session.get('submission_id')
+    sid = get_session_id()
     sub = load_submission(sid) if sid else None
     if not sub:
         return jsonify(error='Session not found'), 400
@@ -1967,7 +1972,7 @@ def api_watcher_subscribe():
 @app.route('/api/watcher/payment-success')
 def api_watcher_payment_success():
     """Stripe redirect after watcher payment."""
-    sid = session.get('submission_id')
+    sid = get_session_id()
     sub = load_submission(sid) if sid else None
     if sub:
         sub['watcher_subscribed'] = True
@@ -1980,7 +1985,7 @@ def api_watcher_payment_success():
 @app.route('/api/watcher/status')
 def api_watcher_status():
     """Get watcher tracking status — countdown timers, dispatch date, notifications."""
-    sid = session.get('submission_id')
+    sid = get_session_id()
     sub = load_submission(sid) if sid else None
     if not sub:
         return jsonify(error='Session not found'), 400
@@ -2265,7 +2270,7 @@ def api_followup_letters(day):
     """Get follow-up letters for a specific day mark (30, 60, 90)."""
     if day not in (30, 60, 90):
         return jsonify(error='Invalid day'), 400
-    sid = session.get('submission_id')
+    sid = get_session_id()
     sub = load_submission(sid) if sid else None
     if not sub:
         return jsonify(error='Session not found'), 400
@@ -2342,7 +2347,7 @@ def api_admin_queue_for_release():
     if not admin_release_manager:
         return jsonify(error='Admin system not available'), 503
     
-    sid = session.get('submission_id')
+    sid = get_session_id()
     sub = load_submission(sid) if sid else None
     if not sub:
         return jsonify(error='Session not found'), 400
@@ -2462,7 +2467,7 @@ def api_parse_credit_report():
     if not credit_report_workflow:
         return jsonify(error='Credit report system not available'), 503
     
-    sid = session.get('submission_id')
+    sid = get_session_id()
     sub = load_submission(sid) if sid else None
     if not sub:
         return jsonify(error='Session not found'), 400
@@ -2495,7 +2500,7 @@ def api_parse_credit_report():
 @app.route('/api/credit-report-status')
 def api_credit_report_status():
     """Check if credit report has been uploaded and parsed."""
-    sid = session.get('submission_id')
+    sid = get_session_id()
     sub = load_submission(sid) if sid else None
     if not sub:
         return jsonify(error='Session not found'), 400
