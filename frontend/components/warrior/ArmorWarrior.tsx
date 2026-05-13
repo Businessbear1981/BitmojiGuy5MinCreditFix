@@ -67,7 +67,7 @@ export function ArmorWarrior({ idUploaded, addressUploaded, reportUploaded, swor
           pointerEvents: 'none',
         }} />
 
-        {/* BASE: Bitmoji in white (no armor) */}
+        {/* BASE: Bitmoji in white (no armor) — always visible underneath */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/bitmoji-base.png"
@@ -81,27 +81,78 @@ export function ArmorWarrior({ idUploaded, addressUploaded, reportUploaded, swor
             top: 0,
             left: 0,
             zIndex: 1,
-            opacity: allArmored ? 0 : 1,
-            transition: 'opacity 0.8s ease',
           }}
         />
 
-        {/* ARMORED: Bitmoji in full samurai armor + dog */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/bitmoji-warrior.png"
-          alt="BitmojiGuy Armored & Maverick"
-          style={{
-            width: 220,
-            height: 352,
-            objectFit: 'contain',
-            display: 'block',
-            position: 'relative',
-            zIndex: 2,
-            opacity: allArmored ? 1 : armoredCount > 0 ? 0.4 + armoredCount * 0.2 : 0,
-            transition: 'opacity 0.8s ease',
-          }}
-        />
+        {/* ARMOR PIECE 1: Helmet region — revealed on ID upload (top 30%) */}
+        <AnimatePresence>
+          {idUploaded && (
+            <motion.div
+              key="helmet"
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ type: 'spring', stiffness: 120, damping: 12 }}
+              style={{
+                position: 'absolute', top: 0, left: 0, width: 220, height: 352,
+                zIndex: 2, clipPath: 'polygon(20% 0%, 80% 0%, 80% 28%, 20% 28%)',
+              }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/bitmoji-warrior.png" alt="" style={{ width: 220, height: 352, objectFit: 'contain' }} />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ARMOR PIECE 2: Breastplate region — revealed on address upload (middle 30-65%) */}
+        <AnimatePresence>
+          {addressUploaded && (
+            <motion.div
+              key="chest"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ type: 'spring', stiffness: 130, damping: 13 }}
+              style={{
+                position: 'absolute', top: 0, left: 0, width: 220, height: 352,
+                zIndex: 2, clipPath: 'polygon(10% 28%, 90% 28%, 90% 62%, 10% 62%)',
+              }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/bitmoji-warrior.png" alt="" style={{ width: 220, height: 352, objectFit: 'contain' }} />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ARMOR PIECE 3: Legs + sword region — revealed on report upload (bottom 62-100%) */}
+        <AnimatePresence>
+          {reportUploaded && (
+            <motion.div
+              key="legs"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ type: 'spring', stiffness: 100, damping: 12 }}
+              style={{
+                position: 'absolute', top: 0, left: 0, width: 220, height: 352,
+                zIndex: 2, clipPath: 'polygon(5% 62%, 95% 62%, 95% 100%, 5% 100%)',
+              }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/bitmoji-warrior.png" alt="" style={{ width: 220, height: 352, objectFit: 'contain' }} />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* FULL WARRIOR — shown when all 3 uploaded, replaces the clipped pieces */}
+        {allArmored && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.6 }}
+            style={{ position: 'absolute', top: 0, left: 0, zIndex: 3 }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/bitmoji-warrior.png" alt="BitmojiGuy Fully Armored" style={{ width: 220, height: 352, objectFit: 'contain' }} />
+          </motion.div>
+        )}
 
         {/* Forge flash */}
         {flash && (
