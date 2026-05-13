@@ -128,21 +128,21 @@ admin_log = []     # lightweight log for admin (no PII)
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# ENCRYPTION ENGINE — timestamp + IP hash, no permanent storage
+# ENCRYPTION ENGINE — session + timestamp hash, no permanent storage
 # ═════════════════════════════════════════════════════════════════════════════
 
-def _derive_key(session_id, ip, timestamp):
-    raw = f"{session_id}:{ip}:{timestamp}:{app.secret_key}"
+def _derive_key(session_id, timestamp):
+    raw = f"{session_id}:{timestamp}:{app.secret_key}"
     digest = hashlib.sha256(raw.encode()).digest()
     return base64.urlsafe_b64encode(digest[:32])
 
 
-def encrypt_data(data, session_id, ip, timestamp):
-    return Fernet(_derive_key(session_id, ip, timestamp)).encrypt(json.dumps(data).encode())
+def encrypt_data(data, session_id, timestamp):
+    return Fernet(_derive_key(session_id, timestamp)).encrypt(json.dumps(data).encode())
 
 
-def decrypt_data(token, session_id, ip, timestamp):
-    return json.loads(Fernet(_derive_key(session_id, ip, timestamp)).decrypt(token).decode())
+def decrypt_data(token, session_id, timestamp):
+    return json.loads(Fernet(_derive_key(session_id, timestamp)).decrypt(token).decode())
 
 
 def get_client_ip():
@@ -150,10 +150,9 @@ def get_client_ip():
 
 
 def store_submission(sid, data):
-    ip = get_client_ip()
     ts = session.get('enc_ts', datetime.utcnow().isoformat())
     session['enc_ts'] = ts
-    submissions[sid] = encrypt_data(data, sid, ip, ts)
+    submissions[sid] = encrypt_data(data, sid, ts)
     # Admin log
     existing = next((e for e in admin_log if e['id'] == sid), None)
     if existing:
@@ -177,7 +176,7 @@ def load_submission(sid):
     if not token:
         return None
     try:
-        return decrypt_data(token, sid, get_client_ip(), session.get('enc_ts', ''))
+        return decrypt_data(token, sid, session.get('enc_ts', ''))
     except Exception:
         return None
 
