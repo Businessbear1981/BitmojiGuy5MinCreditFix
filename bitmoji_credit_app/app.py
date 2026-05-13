@@ -154,9 +154,12 @@ def get_session_id():
     return request.headers.get('X-Session-ID', '') or session.get('submission_id', '')
 
 
+_enc_timestamps = {}  # sid -> timestamp (stored alongside submissions, not in cookie)
+
 def store_submission(sid, data):
-    ts = session.get('enc_ts', datetime.utcnow().isoformat())
-    session['enc_ts'] = ts
+    ts = _enc_timestamps.get(sid, datetime.utcnow().isoformat())
+    _enc_timestamps[sid] = ts
+    session['enc_ts'] = ts  # keep cookie fallback for legacy
     submissions[sid] = encrypt_data(data, sid, ts)
     # Admin log
     existing = next((e for e in admin_log if e['id'] == sid), None)
@@ -180,8 +183,9 @@ def load_submission(sid):
     token = submissions.get(sid)
     if not token:
         return None
+    ts = _enc_timestamps.get(sid, session.get('enc_ts', ''))
     try:
-        return decrypt_data(token, sid, session.get('enc_ts', ''))
+        return decrypt_data(token, sid, ts)
     except Exception:
         return None
 
