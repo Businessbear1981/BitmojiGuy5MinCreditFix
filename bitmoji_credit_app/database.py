@@ -15,8 +15,9 @@ import psycopg2.extras
 from psycopg2.pool import ThreadedConnectionPool
 
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
-POOL_MIN = int(os.environ.get('DB_POOL_MIN', '2'))
+POOL_MIN = int(os.environ.get('DB_POOL_MIN', '1'))
 POOL_MAX = int(os.environ.get('DB_POOL_MAX', '10'))
+DB_CONNECT_TIMEOUT = int(os.environ.get('DB_CONNECT_TIMEOUT', '10'))
 
 _pool = None
 _pool_lock = threading.Lock()
@@ -57,7 +58,10 @@ def _get_pool():
             if _pool is None:
                 if not DATABASE_URL:
                     raise RuntimeError('DATABASE_URL is not set. Add it to your .env file.')
-                _pool = ThreadedConnectionPool(POOL_MIN, POOL_MAX, DATABASE_URL)
+                _pool = ThreadedConnectionPool(
+                    POOL_MIN, POOL_MAX, DATABASE_URL,
+                    connect_timeout=DB_CONNECT_TIMEOUT,
+                )
     return _pool
 
 
@@ -67,7 +71,7 @@ def get_db():
         conn.cursor().execute('SELECT 1')
     except (psycopg2.OperationalError, psycopg2.InterfaceError):
         _get_pool().putconn(conn, close=True)
-        conn = psycopg2.connect(DATABASE_URL)
+        conn = psycopg2.connect(DATABASE_URL, connect_timeout=DB_CONNECT_TIMEOUT)
     return conn
 
 

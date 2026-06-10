@@ -2441,7 +2441,11 @@ def _background_jobs():
 # STARTUP
 # ═════════════════════════════════════════════════════════════════════════════
 
-database.init_db()
+try:
+    database.init_db()
+    print('[DB] Schema initialized OK')
+except Exception as _db_err:
+    print(f'[DB WARNING] init_db failed at startup: {_db_err} — app will retry on first request')
 
 # Start background threads (daemon = dies with main process)
 _bg_thread = threading.Thread(target=_background_jobs, daemon=True)
