@@ -21,6 +21,11 @@ env/
 .env.local
 .env
 
+# SQLite (never commit local DB files)
+*.db
+*.db-shm
+*.db-wal
+
 # Editors / OS
 .vscode/
 .idea/
@@ -38,3 +43,5 @@ yarn-error.log*
 tmp/
 temp/
 .claude/worktrees/
+
+.vercel

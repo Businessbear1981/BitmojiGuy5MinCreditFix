@@ -1216,7 +1216,7 @@ FEDERAL_CASE_LAW = {
         'Nelson v. Chase Manhattan Mortgage, 282 F.3d 1057 (9th Cir. 2002) — furnisher cannot ignore consumer notice of identity theft.',
     ],
     'aged_debt': [
-        'Moran v. Screening Profiles Inc., 2013 WL 1sector (7th Cir. 2013) — re-aging a debt violates FCRA 605(c) and may constitute willful noncompliance.',
+        'Purnell v. Arrow Financial Services, LLC, 303 Fed. Appx. 297 (6th Cir. 2008) — re-aging a debt by resetting the date of first delinquency violates FCRA § 605(c) and constitutes willful noncompliance.',
         'Grigoryan v. Experian, 84 F. Supp. 3d 1044 (C.D. Cal. 2014) — CRA liable for failing to remove obsolete information after consumer dispute.',
         'Phillips v. Grendahl, 312 F.3d 357 (8th Cir. 2002) — impermissible purpose to pull credit report to collect time-barred debt.',
     ],
@@ -1630,6 +1630,7 @@ def api_upload():
         try: os.remove(fp)
         except OSError: pass
     sub['files'] = files_info
+    sub['raw_text'] = raw_text[:50000]
     sub['parsed_disputes'] = parsed
     sub['status'] = 'parsed'
     all_items = []
@@ -1781,7 +1782,7 @@ def api_payment_success():
         sub = load_submission(sid)
         if sub:
             _mark_paid(sub, sid)
-    return redirect('/#step-5')
+    return redirect(os.environ.get('FRONTEND_URL', '') + '/gate')
 
 
 @app.route('/api/stripe-webhook', methods=['POST'])
@@ -1797,13 +1798,12 @@ def stripe_webhook():
         event = json.loads(payload)
     if event.get('type') == 'checkout.session.completed':
         sid = event['data']['object'].get('metadata', {}).get('submission_id')
-        if sid and sid in submissions:
+        if sid:
             sub = load_submission(sid)
+            if not sub:
+                sub = database.load_client_by_session(sid)
             if sub:
-                sub['paid'] = True
-                sub['status'] = 'paid'
-                sub['paid_at'] = datetime.utcnow().isoformat()
-                store_submission(sid, sub)
+                _mark_paid(sub, sid)
     return jsonify(received=True)
 
 
@@ -1826,6 +1826,8 @@ def api_letter_by_id(index):
     sub = load_submission(sid) if sid else None
     if not sub:
         return jsonify(error='Session not found'), 400
+    if not sub.get('paid'):
+        return jsonify(error='Payment required', paid=False), 403
     letters = sub.get('letters', [])
     if index < 0 or index >= len(letters):
         return jsonify(error='Letter not found'), 404
