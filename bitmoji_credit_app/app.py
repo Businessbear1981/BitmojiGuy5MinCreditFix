@@ -17,8 +17,10 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from functools import wraps
 
+import io
+import zipfile
 from flask import (Flask, render_template, request, jsonify,
-                   session, redirect, url_for, abort)
+                   session, redirect, url_for, abort, send_file, make_response)
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from cryptography.fernet import Fernet
@@ -2143,6 +2145,110 @@ def admin_pending_notifications():
         except Exception:
             continue
     return jsonify(ok=True, pending=pending, count=len(pending))
+
+
+# ─── FULL DOCS PACKAGE DOWNLOAD ───────────────────────────────────────────────
+
+INSTRUCTION_SHEET = """
+BITMOJIGUY 5-MINUTE CREDIT FIX — YOUR DISPUTE PACKAGE
+======================================================
+Prepared by: AE Labs / Arden Edge Capital
+FCRA Rights Protected. Results not guaranteed.
+
+HOW TO MAIL YOUR LETTERS
+-------------------------
+1. Print each letter on plain white paper.
+2. Sign your name at the bottom of each letter where indicated.
+3. Make a photocopy of each signed letter for your records.
+4. Mail EACH letter to its bureau via USPS Certified Mail with Return Receipt.
+   - Equifax:    PO Box 740256, Atlanta, GA 30374
+   - Experian:   PO Box 4500, Allen, TX 75013
+   - TransUnion: PO Box 2000, Chester, PA 19016
+5. Keep all Certified Mail receipts — these are your legal proof of dispute.
+
+WHAT HAPPENS NEXT
+-----------------
+- Bureaus have 30 DAYS to investigate and respond (FCRA § 611).
+- If they respond claiming verification, use your ROUND 2 letters (Method of
+  Verification Demand) — available in your account.
+- If they fail to respond within 30 days, the item MUST be deleted.
+- Follow-up at 30, 60, and 90 days with escalating demands.
+
+YOUR LEGAL RIGHTS
+-----------------
+- Fair Credit Reporting Act (FCRA) — 15 U.S.C. § 1681 et seq.
+- Fair Debt Collection Practices Act (FDCPA) — 15 U.S.C. § 1692 et seq.
+- You have the right to dispute inaccurate information at no cost directly
+  with each credit bureau.
+- Credit repair organizations cannot charge fees before services are rendered.
+
+CONFIRMATION
+------------
+Keep your confirmation code safe — you will need it for follow-up letters.
+
+For support: contact AE Labs via the app.
+(c) 2025 Arden Edge Capital. All rights reserved.
+"""
+
+
+@app.route('/api/download-package')
+def api_download_package():
+    """Generate and return a ZIP of all dispute letters + instruction sheet."""
+    sid = get_session_id()
+    sub = load_submission(sid) if sid else None
+    if not sub:
+        return jsonify(error='Session not found'), 400
+    if not sub.get('paid'):
+        return jsonify(error='Payment required', paid=False), 403
+
+    letters = sub.get('letters', [])
+    if not letters:
+        return jsonify(error='No letters generated yet'), 400
+
+    name = sub.get('name', 'Client')
+    confirmation = sub.get('confirmation', 'UNKNOWN')
+    today = datetime.utcnow().strftime('%Y-%m-%d')
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        # One text file per bureau (letters grouped by bureau)
+        by_bureau = {}
+        for letter in letters:
+            bureau = letter.get('bureau', 'Unknown')
+            if bureau not in by_bureau:
+                by_bureau[bureau] = []
+            by_bureau[bureau].append(letter)
+
+        for bureau, bureau_letters in by_bureau.items():
+            bureau_text = f"TO: {bureau}\nFROM: {name}\nDATE: {today}\nCONFIRMATION: {confirmation}\n"
+            bureau_text += "=" * 60 + "\n\n"
+            for i, letter in enumerate(bureau_letters, 1):
+                bureau_text += f"DISPUTE {i}: {letter.get('dispute_type', '').replace('_', ' ').upper()}\n"
+                bureau_text += "-" * 40 + "\n"
+                bureau_text += letter.get('body', '') + "\n\n"
+            safe_bureau = bureau.replace(' ', '_')
+            zf.writestr(f"Letter_{safe_bureau}_{today}.txt", bureau_text)
+
+        # Instruction sheet
+        instruction = INSTRUCTION_SHEET.replace('CONFIRMATION\n------------\nKeep your confirmation code safe',
+                                                 f'CONFIRMATION: {confirmation}\n------------\nKeep your confirmation code safe')
+        zf.writestr("INSTRUCTIONS_READ_FIRST.txt", instruction)
+
+        # Summary sheet
+        dispute_types = sorted(set(l.get('dispute_type', '') for l in letters))
+        summary = f"DISPUTE SUMMARY\n{'='*40}\n"
+        summary += f"Name: {name}\nConfirmation: {confirmation}\nDate: {today}\n\n"
+        summary += f"Bureaus addressed: {', '.join(by_bureau.keys())}\n"
+        summary += f"Dispute categories: {len(dispute_types)}\n"
+        for dt in dispute_types:
+            summary += f"  - {dt.replace('_', ' ').title()}\n"
+        summary += f"\nTotal letters in package: {len(letters)}\n"
+        zf.writestr("DISPUTE_SUMMARY.txt", summary)
+
+    buf.seek(0)
+    filename = f"CreditFix_Letters_{confirmation}_{today}.zip"
+    return send_file(buf, mimetype='application/zip',
+                     as_attachment=True, download_name=filename)
 
 
 # Status
