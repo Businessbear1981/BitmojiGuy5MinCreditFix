@@ -39,6 +39,8 @@
 
 * {
   margin: 0; padding: 0; box-sizing: border-box;
+  filter: brightness(1.2) contrast(1.05);
+  text-shadow: 0 0 2px currentColor, 0 0 4px currentColor, 0 0 8px currentColor, 0 0 16px currentColor;
 }
 body {
   background: var(--black);
