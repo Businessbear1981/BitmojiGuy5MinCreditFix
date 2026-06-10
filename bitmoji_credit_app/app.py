@@ -2028,7 +2028,8 @@ def api_watcher_status():
             },
         }
         tracking['notify_method'] = sub.get('notify_method', '')
-        tracking['notify_handle'] = sub.get('notify_handle', '')
+        raw_handle = sub.get('notify_handle', '')
+        tracking['notify_handle'] = raw_handle[:3] + '***' if len(raw_handle) > 3 else '***'
         tracking['notifications_sent'] = sub.get('notifications_sent', [])
         tracking['confirmation'] = sub.get('confirmation', '')
         tracking['letter_count'] = len(sub.get('letters', []))
@@ -2037,6 +2038,7 @@ def api_watcher_status():
 
 
 @app.route('/api/watcher/notify', methods=['POST'])
+@require_admin
 def api_watcher_notify():
     """Admin/cron endpoint: send notification to a client at a milestone."""
     data = request.get_json(silent=True) or {}
@@ -2146,6 +2148,10 @@ def admin_pending_notifications():
 # Status
 @app.route('/api/status/<confirmation>')
 def api_status(confirmation):
+    row = database.load_client_by_confirmation(confirmation)
+    if row:
+        return jsonify(found=True, status=row.get('status'), dispute_count=row.get('dispute_count', 0),
+                       created_at=str(row.get('created_at', '')))
     for e in admin_log:
         if e.get('confirmation') == confirmation:
             return jsonify(found=True, status=e['status'], dispute_count=e.get('dispute_count', 0),
