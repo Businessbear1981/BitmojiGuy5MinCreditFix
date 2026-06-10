@@ -9,7 +9,9 @@ Consumer credit dispute tool built by Arden Edge Capital (AE Labs). Users upload
 - **Payment**: Stripe Checkout (card) + Cash App + Chime manual pay
 - **PDF Parsing**: pdfplumber
 - **Encryption**: Fernet (cryptography lib)
-- **Deploy target**: Render (see `render.yaml`)
+- **Backend deploy**: Railway (see `railway.toml`) — NOT Render
+- **Frontend deploy**: Vercel (project: bitmoji-guy5-min-credit-fix)
+- **Database**: Supabase PostgreSQL
 - **Process manager**: gunicorn (see `Procfile`)
 
 ## 5-Step User Flow
