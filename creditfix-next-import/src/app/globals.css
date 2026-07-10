@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-dm-sans);
+}
+
+.font-bangers {
+  font-family: 'Bangers', cursive;
+}
+
+/* Animations */
+@keyframes drift {
+  0% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(8vw, -6vh) scale(1.1); }
+  50% { transform: translate(-5vw, 8vh) scale(0.95); }
+  75% { transform: translate(-10vw, -4vh) scale(1.05); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+
+@keyframes petalFall {
+  0% { opacity: 0; transform: translate(0, -20px) rotate(0) scale(0.8); }
+  10% { opacity: 0.6; }
+  50% { opacity: 0.5; transform: translate(30px, 50vh) rotate(180deg) scale(1); }
+  100% { opacity: 0; transform: translate(-10px, 100vh) rotate(360deg) scale(0.6); }
+}
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(140, 100, 180, 0.2); border-radius: 3px; }
+
+@media print {
+  body { background: #fff !important; color: #000 !important; }
+  header, .pointer-events-none, button { display: none !important; }
+  pre { max-height: none !important; overflow: visible !important; }
+}
