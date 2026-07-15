@@ -1,76 +1,100 @@
-# BitmojiGuy 5-Min Credit Fix — AE Labs
+# BitmojiGuy 5-Min Credit Tool — AE.CC.001
+## Sean Gilmore | Arden Edge Capital
 
-## Project Overview
-Consumer credit dispute tool built by Arden Edge Capital (AE Labs). Users upload credit reports, the app auto-detects disputable items, generates legal dispute letters for all 3 bureaus, and delivers them after payment. Code reference: AE.CC.001.
+---
+
+## Product Philosophy (Inviolable)
+
+The tool helps consumers exercise rights they actually have, on items where they actually have specific grounds, in language that honestly reflects their situation. Every feature must serve this principle. Features that pull away from this principle are wrong features regardless of how they perform on other metrics.
+
+The tool does NOT operate as a traditional credit repair organization. It does not dispute negative items as a category. It does not generate letters for items the consumer has not affirmed specific grounds for. It does not produce template boilerplate that overstates what the consumer knows.
+
+## Architectural Commitments (Locked)
+
+The intake → assertion → letter pipeline is the spine of this product:
+- Consumer affirms specific grounds for specific items in intake
+- Tool generates letters only for items with affirmed grounds
+- Letter content cites only what the consumer has affirmed
+- No letter contains assertions the consumer did not enter
+
+**Selective disputing rule:** Items without consumer-affirmed grounds receive no letters. There is no "dispute all" path, no bulk dispute shortcut, and no bypass mechanism. This is a constraint, not a feature.
+
+**Recipient routing rule:** Bureau-appropriate grounds go to bureau letters under FCRA framework. Collector-appropriate grounds (validation, chain of title, license to collect) go to separate collector letters under FDCPA framework. These do not get mixed into single letters.
+
+**Letter structure rule:** Letters follow math-first composition. Audit data and specific factual claims lead. Statutory grounding closes. The order is the strategy and is not interchangeable.
+
+**Honest position rule:** Every claim in a letter must be sourceable to a fact the consumer affirmed in intake. The tool never asserts fraud unless the consumer affirmed certainty of fraud. The tool never asserts a balance is wrong unless the consumer provided basis. The tool says "I cannot verify" rather than "this is inaccurate" when the consumer's epistemic state is uncertainty.
+
+## Forbidden Patterns
+
+Do not implement features that:
+- Generate letters for items without consumer-affirmed grounds
+- Bulk-dispute or shortcut the per-item intake
+- Add statute citations not tied to specific affirmed grounds
+- Produce letter language asserting facts the consumer did not enter
+- Mix bureau-recipient and collector-recipient grounds in single letters
+- Stack multiple statutory framings of the same factual claim against the same recipient
+- Brand letters with internal tool identifiers, customer numbers, or generator strings
+- Embed metadata that identifies the tool in delivered documents
+
+Do not modify the data model that flows through the intake → assertion → letter pipeline without explicit approval surfaced to the project owner.
+
+## Escalation Rule
+
+If a feature request would require changing locked architecture or violating the philosophical commitments, stop and surface the conflict. State plainly: "This request conflicts with locked architecture in section X. Here is why. Here is what we could do that does not conflict." Do not work around the conflict silently. Do not partially implement features that compromise the spine.
+
+## Session Discipline
+
+Each work session focuses on one feature or one issue. Do not let session scope expand into "while we're here let me also..." territory. Architectural questions are not re-litigated in feature sessions; they are surfaced and deferred to architecture sessions.
+
+---
 
 ## Tech Stack
-- **Backend**: Python / Flask (`bitmoji_credit_app/app.py`)
-- **Frontend**: Single-page Jinja2 templates with vanilla JS (no framework)
-- **Payment**: Stripe Checkout (card) + Cash App + Chime manual pay
-- **PDF Parsing**: pdfplumber
-- **Encryption**: Fernet (cryptography lib)
-- **Deploy target**: Render (see `render.yaml`)
-- **Process manager**: gunicorn (see `Procfile`)
 
-## 5-Step User Flow
-1. **Info** — Name, email, phone collected. Session created with encrypted storage.
-2. **Upload** — User uploads credit report (PDF/TXT/image). pdfplumber extracts text, regex engine scans for 5 dispute categories.
-3. **Review** — Parsed disputes shown with category badges. User confirms selections, can add custom items. Letters generated on confirm.
-4. **Pay** — $19.99 one-time. Three payment boxes: Card (Stripe), Cash App (`$AELabsCreditFix`), Chime (`$AELabsPay`). Letters locked until paid.
-5. **Letters** — Confirmation code issued. All generated letters displayed with filter tabs by type. Copy, print single, print all, or download as .txt.
+| Layer    | Tech        | Port | Entry Point                   |
+|----------|-------------|------|-------------------------------|
+| Backend  | Flask       | 5000 | `bitmoji_credit_app/app.py`   |
+| Frontend | Next.js     | 3000 | `frontend/app/` directory     |
 
-## Cypher Security Model
-- **Session-based encryption**: All client data encrypted with Fernet using a key derived from SHA-256(session_id + client_IP + timestamp + SECRET_KEY).
-- **No permanent storage**: Data lives only in encrypted in-memory dict. Uploaded files are parsed then immediately deleted from disk.
-- **Admin log**: Contains only non-PII fields (session ID prefix, status, dispute count, timestamps, initials). No names, emails, or report content.
-- **Temp uploads**: Written to OS temp dir (`tempfile.mkdtemp`), removed after parsing. No persistent disk needed on Render.
+### Backend — `bitmoji_credit_app/app.py`
+- Flask REST API serving JSON to the Next.js frontend
+- Handles: intake, document uploads, credit report parsing, dispute letter generation, payment processing, certified mail dispatch, follow-up scheduling
+- Credit report parsing: pdfplumber (PDF), BeautifulSoup (HTML), python-docx (DOCX), pytesseract (OCR)
+- Encryption: Fernet (AES-128-CBC + HMAC-SHA256) with SHA-256 key derivation
+- Payment: Stripe Checkout (card) + Cash App + Chime manual pay
+- Database: SQLite (encrypted fields)
 
-## 15 Dispute Letter Templates
-3 variants for each of 5 dispute types, all sent to Equifax, Experian, and TransUnion:
+### Frontend — Next.js (Port 3000)
+- 8 screens with Shoji door transitions
+- Zustand state management
+- Gold `#C9A84C`, fonts Cinzel Decorative + Rajdhani
+- `seascape.jpg` landing background
 
-| Type | Variant A | Variant B | Variant C |
-|------|-----------|-----------|-----------|
-| **Collections** | Debt Validation Demand (FDCPA 809b) | Statute of Limitations Challenge | Cease Collection & Remove |
-| **Late Payments** | Goodwill Removal Request | Accuracy Dispute (FCRA 611) | Accommodation Period (CARES Act) |
-| **Wrong Addresses** | Fraud Indicator Dispute | Mixed File Dispute (FCRA 607b) | Simple Correction Request |
-| **Unknown Accounts** | Identity Theft (FCRA 605B) | Verification Demand | Unauthorized Inquiry Dispute |
-| **Aged Debt** | Time-Barred Removal (FCRA 605a) | Re-Aging Violation (FCRA 605c) | Obsolete Information Removal |
+## 8 Screens / Routes
 
-Letters are populated with client name, confirmation code, detected dispute items, bureau name, and current date.
+1. `/` — Landing (Lone Cypress Seascape)
+2. `/map` — Intake Form (Map Room)
+3. `/dojo` — Upload Documents (Samurai Armor Ceremony)
+4. `/koi-pond` — Authorize Disputes (Koi Pond)
+5. `/garden` — Generate Letters (Sand Garden)
+6. `/stairway` — Payment ($24.99)
+7. `/gate` — Certified Mail Dispatch (Dragon's Gate)
+8. `/watcher` — 30/60/90 Day Tracker ($10.99 subscription)
 
-## Document Parsing Engine
-Regex-based scanner in `DISPUTE_PATTERNS` dict. Each dispute type has:
-- `patterns`: list of compiled regexes that trigger detection
-- `extract`: regex to pull specific line items from matched regions
-- Caps at 5 extracted items per type, 30 PDF pages max
-- Images (PNG/JPG) flag for manual review since no OCR is bundled
+## Design System
 
-## Admin Dashboard
-- **Login**: `/admin/login` — single key auth via `ADMIN_KEY` env var
-- **Dashboard**: `/admin` — stats cards (total, paid, pending, revenue) + submission table
-- **API**: `/admin/api/submissions` — JSON endpoint for stats + entries
-- No PII in admin views. Submissions show initials, truncated ID, status badge, dispute count, confirmation code, timestamps.
+| Role          | Value       |
+|---------------|-------------|
+| Primary Gold  | `#C9A84C`   |
+| Neon Glow     | `text-shadow: 0 0 8px currentColor, 0 0 20px currentColor` |
+| Font Display  | Cinzel Decorative |
+| Font Body     | Rajdhani |
+| Navigation    | ShojiDoors.tsx sliding panel transitions |
 
-## Character Sidebar
-The app has a BitmojiGuy brand identity with animated character bubbles in the hero section. The visual style uses:
-- Dark theme with fire/gold/green accent colors
-- Bangers font for headings, DM Sans for body
-- Floating atom background animation
-- Fire-themed progress bar and buttons
+## Key Components
 
-## Render Deployment
-Environment variables needed in Render dashboard:
-- `SECRET_KEY` — auto-generated by Render
-- `ADMIN_KEY` — admin dashboard password
-- `STRIPE_SECRET_KEY` / `STRIPE_PUBLISHABLE_KEY` — from Stripe dashboard
-- `STRIPE_WEBHOOK_SECRET` — from Stripe webhook config
-- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `FROM_EMAIL` — for confirmation emails (optional, gracefully skipped if not set)
-
-No persistent disk required. No database. All state is ephemeral and encrypted in memory.
-
-## Conventions
-- Keep admin UX simple: copy-paste-enter, no multi-step config
-- All letter templates must cite specific FCRA/FDCPA sections
-- Never store PII outside encrypted session memory
-- Frontend is single-file HTML with inline CSS/JS (no build step)
-- Price is $19.99 — update `PRICE_CENTS` in app.py and the HTML if changing
+- `ArmorWarrior.tsx` — Samurai armor ceremony on /dojo
+- `ShojiDoors.tsx` — Global route transition animations
+- `TopNav.tsx` — Step navigation (future steps disabled)
+- `WizardSidebar.tsx` — Mr Beeks mascot + step nav
+- `SceneLayout.tsx` — Cinematic background system
