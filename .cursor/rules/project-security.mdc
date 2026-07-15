@@ -1,0 +1,34 @@
+---
+description: Security baseline for 5-Min Credit Fix (Flask + Next.js, no-storage posture)
+globs:
+  - "**/*.py"
+  - "**/*.ts"
+  - "**/*.tsx"
+alwaysApply: false
+---
+
+# Security Baseline
+
+## 1. No data at rest — the prime directive
+Never persist consumer PII or credit data to any database or disk (ADR-0001). Uploaded report bytes are encrypted in memory (AES-256-GCM via `cypher.py`), parsed from streams, then dropped. Temp files, "just cache it", and retention features are all violations.
+
+## 2. Input validation
+Validate all inputs at the boundary — explicit checks/schemas in Flask routes, Zod in the frontend. Reject invalid input with 422 (the consent gate already does; keep that pattern).
+
+## 3. Error responses
+Sanitize error responses. Never return stack traces, internal paths, or parsed report content to clients.
+
+## 4. Logging & admin surfaces
+Never log names, emails, phone numbers, or report content. The admin dashboard shows non-PII only (initials, truncated session id, status, counts) — keep it that way.
+
+## 5. Secrets
+Env vars only (`SECRET_KEY`, `CYPHER_SERVER_SECRET`, `ADMIN_KEY`, `STRIPE_*`, `CLICK2MAIL_*`). The repo carries `.env.example` without values. `ADMIN_KEY` must fail closed — no documented defaults, ever.
+
+## 6. Payments
+Stripe webhook signatures must be verified (`STRIPE_WEBHOOK_SECRET`). Manual-pay paths require the consent flag and admin release; never auto-unlock letters.
+
+## 7. Sessions
+Session state is in-memory and keyed per session with derived Fernet keys — never widen to shared state, never add a second gunicorn worker, never move session ids into URLs.
+
+## 8. CORS
+Explicit origins only (the Vercel frontend + local dev). Never `*` in production.
