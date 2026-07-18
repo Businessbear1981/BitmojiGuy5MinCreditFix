@@ -1,9 +1,9 @@
 [build]
 builder = "NIXPACKS"
-buildCommand = "pip install -r bitmoji_credit_app/requirements.txt"
+buildCommand = "pip install -r backend/requirements.txt"
 
 [deploy]
-startCommand = "cd bitmoji_credit_app && gunicorn -w 1 -b 0.0.0.0:$PORT --timeout 120 app:app"
-healthcheckPath = "/health"
+startCommand = "cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT --workers 2"
+healthcheckPath = "/api/health"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
