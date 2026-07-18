@@ -6,15 +6,12 @@ dispute items, classifying each into the correct bucket.
 
 Fallback: keyword-based scanner if Claude API is not configured.
 """
+import json
 import os
 import re
-import json
-from pathlib import Path
 from typing import List
-from dotenv import load_dotenv
-load_dotenv()
 
-from buckets import DISPUTE_BUCKETS, FCRA_CITATIONS
+from buckets import DISPUTE_BUCKETS
 
 # --- PDF text extraction ---
 try:
@@ -33,27 +30,28 @@ except ImportError:
     HAS_ANTHROPIC = False
 
 
-def extract_text_from_pdf(file_path: Path) -> str:
+def extract_text_from_pdf_bytes(content: bytes) -> str:
     if not HAS_PYMUPDF:
         return ""
     try:
-        doc = fitz.open(str(file_path))
+        doc = fitz.open(stream=content, filetype="pdf")
         text = ""
         for page in doc:
             text += page.get_text() + "\n"
         doc.close()
         return text
     except Exception as e:
-        print(f"PDF extraction error: {e}")
+        print(f"PDF extraction error: {type(e).__name__}")
         return ""
 
 
-def extract_text(file_path: Path) -> str:
-    suffix = file_path.suffix.lower()
+def extract_text_from_bytes(content: bytes, suffix: str) -> str:
+    """Extract text fully in memory — plaintext never touches disk."""
+    suffix = suffix.lower()
     if suffix == ".pdf":
-        return extract_text_from_pdf(file_path)
+        return extract_text_from_pdf_bytes(content)
     elif suffix in (".txt", ".csv", ".text"):
-        return file_path.read_text(encoding="utf-8", errors="replace")
+        return content.decode("utf-8", errors="replace")
     return ""
 
 
@@ -233,12 +231,12 @@ def _guess_bucket(reason: str) -> str:
 # Main entry point
 # ======================================================================
 
-def parse_credit_report(file_path: Path) -> List[dict]:
+def parse_credit_report_bytes(content: bytes, suffix: str) -> List[dict]:
     """
-    Parse a credit report file and extract dispute items.
+    Parse a credit report from in-memory bytes and extract dispute items.
     Uses Claude API if configured, falls back to keyword scanning.
     """
-    text = extract_text(file_path)
+    text = extract_text_from_bytes(content, suffix)
     if not text.strip():
         return []
 

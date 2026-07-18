@@ -8,9 +8,15 @@ and mailing by region.
 
 Each fishbowl processes letters independently and can be rate-limited
 separately.
+Queue occupancy is derived from the database (open unpaid cases per region)
+so it is correct across multiple workers and restarts.
 """
 import re
 from typing import Optional
+
+from sqlalchemy.orm import Session
+
+from database import CaseRecord
 
 # Beta regions: state -> zip prefix ranges
 # TX: 750xx-799xx, CA: 900xx-961xx, WA: 980xx-994xx
@@ -20,8 +26,10 @@ BETA_REGIONS = {
     "WA": {"name": "Washington", "zip_prefixes": list(range(980, 995)), "queue_limit": 80},
 }
 
-# Active fishbowl queues (in-memory counters; in production, use Redis)
-_fishbowl_counts = {state: 0 for state in BETA_REGIONS}
+
+def _active_count(db: Session, region: str) -> int:
+    """Open (unpaid) cases in a region. The 24h purge bounds this window."""
+    return db.query(CaseRecord).filter_by(region=region, paid=False).count()
 
 
 def extract_zip(address: str) -> Optional[str]:
@@ -42,10 +50,11 @@ def get_region(zip_code: str) -> Optional[str]:
     return None
 
 
-def check_beta_eligibility(address: str) -> dict:
+def check_beta_eligibility(address: str, db: Optional[Session] = None) -> dict:
     """
     Check if an address is in a beta-eligible region.
-    Returns eligibility status and region info.
+    Returns eligibility status and region info. Pass a db session to also
+    enforce the queue capacity limit.
     """
     zip_code = extract_zip(address)
     if not zip_code:
@@ -66,7 +75,7 @@ def check_beta_eligibility(address: str) -> dict:
         }
 
     config = BETA_REGIONS[region]
-    current_count = _fishbowl_counts.get(region, 0)
+    current_count = _active_count(db, region) if db is not None else 0
 
     if current_count >= config["queue_limit"]:
         return {
@@ -87,22 +96,11 @@ def check_beta_eligibility(address: str) -> dict:
     }
 
 
-def enter_fishbowl(region: str) -> int:
-    """Add a case to a regional fishbowl. Returns queue position."""
-    _fishbowl_counts[region] = _fishbowl_counts.get(region, 0) + 1
-    return _fishbowl_counts[region]
-
-
-def exit_fishbowl(region: str):
-    """Remove a completed case from the fishbowl."""
-    _fishbowl_counts[region] = max(0, _fishbowl_counts.get(region, 0) - 1)
-
-
-def get_fishbowl_status() -> dict:
+def get_fishbowl_status(db: Session) -> dict:
     """Get current status of all fishbowl queues."""
     status = {}
     for state, config in BETA_REGIONS.items():
-        count = _fishbowl_counts.get(state, 0)
+        count = _active_count(db, state)
         status[state] = {
             "name": config["name"],
             "current": count,

@@ -1,0 +1,5 @@
+exclude = [".venv-ko", "uploads"]
+
+[lint.per-file-ignores]
+# conftest must set env vars before backend modules are imported
+"tests/conftest.py" = ["E402"]

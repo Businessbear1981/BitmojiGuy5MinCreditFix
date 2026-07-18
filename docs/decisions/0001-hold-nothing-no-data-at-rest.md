@@ -1,6 +1,6 @@
 # 0001 — Hold nothing: no consumer data at rest
 
-> **Status:** ACCEPTED
+> **Status:** SUPERSEDED by [0002-encrypted-ephemeral-storage.md](0002-encrypted-ephemeral-storage.md) (2026-07-18)
 > **Date:** 2026-07-14 (records the model confirmed with Sean 2026-07-04)
 > **Decision:** The platform persists **no** consumer PII or credit data — no database, no disk. All client records live in the worker's encrypted RAM for the active session only.
 

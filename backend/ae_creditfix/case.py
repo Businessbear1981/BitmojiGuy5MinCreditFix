@@ -1,9 +1,7 @@
 
 from __future__ import annotations
 from dataclasses import dataclass, asdict, field
-from datetime import datetime, timedelta, date
 from typing import List, Optional, Dict, Any
-from pathlib import Path
 import uuid
 
 def new_id(prefix: str) -> str:
@@ -54,7 +52,7 @@ class Case:
             "client": asdict(self.client),
             "attachments": list(self.attachments),
             "items": [asdict(i) for i in self.items],
-            "letters": [asdict(l) for l in self.letters],
+            "letters": [asdict(ltr) for ltr in self.letters],
             "logs": self.logs,
             "phases": self.phases
         }
