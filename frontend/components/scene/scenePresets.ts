@@ -1,0 +1,129 @@
+export type ScenePresetKey =
+  | 'landing'
+  | 'warrior'
+  | 'water'
+  | 'wisdom'
+  | 'gold'
+  | 'nirvana'
+  | 'interstitial'
+  | 'command'
+
+export interface ScenePreset {
+  bg: string
+  accent: string
+  kanji?: string
+  overlay: number
+  lighting: {
+    color: string
+    position: string
+    size: string
+    intensity: number
+  }
+  breathing?: {
+    color: string
+    motif: 'ripples' | 'embers' | 'petals' | 'scrolls' | 'mist'
+  }
+}
+
+export const PRESETS: Record<ScenePresetKey, ScenePreset> = {
+  landing: {
+    bg: '/seascape.jpg',
+    accent: '#C9A84C',
+    overlay: 0.25,
+    lighting: {
+      color: 'rgba(201,168,76,0.18)',
+      position: '20% 18%',
+      size: '1000px 700px',
+      intensity: 0.7,
+    },
+  },
+  warrior: {
+    bg: '/maproom.jpg',
+    accent: '#C9A84C',
+    kanji: '武',
+    overlay: 0.32,
+    lighting: {
+      color: 'rgba(232,152,68,0.3)',
+      position: '18% 15%',
+      size: '1000px 700px',
+      intensity: 1.0,
+    },
+    breathing: { color: 'rgba(232,152,68,0.15)', motif: 'embers' },
+  },
+  water: {
+    bg: '/koipond-meshy.png',
+    accent: '#1D9E75',
+    kanji: '水',
+    overlay: 0.3,
+    lighting: {
+      color: 'rgba(29,158,117,0.3)',
+      position: '50% 85%',
+      size: '1300px 600px',
+      intensity: 1.0,
+    },
+    breathing: { color: 'rgba(29,158,117,0.15)', motif: 'ripples' },
+  },
+  wisdom: {
+    bg: '/scrollroom.jpg',
+    accent: '#7F77DD',
+    kanji: '智',
+    overlay: 0.32,
+    lighting: {
+      color: 'rgba(127,119,221,0.32)',
+      position: '50% 45%',
+      size: '1000px 800px',
+      intensity: 0.95,
+    },
+    breathing: { color: 'rgba(127,119,221,0.15)', motif: 'scrolls' },
+  },
+  gold: {
+    bg: '/sandgarden.jpg',
+    accent: '#EF9F27',
+    kanji: '金',
+    overlay: 0.3,
+    lighting: {
+      color: 'rgba(239,159,39,0.35)',
+      position: '50% 75%',
+      size: '1200px 700px',
+      intensity: 1.1,
+    },
+    breathing: { color: 'rgba(239,159,39,0.18)', motif: 'embers' },
+  },
+  nirvana: {
+    bg: 'https://d2xsxph8kpxj0f.cloudfront.net/310519663623353486/TFHGKZ8eZeQPrrYUXjWpCv/dragon_gate_final_release-2ph72kMzLxEGcYQjfoaFXA.webp',
+    accent: '#D94A3B',
+    kanji: '門',
+    overlay: 0.32,
+    lighting: {
+      color: 'rgba(255,160,100,0.35)',
+      position: '50% 40%',
+      size: '1300px 900px',
+      intensity: 1.15,
+    },
+    breathing: { color: 'rgba(255,140,180,0.18)', motif: 'petals' },
+  },
+  interstitial: {
+    bg: '/interstitial.jpg',
+    accent: '#C9A84C',
+    overlay: 0.35,
+    lighting: {
+      color: 'rgba(201,168,76,0.25)',
+      position: '50% 50%',
+      size: '800px 800px',
+      intensity: 1.0,
+    },
+    breathing: { color: 'rgba(201,168,76,0.08)', motif: 'mist' },
+  },
+  command: {
+    bg: '/wartable.jpg',
+    accent: '#B0701C',
+    overlay: 0.32,
+    lighting: {
+      color: 'rgba(176,112,28,0.26)',
+      position: '50% 50%',
+      size: '900px 600px',
+      intensity: 0.85,
+    },
+    breathing: { color: 'rgba(176,112,28,0.08)', motif: 'scrolls' },
+  },
+}

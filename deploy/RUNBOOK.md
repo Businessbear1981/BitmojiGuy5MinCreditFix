@@ -72,7 +72,7 @@ domain if it changed, and redeploy the backend.
 ## 3. Stripe webhook
 
 In the Stripe dashboard (Sean's account): add endpoint
-`https://<railway-domain>/api/webhook/stripe` for `checkout.session.completed`,
+`https://<railway-domain>/api/webhooks/stripe` for `checkout.session.completed`,
 copy the signing secret into `STRIPE_WEBHOOK_SECRET`.
 
 ## 4. Lob webhook
