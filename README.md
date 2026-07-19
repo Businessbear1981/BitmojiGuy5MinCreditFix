@@ -1,16 +1,41 @@
-# React + Vite
+# AE 5-Min Credit Fix
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Consumer credit-dispute platform (AE Labs / Arden Edge Capital). Upload your
+credit report, the app detects disputable items, generates FCRA-compliant
+dispute letters for all three bureaus, and mails them after a one-time
+$24.99 payment.
 
-Currently, two official plugins are available:
+**Agent/contributor context lives in [AGENTS.md](AGENTS.md)** — read it first,
+then [docs/STATE.md](docs/STATE.md) for current state.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Layout
 
-## React Compiler
+| Path | What |
+|---|---|
+| `backend/` | FastAPI API — cases, report parsing, letter engine, Stripe, Lob mail |
+| `frontend/` | Next.js customer app (Vercel) |
+| `docs/` | State + architecture decision records |
+| `remotion-video/` | Marketing video project |
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Quick start
 
-## Expanding the ESLint configuration
+```bash
+# Backend (Python 3.12+)
+cd backend
+pip install -r requirements.txt
+cp ../.env.example .env   # fill in what you need; dev works with defaults
+uvicorn main:app --reload --port 8000
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+# Frontend (Node 22)
+cd frontend
+npm install
+NEXT_PUBLIC_API_URL=http://localhost:8000 npm run dev
+```
+
+Tests: `cd backend && pytest`.
+
+## Data posture
+
+PII is stored **encrypted at the field level** and **hard-deleted after 24
+hours** (ADR-0002, superseding ADR-0001). Uploaded documents are encrypted
+with a per-session key before touching disk and purged on the same schedule.

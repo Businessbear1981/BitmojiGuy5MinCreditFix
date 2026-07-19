@@ -1,10 +1,9 @@
 import os
 import smtplib
+from email import encoders
+from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email.mime.base import MIMEBase
-from email import encoders
-from pathlib import Path
 
 SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY", "")
 SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.sendgrid.net")
@@ -14,7 +13,7 @@ SMTP_PASS = os.environ.get("SMTP_PASS", SENDGRID_API_KEY)
 FROM_EMAIL = os.environ.get("FROM_EMAIL", "noreply@ardanedgecapital.com")
 
 
-def send_letters_email(to_email: str, client_name: str, session_id: str, pdf_path: Path) -> bool:
+def send_letters_email(to_email: str, client_name: str, session_id: str, pdf_bytes: bytes) -> bool:
     """Send the dispute letters PDF to the user via email."""
     if not SMTP_PASS:
         print("WARN: No SMTP credentials configured, skipping email")
@@ -48,16 +47,15 @@ Your session ID is {session_id} — save this to re-download your letters anytim
 """
     msg.attach(MIMEText(body, "plain"))
 
-    if pdf_path.exists():
-        with open(pdf_path, "rb") as f:
-            part = MIMEBase("application", "pdf")
-            part.set_payload(f.read())
-            encoders.encode_base64(part)
-            part.add_header(
-                "Content-Disposition",
-                f'attachment; filename="AE_CreditFix_Letters_{session_id}.pdf"',
-            )
-            msg.attach(part)
+    if pdf_bytes:
+        part = MIMEBase("application", "pdf")
+        part.set_payload(pdf_bytes)
+        encoders.encode_base64(part)
+        part.add_header(
+            "Content-Disposition",
+            f'attachment; filename="AE_CreditFix_Letters_{session_id}.pdf"',
+        )
+        msg.attach(part)
 
     try:
         with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
@@ -66,5 +64,6 @@ Your session ID is {session_id} — save this to re-download your letters anytim
             server.send_message(msg)
         return True
     except Exception as e:
-        print(f"Email send failed: {e}")
+        # Log the error type only — the exception could echo message content
+        print(f"Email send failed: {type(e).__name__}")
         return False

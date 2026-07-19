@@ -17,6 +17,7 @@ export function SoundDesign({ sceneKey = 'landing', enabled = true }: SoundDesig
 
     const initAudio = () => {
       if (!audioContextRef.current) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- pre-existing: legacy Safari webkitAudioContext fallback
         audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)()
       }
 

@@ -11,13 +11,13 @@ Key derivation:
 Encryption:
   AES-256-GCM (authenticated encryption)
 """
-import os
 import hashlib
-import time
 import secrets
+import time
+
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
-CYPHER_SERVER_SECRET = os.environ.get("CYPHER_SERVER_SECRET", "ae-labs-default-dev-secret-change-in-prod")
+from config import CYPHER_SERVER_SECRET
 
 
 def generate_session_key(client_ip: str) -> tuple[str, bytes]:

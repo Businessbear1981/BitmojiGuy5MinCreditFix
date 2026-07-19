@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useShojiNav } from '@/lib/shojiNav'
 import { TopNav } from '@/components/nav/TopNav'
 import { WizardSidebar } from '@/components/sidebar/WizardSidebar'
@@ -56,6 +57,8 @@ export default function Step1Page() {
     address: '',
     phone: '',
     email: '',
+    dob: '',
+    ssnLast4: '',
     state: 'CA',
     bureau: 'All Three',
     disputeReason: 'Identity theft',
@@ -63,22 +66,37 @@ export default function Step1Page() {
 
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
+  const [consent, setConsent] = useState(false)
 
   const update = (k: keyof typeof formData, v: string) =>
     setFormData((prev) => ({ ...prev, [k]: v }))
 
   async function handleSubmit() {
     if (!formData.firstName || !formData.email) return
+    if (!consent) { setSubmitError('Please review and accept the terms below to continue.'); return }
+    // The backend routes cases by the 5-digit zip inside the address — catch a
+    // missing zip here with a friendlier message than the server's.
+    if (!/\b\d{5}\b/.test(formData.address)) {
+      setSubmitError('Please include your 5-digit zip code in the address (e.g. 123 Main St, Austin, TX 78701). The beta is currently open in TX, CA & WA.')
+      return
+    }
     setSubmitting(true)
+    setSubmitError('')
     try {
       const res = await submitIntake({
         name: `${formData.firstName} ${formData.lastName}`.trim(),
         email: formData.email,
         phone: formData.phone,
         address: formData.address,
-        state: formData.state,
+        dob: formData.dob,
+        ssn_last4: formData.ssnLast4,
       })
       const data = await res.json()
+      if (!res.ok) {
+        setSubmitError(data.error || 'Could not start your case. Please check your details and try again.')
+        setSubmitting(false)
+        return
+      }
       if (data.session_id) setApiSessionId(data.session_id)
     } catch {
       setSubmitError('Could not connect to server. Please try again.')
@@ -139,6 +157,7 @@ export default function Step1Page() {
                 <div style={{ gridColumn: '1 / -1' }}>
                   <label style={labelStyle}>Address</label>
                   <input type="text" style={inputStyle}
+                    placeholder="123 Main St, City, ST 12345"
                     value={formData.address}
                     onChange={(e) => update('address', e.target.value)} />
                 </div>
@@ -153,6 +172,18 @@ export default function Step1Page() {
                   <input type="email" style={inputStyle}
                     value={formData.email}
                     onChange={(e) => update('email', e.target.value)} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Date of Birth</label>
+                  <input type="date" style={{ ...inputStyle, colorScheme: 'dark' }}
+                    value={formData.dob}
+                    onChange={(e) => update('dob', e.target.value)} />
+                </div>
+                <div>
+                  <label style={labelStyle}>SSN Last 4</label>
+                  <input type="text" inputMode="numeric" maxLength={4} style={inputStyle}
+                    value={formData.ssnLast4}
+                    onChange={(e) => update('ssnLast4', e.target.value.replace(/\D/g, ''))} />
                 </div>
                 <div>
                   <label style={labelStyle}>State</label>
@@ -180,11 +211,41 @@ export default function Step1Page() {
                 </div>
               </div>
 
+              {/* Consent gate — the backend requires terms acceptance before case creation */}
+              <label style={{
+                display: 'flex', alignItems: 'flex-start', gap: 10,
+                padding: '12px 14px', marginTop: 20, cursor: 'pointer',
+                border: `1px solid ${consent ? 'rgba(201,168,76,0.55)' : 'rgba(138,130,120,0.25)'}`,
+                borderRadius: 6, background: 'rgba(0,0,0,0.35)', transition: 'border-color 0.2s',
+              }}>
+                <input
+                  type="checkbox"
+                  checked={consent}
+                  onChange={(e) => { setConsent(e.target.checked); if (e.target.checked) setSubmitError('') }}
+                  style={{ accentColor: '#C9A84C', marginTop: 2, flexShrink: 0 }}
+                />
+                <span style={{
+                  fontFamily: 'var(--font-body)', fontSize: 11, color: '#A8A29A',
+                  lineHeight: 1.55, letterSpacing: 0.3,
+                }}>
+                  I authorize 5-Min Credit Fix to prepare and mail my dispute letters to the credit bureaus.
+                  I understand this is a self-help fintech tool &mdash; <strong style={{ color: '#C9BFB2' }}>not legal
+                  advice</strong>, and 5-Min Credit Fix is not a law firm, credit counselor, or credit repair
+                  organization. My uploaded documents are processed in memory only and{' '}
+                  <strong style={{ color: '#C9BFB2' }}>no personal data is retained after my session ends</strong>.
+                  I have read the{' '}
+                  <Link href="/terms" target="_blank" style={{ color: '#C9A84C', textDecoration: 'underline' }}>Terms of Service</Link>
+                  {' '}and{' '}
+                  <Link href="/privacy" target="_blank" style={{ color: '#C9A84C', textDecoration: 'underline' }}>Privacy Policy</Link>
+                  {' '}and agree to proceed.
+                </span>
+              </label>
+
               {submitError && <p style={{ color: '#FF5A5A', fontFamily: 'var(--font-body)', fontSize: 13, textAlign: 'center', marginTop: 12 }}>{submitError}</p>}
               <div style={{ marginTop: 28, display: 'flex', justifyContent: 'center' }}>
                 <button
                   onClick={handleSubmit}
-                  disabled={submitting || !formData.firstName || !formData.email}
+                  disabled={submitting || !formData.firstName || !formData.email || !consent}
                   style={{
                     fontFamily: 'var(--font-cinzel), serif',
                     fontSize: 14,

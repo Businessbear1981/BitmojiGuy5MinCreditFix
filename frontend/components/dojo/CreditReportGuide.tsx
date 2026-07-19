@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { ExternalLink, CheckCircle, AlertCircle } from 'lucide-react'
+import { getCreditReportGuide, getCreditReportBureaus } from '@/lib/api'
 
-const FLASK = process.env.NEXT_PUBLIC_FLASK_URL ?? 'http://localhost:5000'
 const GOLD = '#C9A84C'
 
 interface Guide {
@@ -45,8 +45,8 @@ export function CreditReportGuide() {
     const fetchGuide = async () => {
       try {
         const [guideRes, bureauxRes] = await Promise.all([
-          fetch(`${FLASK}/api/credit-report-guide`),
-          fetch(`${FLASK}/api/credit-report-bureaus`),
+          getCreditReportGuide(),
+          getCreditReportBureaus(),
         ])
 
         if (guideRes.ok) {

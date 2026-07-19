@@ -35,6 +35,7 @@ export function ArmorWarrior({ idUploaded, addressUploaded, reportUploaded, swor
   useEffect(() => {
     if (armoredCount === prevCount.current) return
     if (armoredCount > prevCount.current) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- pre-existing: flash/shake animation triggered by upload count change
       setFlash(true)
       setShake(true)
       const t1 = setTimeout(() => setFlash(false), 1200)

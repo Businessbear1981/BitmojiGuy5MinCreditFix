@@ -45,6 +45,7 @@ export function ParticleEffects() {
           style={{
             left: `${particle.x}%`,
             top: `${particle.y}%`,
+            // eslint-disable-next-line react-hooks/purity -- pre-existing: random drift per render is intentional for the particle effect
             '--tx': `${(Math.random() - 0.5) * 100}px`,
             animationDuration: `${particle.duration}s`,
             animationDelay: `${particle.delay}s`,

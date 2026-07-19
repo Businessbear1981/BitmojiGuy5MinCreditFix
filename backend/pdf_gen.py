@@ -1,19 +1,21 @@
-from pathlib import Path
 from datetime import datetime
+from io import BytesIO
+
+from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
-from reportlab.lib.enums import TA_LEFT, TA_CENTER
+from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer
 
 
-def build_letter_pdf(session_id: str, client: dict, letters: list, output_dir: Path) -> Path:
-    """Generate a professional PDF containing all dispute letters."""
-    output_dir.mkdir(parents=True, exist_ok=True)
-    pdf_path = output_dir / f"AE_CreditFix_{session_id}.pdf"
-
+def build_letter_pdf(session_id: str, client: dict, letters: list) -> bytes:
+    """
+    Generate the dispute-letter packet PDF fully in memory.
+    Returns raw PDF bytes — never written to disk (contains PII).
+    """
+    buffer = BytesIO()
     doc = SimpleDocTemplate(
-        str(pdf_path),
+        buffer,
         pagesize=letter,
         leftMargin=1 * inch,
         rightMargin=1 * inch,
@@ -116,13 +118,13 @@ def build_letter_pdf(session_id: str, client: dict, letters: list, output_dir: P
         story.append(Spacer(1, 0.4 * inch))
         story.append(Paragraph("_" * 40, styles["LetterBody"]))
         story.append(Paragraph(f"{_esc(client['name'])} (sign above)", styles["LetterBody"]))
-        story.append(Paragraph(f"Date: _______________", styles["LetterBody"]))
+        story.append(Paragraph("Date: _______________", styles["LetterBody"]))
 
         if i < len(letters) - 1:
             story.append(PageBreak())
 
     doc.build(story)
-    return pdf_path
+    return buffer.getvalue()
 
 
 def _esc(text: str) -> str:

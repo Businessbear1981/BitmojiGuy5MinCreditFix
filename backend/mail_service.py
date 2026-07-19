@@ -1,7 +1,14 @@
 """
-Certified mail integration via Lob API.
-Lob handles printing, stuffing, and mailing letters via USPS Certified Mail
-with tracking. Webhooks notify us of delivery status.
+Mail integration via Lob API — printing, stuffing, and USPS mailing with
+tracking. Webhooks notify us of delivery status.
+
+Postage ladder (product design, confirmed w/ Sean):
+  round 1        -> First Class
+  round 2 (d30)  -> Certified
+  round 3 (d60)  -> Certified + Return Receipt
+  round 4 (d90+) -> Certified + Return Receipt (+ CFPB/FTC escalation letters)
+Follow-up rounds are the customer re-running the flow; the round number is
+passed per send.
 
 Set these env vars:
   LOB_API_KEY       - your Lob API key (test or live)
@@ -9,19 +16,27 @@ Set these env vars:
 
 Docs: https://docs.lob.com/
 """
-import os
-import json
-import hmac
 import hashlib
+import hmac
+import os
 from datetime import datetime
-from pathlib import Path
 from typing import Optional
 
 import httpx
 
+from config import IS_PROD
+
 LOB_API_KEY = os.environ.get("LOB_API_KEY", "")
 LOB_BASE_URL = "https://api.lob.com/v1"
 LOB_WEBHOOK_SECRET = os.environ.get("LOB_WEBHOOK_SECRET", "")
+
+# round number -> Lob extra_service (None = plain First Class)
+POSTAGE_LADDER = {
+    1: None,
+    2: "certified",
+    3: "certified_return_receipt",
+    4: "certified_return_receipt",
+}
 
 BUREAU_ADDRESSES = {
     "Experian": {
@@ -48,19 +63,20 @@ BUREAU_ADDRESSES = {
 }
 
 
-def send_certified_letter(
+def send_letter(
     client_name: str,
     client_address: str,
     target: str,
     letter_html: str,
     session_id: str,
+    round_number: int = 1,
 ) -> Optional[dict]:
     """
-    Send a letter via Lob Certified Mail.
+    Send a letter via Lob, with postage escalating by dispute round.
     Returns Lob letter object with tracking info, or None if not configured.
     """
     if not LOB_API_KEY:
-        print("WARN: LOB_API_KEY not set, skipping certified mail")
+        print("WARN: LOB_API_KEY not set, skipping mail")
         return None
 
     to_addr = BUREAU_ADDRESSES.get(target)
@@ -77,7 +93,7 @@ def send_certified_letter(
     zip_code = state_zip[1] if len(state_zip) > 1 else ""
 
     payload = {
-        "description": f"AE CreditFix dispute - {session_id[:8]} -> {target}",
+        "description": f"AE CreditFix dispute r{round_number} - {session_id[:8]} -> {target}",
         "to": to_addr,
         "from": {
             "name": client_name,
@@ -89,13 +105,16 @@ def send_certified_letter(
         "file": letter_html,
         "color": False,
         "mail_type": "usps_first_class",
-        "extra_service": "certified",
         "return_envelope": True,
         "metadata": {
             "session_id": session_id,
             "target": target,
+            "round": str(round_number),
         },
     }
+    extra_service = POSTAGE_LADDER.get(round_number, "certified_return_receipt")
+    if extra_service:
+        payload["extra_service"] = extra_service
 
     try:
         resp = httpx.post(
@@ -115,7 +134,7 @@ def send_certified_letter(
             "created_at": datetime.utcnow().isoformat(),
         }
     except Exception as e:
-        print(f"Lob API error: {e}")
+        print(f"Lob API error: {type(e).__name__}")
         return None
 
 
@@ -124,24 +143,27 @@ def send_all_letters(
     client_address: str,
     letters: list,
     session_id: str,
+    round_number: int = 1,
 ) -> list:
-    """Send all dispute letters via certified mail. Returns list of tracking results."""
+    """Send all dispute letters via Lob. Returns list of tracking results."""
     results = []
     for ltr in letters:
         target = ltr.get("target", "")
         text = ltr.get("text", "")
         # Convert plain text to simple HTML for Lob
         html = f"<html><body><pre style='font-family:Courier;font-size:11pt;'>{text}</pre></body></html>"
-        result = send_certified_letter(client_name, client_address, target, html, session_id)
+        result = send_letter(client_name, client_address, target, html, session_id, round_number)
         if result:
             results.append(result)
     return results
 
 
 def verify_webhook_signature(payload: bytes, signature: str) -> bool:
-    """Verify Lob webhook signature."""
+    """Verify Lob webhook signature. Fails closed in production."""
     if not LOB_WEBHOOK_SECRET:
-        return True  # Skip verification if no secret configured
+        # Without a secret we cannot verify anything: reject in production,
+        # allow only for local development.
+        return not IS_PROD
     expected = hmac.new(
         LOB_WEBHOOK_SECRET.encode(), payload, hashlib.sha256
     ).hexdigest()

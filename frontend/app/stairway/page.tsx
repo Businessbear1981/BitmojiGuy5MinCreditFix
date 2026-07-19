@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useShojiNav } from '@/lib/shojiNav'
 import { useWizardStore } from '@/store/wizardStore'
 import { TopNav } from '@/components/nav/TopNav'
 import { WizardSidebar } from '@/components/sidebar/WizardSidebar'
-import { createCheckout, manualPay, queueForRelease } from '@/lib/api'
+import { createCheckout, getCaseStatus, manualPay, queueForRelease, setApiSessionId } from '@/lib/api'
+import { MANUAL_PAY_HANDLES, type ManualPayPending } from '@/lib/types'
 
 const ACCENT = '#5CFFCC'
 
@@ -14,6 +15,51 @@ export default function StairwayPage() {
   const { setPaid } = useWizardStore()
   const [loading, setLoading] = useState<'card' | 'cashapp' | 'chime' | null>(null)
   const [error, setError] = useState('')
+  const [pending, setPending] = useState<ManualPayPending | null>(null)
+
+  // Stripe cancel_url lands back here with ?session_id= — restore the session
+  // so the customer can retry payment after a refresh. Also restore a manual
+  // (Cash App / Chime) payment that's still awaiting verification.
+  useEffect(() => {
+    const sid = new URLSearchParams(window.location.search).get('session_id')
+    if (sid) setApiSessionId(sid)
+    ;(async () => {
+      try {
+        const status = await getCaseStatus()
+        if (status?.paid) {
+          setPaid(true)
+          navigateTo('/gate')
+        } else if (status?.manual_pay_pending && status.manual_pay_code) {
+          const method = status.manual_pay_method === 'chime' ? 'chime' : 'cashapp'
+          setPending({
+            confirmation: status.manual_pay_code,
+            method,
+            handle: MANUAL_PAY_HANDLES[method].handle,
+            amount: '$24.99',
+          })
+        }
+      } catch { /* no session yet */ }
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // While a manual payment is pending, poll for the admin release and walk
+  // the customer through the gate the moment their letters unlock.
+  useEffect(() => {
+    if (!pending) return
+    const timer = setInterval(async () => {
+      try {
+        const status = await getCaseStatus()
+        if (status?.paid) {
+          clearInterval(timer)
+          setPaid(true)
+          navigateTo('/gate')
+        }
+      } catch { /* server unreachable — keep polling */ }
+    }, 5000)
+    return () => clearInterval(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pending])
 
   async function handleCard() {
     setError(''); setLoading('card')
@@ -37,20 +83,22 @@ export default function StairwayPage() {
     }
   }
 
-  const [pendingConf, setPendingConf] = useState('')
-
   async function handleManual(method: 'cashapp' | 'chime') {
     setError(''); setLoading(method)
     try {
       const res = await manualPay(method)
       const data = await res.json()
-      if (data.ok && !data.pending) {
+      if (data.pending) {
+        setPending({
+          confirmation: data.confirmation || '',
+          method,
+          handle: data.handle || MANUAL_PAY_HANDLES[method].handle,
+          amount: data.amount || '$24.99',
+        })
+      } else if (data.ok && data.paid) {
         setPaid(true)
-        // Queue for admin release
         await queueForRelease()
         navigateTo('/gate')
-      } else if (data.pending) {
-        setPendingConf(data.confirmation || '')
       } else {
         throw new Error(data.error || 'Payment not recorded')
       }
@@ -176,7 +224,7 @@ export default function StairwayPage() {
                 }}
               >
                 <span style={{ position: 'absolute', top: -8, right: 8, fontSize: 9, background: '#00D54B', color: '#050403', padding: '2px 6px', borderRadius: 3, letterSpacing: 1 }}>RECOMMENDED</span>
-                {loading === 'cashapp' ? 'Processing...' : 'Cash App · $AELabsCreditFix'}
+                {loading === 'cashapp' ? 'Processing...' : `Cash App · ${MANUAL_PAY_HANDLES.cashapp.handle}`}
               </button>
               <button
                 onClick={() => handleManual('chime')}
@@ -192,7 +240,7 @@ export default function StairwayPage() {
                 }}
               >
                 <span style={{ position: 'absolute', top: -8, right: 8, fontSize: 9, background: '#00D54B', color: '#050403', padding: '2px 6px', borderRadius: 3, letterSpacing: 1 }}>RECOMMENDED</span>
-                {loading === 'chime' ? 'Processing...' : 'Chime · $AELabsPay'}
+                {loading === 'chime' ? 'Processing...' : `Chime · ${MANUAL_PAY_HANDLES.chime.handle}`}
               </button>
             </div>
 
@@ -222,21 +270,30 @@ export default function StairwayPage() {
               {loading === 'card' ? 'Connecting to Stripe...' : 'Pay with Card (Stripe)'}
             </button>
 
-            {pendingConf && (
+            {pending && (
               <div style={{
                 marginTop: 16, padding: '1.25rem',
                 background: `linear-gradient(135deg, ${ACCENT}15, rgba(0,0,0,0.5))`,
                 border: `1px solid ${ACCENT}44`, borderRadius: 6,
                 textAlign: 'center',
               }}>
-                <p style={{ fontFamily: 'var(--font-cinzel), serif', fontSize: 11, color: ACCENT, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 6 }}>
+                <p style={{ fontFamily: 'var(--font-cinzel), serif', fontSize: 11, color: ACCENT, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 10 }}>
                   Payment Pending Verification
                 </p>
-                <p style={{ fontFamily: 'monospace', fontSize: 16, color: '#F0EBE0', letterSpacing: 2, marginBottom: 8 }}>
-                  {pendingConf}
+                <p style={{ fontFamily: 'var(--font-body)', fontSize: 13, color: '#F0EBE0', lineHeight: 1.6, marginBottom: 10 }}>
+                  Send <strong style={{ color: ACCENT }}>{pending.amount}</strong> on{' '}
+                  {MANUAL_PAY_HANDLES[pending.method].label} to{' '}
+                  <strong style={{ color: ACCENT, fontFamily: 'monospace', letterSpacing: 1 }}>{pending.handle}</strong>
+                </p>
+                <p style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: '#A8A29A', marginBottom: 4 }}>
+                  Put this code in the payment note:
+                </p>
+                <p style={{ fontFamily: 'monospace', fontSize: 18, color: '#F0EBE0', letterSpacing: 3, marginTop: 0, marginBottom: 10 }}>
+                  {pending.confirmation}
                 </p>
                 <p style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: '#A8A29A', lineHeight: 1.5, margin: 0 }}>
-                  Send $24.99 + postage to the address above. Include this confirmation number in the memo. Admin will verify and unlock your letters within 24 hours.
+                  We verify payments by hand and unlock your letters as soon as yours lands — this page will
+                  move you forward automatically. Keep it open or come back any time.
                 </p>
               </div>
             )}

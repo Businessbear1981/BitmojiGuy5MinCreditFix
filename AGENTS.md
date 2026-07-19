@@ -15,7 +15,7 @@ Consumer credit-dispute platform (AE Labs / Arden Edge Capital, code AE.CC.001).
 |---|---|---|
 | Backend | Flask in `bitmoji_credit_app/` — sessions, parsing, letters, Stripe, admin | Railway (`railway.toml`; gunicorn **single worker `-w 1`**, required) |
 | Frontend | Next.js 16 in `frontend/` — the themed "journey" (map → dojo → koi-pond → garden → stairway → gate → watcher) | Vercel `bitmoji-guy5-min-credit-fix.vercel.app`, talks to Flask via `NEXT_PUBLIC_FLASK_URL` |
-| Payments | Stripe Checkout (card) + manual Cash App `$AELabsCreditFix` / Chime `$AELabsPay` (admin-released) | keys pending from Sean |
+| Payments | Stripe Checkout (card) + manual Cash App `$5mincreditfix` / Chime `$AELabsPay` (admin-released via /admin) | keys pending from Sean |
 | Mail | Click2Mail (`click2mail_integration.py`) | account/funding pending from Sean |
 | Storage | **None by design** (ADR-0001) | — |
 

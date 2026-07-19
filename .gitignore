@@ -6,6 +6,7 @@ out/
 __pycache__/
 *.pyc
 .venv/
+.venv-*/
 venv/
 .env
 .env.local
@@ -13,3 +14,12 @@ venv/
 !.env.example
 .DS_Store
 Thumbs.db
+*.db
+*.db-shm
+*.db-wal
+backend/session_data/
+backend/uploads/
+backend/generated_pdfs/
+creditfix_data/
+.pytest_cache/
+.ruff_cache/

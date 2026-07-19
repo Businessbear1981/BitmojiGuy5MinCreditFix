@@ -1,20 +1,45 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useShojiNav } from '@/lib/shojiNav'
+import { useWizardStore } from '@/store/wizardStore'
 import { SceneLayout } from '@/components/scene/SceneLayout'
 import { TopNav } from '@/components/nav/TopNav'
 import { WizardSidebar } from '@/components/sidebar/WizardSidebar'
-import { sendCertified } from '@/lib/api'
+import { sendCertified, getCaseStatus, setApiSessionId, getDownloadPackageUrl } from '@/lib/api'
 
 const ACCENT = '#D94A3B'
 
 export default function GatePage() {
   const { navigateTo } = useShojiNav()
+  const { paid, setPaid } = useWizardStore()
   const [postage, setPostage] = useState<'first' | 'certified'>('certified')
   const [sending, setSending] = useState(false)
   const [confirmation, setConfirmation] = useState('')
   const [error, setError] = useState('')
+
+  // Stripe success_url lands here with ?session_id=...&paid=true. Restore the
+  // session and poll case status briefly — the payment webhook can lag a beat.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const sid = params.get('session_id')
+    if (sid) setApiSessionId(sid)
+    if (params.get('paid') !== 'true') return
+    let cancelled = false
+    ;(async () => {
+      for (let i = 0; i < 6 && !cancelled; i++) {
+        try {
+          const status = await getCaseStatus()
+          if (status?.paid) {
+            setPaid(true)
+            return
+          }
+        } catch { /* server unreachable — keep trying */ }
+        await new Promise((r) => setTimeout(r, 1500))
+      }
+    })()
+    return () => { cancelled = true }
+  }, [setPaid])
 
   async function handleDispatch() {
     setError('')
@@ -201,6 +226,27 @@ export default function GatePage() {
               >
                 {sending ? 'Dispatching...' : '✉ Dispatch All Letters Through the Gate'}
               </button>
+            )}
+
+            {/* Paid users always get their packet, even before mailing is available */}
+            {paid && (
+              <a
+                href={getDownloadPackageUrl()}
+                download
+                style={{
+                  display: 'block', width: '100%', textAlign: 'center',
+                  boxSizing: 'border-box',
+                  fontFamily: 'var(--font-heading)', fontSize: 13, letterSpacing: 2,
+                  textTransform: 'uppercase', color: ACCENT,
+                  background: `${ACCENT}15`,
+                  padding: '12px 0', borderRadius: 4,
+                  border: `1px solid ${ACCENT}55`,
+                  textDecoration: 'none',
+                  marginBottom: 20,
+                }}
+              >
+                ⬇ Download Your Letters (PDF)
+              </a>
             )}
 
             <div style={{ display: 'flex', gap: 12, justifyContent: 'space-between' }}>
