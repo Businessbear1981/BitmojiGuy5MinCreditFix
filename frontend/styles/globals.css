@@ -257,3 +257,8 @@ input:focus, textarea:focus, select:focus {
   box-shadow: 0 0 16px rgba(201,168,76,0.2), inset 0 0 8px rgba(201,168,76,0.05);
   background: rgba(10,8,6,0.8);
 }
+
+input::placeholder {
+  color: rgba(138, 130, 120, 0.55);
+  font-style: italic;
+}

@@ -74,6 +74,12 @@ export default function Step1Page() {
   async function handleSubmit() {
     if (!formData.firstName || !formData.email) return
     if (!consent) { setSubmitError('Please review and accept the terms below to continue.'); return }
+    // The backend routes cases by the 5-digit zip inside the address — catch a
+    // missing zip here with a friendlier message than the server's.
+    if (!/\b\d{5}\b/.test(formData.address)) {
+      setSubmitError('Please include your 5-digit zip code in the address (e.g. 123 Main St, Austin, TX 78701). The beta is currently open in TX, CA & WA.')
+      return
+    }
     setSubmitting(true)
     setSubmitError('')
     try {
@@ -151,6 +157,7 @@ export default function Step1Page() {
                 <div style={{ gridColumn: '1 / -1' }}>
                   <label style={labelStyle}>Address</label>
                   <input type="text" style={inputStyle}
+                    placeholder="123 Main St, City, ST 12345"
                     value={formData.address}
                     onChange={(e) => update('address', e.target.value)} />
                 </div>
