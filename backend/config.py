@@ -69,3 +69,6 @@ SESSION_TTL_HOURS = int(os.environ.get("SESSION_TTL_HOURS", "24"))
 
 # Optional persistent rate-limit backend (e.g. redis://...); memory otherwise
 RATE_LIMIT_STORAGE_URI = os.environ.get("RATE_LIMIT_STORAGE_URI", "memory://")
+
+# Optional error tracking. When unset, Sentry is disabled entirely.
+SENTRY_DSN = os.environ.get("SENTRY_DSN", "")

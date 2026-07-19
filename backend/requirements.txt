@@ -12,3 +12,4 @@ PyMuPDF
 anthropic
 cryptography
 python-dotenv
+sentry-sdk[fastapi]

@@ -36,6 +36,18 @@ from terms_token import issue_token, verify_token
 
 stripe.api_key = config.STRIPE_SECRET_KEY
 
+if config.SENTRY_DSN:
+    import sentry_sdk
+
+    sentry_sdk.init(
+        dsn=config.SENTRY_DSN,
+        environment=config.ENVIRONMENT,
+        traces_sample_rate=0.1,
+        # PII never leaves the box: no request bodies, no user context.
+        send_default_pii=False,
+        max_request_body_size="never",
+    )
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -295,7 +307,9 @@ async def upload_doc(session_id: str, request: Request, file: UploadFile = File(
     encrypted = encrypt_file_in_memory(content, session_key)
     (upload_dir / f"{uuid.uuid4().hex[:8]}{suffix}.enc").write_bytes(encrypted)
 
-    attachments = record.attachments or []
+    # Copy before append: assigning the same (mutated) list object back would
+    # not be detected as a change by SQLAlchemy and the update would be lost
+    attachments = list(record.attachments or [])
     attachments.append(file.filename)
     record.attachments = attachments
     record.docs_complete = True
@@ -321,7 +335,7 @@ async def upload_doc(session_id: str, request: Request, file: UploadFile = File(
 @limiter.limit("10/minute")
 async def confirm_disputes(session_id: str, req: ConfirmDisputesRequest, request: Request, db: Session = Depends(get_db)):
     record = get_case(session_id, db)
-    items = record.items or []
+    items = list(record.items or [])
     for item in req.items:
         items.append({
             "id": new_id("ITM"),
@@ -434,7 +448,8 @@ async def lob_webhook(request: Request, db: Session = Depends(get_db)):
     if session_id:
         record = db.query(CaseRecord).filter_by(session_id=session_id).first()
         if record:
-            letters = record.letters or []
+            # Fresh dicts so SQLAlchemy sees the assignment as a change
+            letters = [dict(ltr) for ltr in (record.letters or [])]
             target = metadata.get("target", "")
             for ltr in letters:
                 if ltr.get("target") == target:
