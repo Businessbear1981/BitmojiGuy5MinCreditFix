@@ -22,6 +22,8 @@ except ImportError:
 
 # --- Claude API ---
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+# Overridable so a model retirement never requires a code change again.
+ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
 
 try:
     import anthropic
@@ -99,7 +101,7 @@ def analyze_with_claude(report_text: str) -> List[dict]:
 
     try:
         message = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model=ANTHROPIC_MODEL,
             max_tokens=4096,
             system=SYSTEM_PROMPT,
             messages=[
