@@ -33,9 +33,18 @@ def _active_count(db: Session, region: str) -> int:
 
 
 def extract_zip(address: str) -> Optional[str]:
-    """Extract 5-digit zip code from an address string."""
-    match = re.search(r"\b(\d{5})(?:-\d{4})?\b", address)
-    return match.group(1) if match else None
+    """Extract 5-digit zip from an address.
+
+    Prefer a ZIP at the end of the string (US mailing format). Falling back
+    to the *last* 5-digit token avoids mistaking a street number
+    (e.g. "15255 Main St … 49097") for the ZIP.
+    """
+    text = (address or "").strip()
+    match = re.search(r"\b(\d{5})(?:-\d{4})?\s*$", text)
+    if match:
+        return match.group(1)
+    matches = re.findall(r"\b(\d{5})(?:-\d{4})?\b", text)
+    return matches[-1] if matches else None
 
 
 def get_region(zip_code: str) -> Optional[str]:

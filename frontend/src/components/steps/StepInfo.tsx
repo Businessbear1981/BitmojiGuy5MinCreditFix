@@ -5,7 +5,7 @@ import { Card, CardTitle, CardSub } from '../ui/Card';
 import { Input, Select } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { BitmojiFigure } from '../BitmojiFigure';
-import { US_STATES } from '@/lib/types';
+import { BETA_STATES, US_STATES } from '@/lib/types';
 import { acceptTerms, createCase, ApiError } from '@/lib/api';
 import { saveSession } from '@/lib/session';
 
@@ -35,6 +35,11 @@ export function StepInfo({ onComplete }: Props) {
     if (!/^\d{4}$/.test(ssnLast4)) return setError('Enter the last 4 digits of your SSN');
     if (!phone.trim()) return setError('Phone number is required');
     if (!consent) return setError('Please review and accept the terms to continue');
+    if (!(BETA_STATES as readonly string[]).includes(state)) {
+      return setError(
+        `Beta launch is limited to Texas, California, and Washington — ${state} isn’t open yet.`,
+      );
+    }
 
     setError('');
     setLoading(true);

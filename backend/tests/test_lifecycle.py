@@ -38,6 +38,15 @@ def test_case_rejects_non_beta_zip(client, terms_token):
     body = dict(TEST_CASE, address="9 Elm St, Portland, ME 04101")
     resp = client.post("/api/case", json=body, headers={"X-Terms-Token": terms_token})
     assert resp.status_code == 403
+    assert "04101" in resp.json()["detail"]
+
+
+def test_case_uses_trailing_zip_not_street_number(client, terms_token):
+    """Street numbers can be 5 digits — eligibility must use the ZIP at the end."""
+    body = dict(TEST_CASE, address="15255 Main St, Dallas, TX 75201")
+    resp = client.post("/api/case", json=body, headers={"X-Terms-Token": terms_token})
+    assert resp.status_code == 200
+    assert resp.json()["region"] == "Texas"
 
 
 def test_case_validates_pii_fields(client, terms_token):
