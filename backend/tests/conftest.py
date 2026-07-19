@@ -41,6 +41,13 @@ def client():
         yield c
 
 
+@pytest.fixture(autouse=True)
+def _reset_rate_limits():
+    # Every test shares one in-memory limiter keyed by the test client's IP —
+    # without a reset, later tests inherit earlier tests' request counts.
+    main.limiter.reset()
+
+
 @pytest.fixture()
 def terms_token(client):
     resp = client.post("/api/terms/accept")

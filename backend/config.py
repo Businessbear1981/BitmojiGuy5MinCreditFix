@@ -54,6 +54,12 @@ if IS_PROD and STRIPE_SECRET_KEY and not STRIPE_WEBHOOK_SECRET:
 STRIPE_PRICE_CENTS = 2499
 PRICE_DISPLAY = "$24.99"
 
+# Manual pay (Cash App / Chime): customer sends money to Sean directly and the
+# admin releases their letters after verifying receipt. Tags confirmed with
+# Sean 2026-07-19 (Cash App cashtag = $5mincreditfix).
+CASHAPP_CASHTAG = os.environ.get("CASHAPP_CASHTAG", "$5mincreditfix")
+CHIME_TAG = os.environ.get("CHIME_TAG", "$AELabsPay")
+
 # URLs
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000")
 ALLOWED_ORIGINS = [

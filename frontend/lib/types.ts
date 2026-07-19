@@ -65,6 +65,24 @@ export interface CaseStatus {
   email_sent: boolean
   mail_sent: boolean
   created_at: string | null
+  manual_pay_pending?: boolean
+  manual_pay_method?: 'cashapp' | 'chime' | null
+  manual_pay_code?: string | null
+}
+
+/** Cash App / Chime handles shown on the payment page. Must match the
+ *  backend's CASHAPP_CASHTAG / CHIME_TAG config (source of truth for the
+ *  pending-payment instructions is the manual-pay API response). */
+export const MANUAL_PAY_HANDLES = {
+  cashapp: { label: 'Cash App', handle: '$5mincreditfix' },
+  chime: { label: 'Chime', handle: '$AELabsPay' },
+} as const
+
+export interface ManualPayPending {
+  confirmation: string
+  method: 'cashapp' | 'chime'
+  handle: string
+  amount: string
 }
 
 export interface MailTracking {

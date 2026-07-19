@@ -508,6 +508,47 @@ async def create_checkout(session_id: str, request: Request, db: Session = Depen
     return {"checkout_url": checkout.url}
 
 
+class ManualPayRequest(BaseModel):
+    method: str
+
+    @field_validator("method")
+    @classmethod
+    def validate_method(cls, v):
+        if v not in ("cashapp", "chime"):
+            raise ValueError("Method must be 'cashapp' or 'chime'")
+        return v
+
+
+@app.post("/api/case/{session_id}/manual-pay")
+@limiter.limit("5/minute")
+async def manual_pay(session_id: str, body: ManualPayRequest, request: Request, db: Session = Depends(get_db)):
+    """
+    Cash App / Chime: the customer sends money to our handle directly with a
+    confirmation code in the payment note; admin verifies receipt and releases
+    the letters via /api/admin/release/{session_id}.
+    """
+    record = get_case(session_id, db)
+    if record.paid:
+        return {"already_paid": True, "session_id": session_id}
+
+    # Keep the same code across retries / method switches so the customer
+    # never ends up with two codes for one case.
+    if not record.manual_pay_code:
+        record.manual_pay_code = f"CF-{uuid.uuid4().hex[:6].upper()}"
+    record.manual_pay_method = body.method
+    record.manual_pay_requested_at = datetime.utcnow()
+    db.commit()
+
+    handle = config.CASHAPP_CASHTAG if body.method == "cashapp" else config.CHIME_TAG
+    return {
+        "pending": True,
+        "confirmation": record.manual_pay_code,
+        "method": body.method,
+        "handle": handle,
+        "amount": config.PRICE_DISPLAY,
+    }
+
+
 @app.post("/api/webhooks/stripe")
 async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
     """Handle Stripe webhook for payment confirmation."""
@@ -619,6 +660,11 @@ async def case_status(session_id: str, db: Session = Depends(get_db)):
         "email_sent": record.email_sent,
         "mail_sent": record.mail_sent,
         "created_at": record.created_at.isoformat() if record.created_at else None,
+        # Manual pay (Cash App / Chime) — lets the payment page restore its
+        # "pending verification" panel after a refresh.
+        "manual_pay_pending": bool(record.manual_pay_requested_at and not record.paid),
+        "manual_pay_method": record.manual_pay_method,
+        "manual_pay_code": record.manual_pay_code,
     }
 
 
@@ -658,10 +704,59 @@ async def admin_stats(request: Request, db: Session = Depends(get_db)):
     today_count = db.query(CaseRecord).filter(
         CaseRecord.created_at >= datetime.utcnow().replace(hour=0, minute=0, second=0)
     ).count()
+    pending_manual = db.query(CaseRecord).filter(
+        CaseRecord.manual_pay_requested_at.isnot(None), CaseRecord.paid.is_(False)
+    ).count()
     return {
         "total_cases": total,
         "paid_cases": paid,
         "revenue_estimate": f"${paid * config.STRIPE_PRICE_CENTS / 100:.2f}",
         "today": today_count,
+        "pending_manual": pending_manual,
         "fishbowl": get_fishbowl_status(db),
     }
+
+
+@app.get("/api/admin/pending-payments")
+async def admin_pending_payments(request: Request, db: Session = Depends(get_db)):
+    """Cases waiting on a Cash App / Chime payment to be verified + released."""
+    verify_admin(request)
+    records = (
+        db.query(CaseRecord)
+        .filter(CaseRecord.manual_pay_requested_at.isnot(None), CaseRecord.paid.is_(False))
+        .order_by(CaseRecord.manual_pay_requested_at.desc())
+        .all()
+    )
+    return {
+        "pending": [
+            {
+                "session_id": r.session_id,
+                "name": r.name,
+                "email": r.email,
+                "method": r.manual_pay_method,
+                "confirmation": r.manual_pay_code,
+                "requested_at": r.manual_pay_requested_at.isoformat() if r.manual_pay_requested_at else None,
+                "amount": config.PRICE_DISPLAY,
+                "letters_count": len(r.letters or []),
+            }
+            for r in records
+        ]
+    }
+
+
+@app.post("/api/admin/release/{session_id}")
+async def admin_release_payment(session_id: str, request: Request, db: Session = Depends(get_db)):
+    """
+    Mark a case paid after manually verifying the Cash App / Chime payment
+    landed. Triggers the same post-payment actions as the Stripe webhook
+    (mail letters round 1, email the PDF packet).
+    """
+    verify_admin(request)
+    record = get_case(session_id, db)
+    if record.paid:
+        return {"ok": True, "already_paid": True, "session_id": session_id}
+    record.paid = True
+    record.manual_pay_released_at = datetime.utcnow()
+    db.commit()
+    _post_payment(record, db)
+    return {"ok": True, "released": True, "session_id": session_id}

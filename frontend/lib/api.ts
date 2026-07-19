@@ -331,11 +331,33 @@ export async function createCheckout(): Promise<Response> {
   return stripeCheckout()
 }
 
-// The FastAPI backend has no manual-pay flow: Cash App / Chime route through
-// the same Stripe Checkout (Stripe's hosted page accepts their cards).
-export async function manualPay(_method: string): Promise<Response> {
-  void _method // signature parity with the journey pages; Stripe hosts all methods
-  return stripeCheckout()
+// Cash App / Chime: the backend issues a confirmation code; the customer sends
+// the money directly with the code in the payment note, and admin verifies +
+// releases the letters from /admin.
+export async function manualPay(method: 'cashapp' | 'chime'): Promise<Response> {
+  if (!_sessionId) {
+    return jsonResponse({ ok: false, error: 'No active session — please complete the intake first.' }, 400)
+  }
+  const res = await fetch(`${API}/api/case/${_sessionId}/manual-pay`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ method }),
+  })
+  const data = await readJson(res)
+  if (!res.ok) {
+    return jsonResponse({ ok: false, error: detailMessage(data, 'Could not start payment.') }, res.status)
+  }
+  if (data.already_paid) {
+    return jsonResponse({ ok: true, paid: true })
+  }
+  return jsonResponse({
+    ok: true,
+    pending: true,
+    confirmation: data.confirmation,
+    method: data.method,
+    handle: data.handle,
+    amount: data.amount,
+  })
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -578,6 +600,15 @@ export async function adminGetBuckets(): Promise<Response> {
 
 export async function adminGetTemplates(): Promise<Response> {
   return fetch(`${API}/api/admin/templates`, { headers: adminHeaders() })
+}
+
+// Manual-pay release queue: cases waiting on a Cash App / Chime payment.
+export async function adminGetPendingPayments(): Promise<Response> {
+  return fetch(`${API}/api/admin/pending-payments`, { headers: adminHeaders() })
+}
+
+export async function adminReleasePayment(sessionId: string): Promise<Response> {
+  return fetch(`${API}/api/admin/release/${sessionId}`, { method: 'POST', headers: adminHeaders() })
 }
 
 const ADMIN_NOT_SUPPORTED = 'Not supported by the current backend.'

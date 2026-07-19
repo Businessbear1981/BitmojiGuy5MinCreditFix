@@ -1,7 +1,7 @@
 # BitmojiGuy 5-Min Credit Fix — State
 
-> **Status:** PRE-LAUNCH (release candidate on PR #3; blocked on Sean's provider keys + deploy logins)
-> **Last updated:** 2026-07-18 (FastAPI takeover) · **Last verified:** 2026-07-18 (tests, build, API e2e, browser walk on Kevin's branch)
+> **Status:** LIVE in test/demo mode on `bitmojiguycredittool.tech` (themed journey + full e2e); real charges blocked on Sean's live keys + PR #3 merge
+> **Last updated:** 2026-07-19 (manual-pay release gate) · **Last verified:** 2026-07-19 (pytest 19/19, build clean, local browser e2e of Cash App→admin release→gate)
 > **One-liner:** $24.99 credit-dispute letters — detect from the customer's own report, one letter per bureau, mailed on an escalating postage ladder, encrypted at rest and hard-deleted within 24h.
 > **Links:** `AGENTS.md` (charter/SOP) · `docs/decisions/` (ADRs) · `docs/compliance/croa-positioning.md` · GitHub Issues (work tracking)
 
@@ -42,6 +42,7 @@ Facts carry confidence tags: `verified` (checked against ground truth on the sta
 | Letter generation (per-bureau + per-creditor, FCRA/FDCPA citations, in-memory PDF) | **Real** (Sean's perfected letter texts still pending — drop-in swap in `ae_creditfix/templates.py`) |
 | Postage ladder (Lob: First Class r1 → Certified r2 → Certified+RR r3) | **Built**, needs `LOB_API_KEY` |
 | Stripe Checkout ($24.99) + webhook + demo mode | **Built**, test/demo only until live keys |
+| Manual pay (Cash App `$5mincreditfix` / Chime `$AELabsPay`): confirmation code → customer pays Sean directly → admin verifies + releases from /admin (unlock, mail r1, email PDF) | **Real** (2026-07-19), covered by tests; stairway polls and auto-advances on release |
 | PII encryption at rest + 24h purge loop | **Real**, covered by tests |
 | Terms/consent gate (FE + server-side token) | **Real** |
 | Admin dashboard (/admin, key-gated stats) | **Real** |
