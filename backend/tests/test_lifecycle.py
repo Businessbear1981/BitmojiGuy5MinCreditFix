@@ -110,6 +110,22 @@ def test_full_lifecycle(client, terms_token):
     assert status["name"] == TEST_CASE["name"]
 
 
+def test_multiple_uploads_all_persist(client, case_session):
+    """Regression: appending to a non-empty attachments list must persist."""
+    for name in ("id.png", "address.png", "report.txt"):
+        resp = client.post(
+            f"/api/case/{case_session}/upload",
+            files={"file": (name, io.BytesIO(b"data"), "application/octet-stream")},
+        )
+        assert resp.status_code == 200
+    # Re-read from the DB via the API — all three must survive
+    resp = client.post(
+        f"/api/case/{case_session}/upload",
+        files={"file": ("extra.txt", io.BytesIO(b"x"), "text/plain")},
+    )
+    assert resp.json()["attachments"] == ["id.png", "address.png", "report.txt", "extra.txt"]
+
+
 def test_upload_rejects_bad_type_and_unknown_session(client, case_session):
     resp = client.post(
         f"/api/case/{case_session}/upload",

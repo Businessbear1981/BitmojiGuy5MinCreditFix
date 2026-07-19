@@ -4,11 +4,12 @@ import { useState, useRef } from 'react';
 import { Card, CardTitle, CardSub } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { BitmojiFigure } from '../BitmojiFigure';
-import { uploadFiles } from '@/lib/api';
-import type { DisputeItem, ParsedDisputes } from '@/lib/types';
+import { uploadDocument, ApiError } from '@/lib/api';
+import type { Suggestion } from '@/lib/types';
 
 interface Props {
-  onComplete: (parsed: ParsedDisputes, items: DisputeItem[]) => void;
+  sessionId: string;
+  onComplete: (suggestions: Suggestion[]) => void;
 }
 
 interface SlotConfig {
@@ -50,10 +51,12 @@ const SLOTS: SlotConfig[] = [
 function UploadSlot({
   config,
   file,
+  status,
   onFileSelect,
 }: {
   config: SlotConfig;
   file: File | null;
+  status: 'idle' | 'uploading' | 'done';
   onFileSelect: (file: File) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -93,13 +96,17 @@ function UploadSlot({
 
       {file ? (
         <div className="flex items-center gap-3 text-left">
-          <span className="text-3xl shrink-0">&#10003;</span>
+          <span className="text-3xl shrink-0">{status === 'uploading' ? '⏳' : '\u2713'}</span>
           <div className="flex-1 min-w-0">
             <div className="text-sm font-bold text-green-400 mb-0.5">{config.label}</div>
             <div className="text-[13px] text-gray-300 truncate">{file.name}</div>
-            <div className="text-[11px] text-gray-500">{(file.size / 1024).toFixed(0)} KB</div>
+            <div className="text-[11px] text-gray-500">
+              {(file.size / 1024).toFixed(0)} KB{status === 'uploading' ? ' — encrypting & scanning...' : ''}
+            </div>
           </div>
-          <span className="text-green-400 text-xl drop-shadow-[0_0_8px_rgba(0,255,136,0.4)]">&#10003;</span>
+          {status === 'done' && (
+            <span className="text-green-400 text-xl drop-shadow-[0_0_8px_rgba(0,255,136,0.4)]">&#10003;</span>
+          )}
         </div>
       ) : (
         <>
@@ -113,11 +120,16 @@ function UploadSlot({
   );
 }
 
-export function StepUpload({ onComplete }: Props) {
+export function StepUpload({ sessionId, onComplete }: Props) {
   const [files, setFiles] = useState<Record<string, File | null>>({
     gov_id: null,
     proof_address: null,
     credit_report: null,
+  });
+  const [statuses, setStatuses] = useState<Record<string, 'idle' | 'uploading' | 'done'>>({
+    gov_id: 'idle',
+    proof_address: 'idle',
+    credit_report: 'idle',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -127,6 +139,7 @@ export function StepUpload({ onComplete }: Props) {
 
   function setSlotFile(key: string, file: File) {
     setFiles((prev) => ({ ...prev, [key]: file }));
+    setStatuses((prev) => ({ ...prev, [key]: 'idle' }));
   }
 
   async function handleUpload() {
@@ -134,11 +147,19 @@ export function StepUpload({ onComplete }: Props) {
     setError('');
     setLoading(true);
     try {
-      const allFiles = Object.values(files).filter(Boolean) as File[];
-      const data = await uploadFiles(allFiles);
-      onComplete(data.parsed_disputes, data.dispute_items);
+      // Upload sequentially; the credit report upload returns dispute suggestions
+      let suggestions: Suggestion[] = [];
+      for (const slot of SLOTS) {
+        const file = files[slot.key];
+        if (!file || statuses[slot.key] === 'done') continue;
+        setStatuses((prev) => ({ ...prev, [slot.key]: 'uploading' }));
+        const data = await uploadDocument(sessionId, file);
+        setStatuses((prev) => ({ ...prev, [slot.key]: 'done' }));
+        if (slot.key === 'credit_report') suggestions = data.suggestions;
+      }
+      onComplete(suggestions);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Upload failed');
+      setError(e instanceof ApiError ? e.message : 'Upload failed — please try again');
     } finally {
       setLoading(false);
     }
@@ -189,20 +210,24 @@ export function StepUpload({ onComplete }: Props) {
                 key={slot.key}
                 config={slot}
                 file={files[slot.key]}
+                status={statuses[slot.key]}
                 onFileSelect={(f) => setSlotFile(slot.key, f)}
               />
             ))}
           </div>
 
-          {/* Required notice */}
-          {!allFilled && (
-            <div className="mt-4 text-[12px] text-gray-500 text-center">
-              <span className="text-purple-400">*</span> All three documents required to proceed.
-              Your files are encrypted and deleted immediately after scanning.
-            </div>
-          )}
+          <div className="mt-4 text-[12px] text-gray-500 text-center">
+            {allFilled ? (
+              <>Files are encrypted before they touch disk and deleted within 24 hours.</>
+            ) : (
+              <>
+                <span className="text-purple-400">*</span> All three documents required to proceed.
+                Your files are encrypted and deleted within 24 hours.
+              </>
+            )}
+          </div>
 
-          {error && <p className="text-sm text-red-400 mt-3">{error}</p>}
+          {error && <p className="text-sm text-red-400 mt-3" role="alert">{error}</p>}
           <Button full onClick={handleUpload} disabled={loading || !allFilled} className="mt-4">
             {loading ? 'Scanning your documents...' : allFilled ? 'Scan My Report' : `Upload ${3 - filledCount} more document${3 - filledCount !== 1 ? 's' : ''}`}
           </Button>

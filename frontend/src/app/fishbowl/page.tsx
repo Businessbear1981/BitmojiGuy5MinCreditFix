@@ -1,5 +1,5 @@
 import { Header } from '@/components/Header';
-import { Card, CardTitle } from '@/components/ui/Card';
+import { Card } from '@/components/ui/Card';
 
 const FACTORS = [
   { label: 'Payment History', pct: 35, color: 'bg-purple-500', shadow: 'shadow-[0_0_8px_rgba(168,85,200,0.3)]', textColor: 'text-purple-400' },

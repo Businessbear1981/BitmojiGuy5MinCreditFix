@@ -1,100 +1,101 @@
-// BitmojiGuy 5-Min Credit Fix — Type Definitions
-// AE Labs — (c) 2025 Sean Gilmore / Arden Edge Capital
+// AE 5-Min Credit Fix — Type definitions for the FastAPI backend
+// AE Labs — Sean Gilmore / Arden Edge Capital
 
-export interface DisputeItem {
-  type: string;
-  label: string;
+export const PRICE_DISPLAY = '$24.99';
+
+/** A disputable item detected by the report scanner (backend suggestion). */
+export interface Suggestion {
+  bucket: string;
+  type: 'bureau' | 'creditor';
+  target: string;
+  account: string;
+  amount: number | null;
+  opened: string | null;
+  reason: string;
+  confidence: 'high' | 'medium' | 'low';
+}
+
+/** A dispute item as confirmed by the customer (backend request shape). */
+export interface DisputeItemInput {
+  type: 'bureau' | 'creditor';
+  target: string;
+  account: string;
+  amount?: number | null;
+  opened?: string | null;
+  reason: string;
+}
+
+export interface GeneratedLetter {
+  id: string;
+  target: string;
   text: string;
+  mail_status?: string;
+  tracking_number?: string;
 }
 
-export interface ParsedDisputes {
-  [key: string]: {
-    label: string;
-    items: string[];
-  };
-}
-
-export interface Letter {
-  bureau: string;
-  bureau_address: string;
-  type: string;
-  type_label: string;
-  variant: string;
-  title: string;
-  body: string;
-}
-
-export interface StartResponse {
-  ok: boolean;
+export interface CreateCaseResponse {
   session_id: string;
-  name: string;
+  status: string;
+  region: string;
+  queue_position: number;
 }
 
 export interface UploadResponse {
-  ok: boolean;
-  files_received: number;
-  parsed_disputes: ParsedDisputes;
-  dispute_items: DisputeItem[];
-}
-
-export interface ReviewResponse {
-  ok: boolean;
-  confirmation: string;
-  dispute_types: string[];
-  dispute_order: string[];
-  letter_count: number;
-  items: DisputeItem[];
-}
-
-export interface CheckoutResponse {
-  ok: boolean;
-  dev_mode?: boolean;
-  message?: string;
-  checkout_url?: string;
-  session_id?: string;
+  filename: string;
+  attachments: string[];
+  suggestions: Suggestion[];
 }
 
 export interface LettersResponse {
-  ok: boolean;
-  confirmation: string;
+  letters: GeneratedLetter[];
+  cover_sheet: string;
+  total: number;
+}
+
+export interface CheckoutResponse {
+  checkout_url?: string;
+  demo_mode?: boolean;
+  paid?: boolean;
+  already_paid?: boolean;
+  session_id?: string;
+}
+
+export interface CaseStatus {
+  session_id: string;
   name: string;
-  letters: Letter[];
-  dispute_types: string[];
+  email: string;
+  docs_complete: boolean;
+  items_count: number;
+  letters_count: number;
+  paid: boolean;
+  email_sent: boolean;
+  mail_sent: boolean;
+  created_at: string | null;
 }
 
-export interface StatusResponse {
-  found: boolean;
-  status?: string;
-  dispute_count?: number;
-  created_at?: string;
+export interface MailStatus {
+  status: 'sent' | 'processing';
+  tracking: Array<{
+    target: string;
+    tracking_number: string;
+    expected_delivery: string;
+    status: string;
+  }>;
 }
 
-export const GILMORE_ORDER = [
-  'wrong_addresses',
-  'unknown_accounts',
-  'collections',
-  'aged_debt',
-  'late_payments',
-  'mov_demand',
-] as const;
-
-export const GILMORE_PHASES: Record<string, string> = {
-  wrong_addresses: 'Phase 1: Personal Info',
-  unknown_accounts: 'Phase 2: Inquiries',
-  collections: 'Phase 3: Collections',
-  aged_debt: 'Phase 4: Charge-Offs',
-  late_payments: 'Phase 5: Late Payments',
-  mov_demand: 'Follow-Up: MOV',
+export const BUCKET_LABELS: Record<string, string> = {
+  collection: 'Collection',
+  late_payment: 'Late Payment',
+  charge_off: 'Charge-Off',
+  identity_error: 'Not My Account',
+  inquiry: 'Hard Inquiry',
+  medical_debt: 'Medical Debt',
+  creditor_direct: 'Creditor Direct',
+  obsolete: 'Obsolete (>7yr)',
 };
 
-export const DISPUTE_LABELS: Record<string, string> = {
-  collections: 'Collection',
-  late_payments: 'Late Payment',
-  wrong_addresses: 'Wrong Address',
-  unknown_accounts: 'Unknown Account',
-  aged_debt: 'Aged Debt',
-  mov_demand: 'MOV Demand',
-};
+/** Beta launch regions enforced by the backend fishbowl. */
+export const BETA_STATES = ['TX', 'CA', 'WA'] as const;
 
 export const US_STATES = [
   { value: 'AL', label: 'Alabama' }, { value: 'AK', label: 'Alaska' },

@@ -1,61 +1,56 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, CardTitle, CardSub } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { BitmojiFigure } from '../BitmojiFigure';
-import { createCheckout, manualPay } from '@/lib/api';
+import { createCheckout, generateLetters, ApiError } from '@/lib/api';
+import { PRICE_DISPLAY } from '@/lib/types';
+import type { GeneratedLetter } from '@/lib/types';
 
 interface Props {
-  letterCount: number;
+  sessionId: string;
   onComplete: () => void;
 }
 
-type PayMethod = 'card' | 'cashapp' | 'chime' | null;
-
-export function StepPay({ letterCount, onComplete }: Props) {
-  const [method, setMethod] = useState<PayMethod>(null);
+export function StepPay({ sessionId, onComplete }: Props) {
+  const [letters, setLetters] = useState<GeneratedLetter[]>([]);
+  const [generating, setGenerating] = useState(true);
+  const [preview, setPreview] = useState<GeneratedLetter | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  async function handleCardPay() {
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await generateLetters(sessionId);
+        if (!cancelled) setLetters(data.letters);
+      } catch (e: unknown) {
+        if (!cancelled) setError(e instanceof ApiError ? e.message : 'Could not generate letters — please try again');
+      } finally {
+        if (!cancelled) setGenerating(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [sessionId]);
+
+  async function handlePay() {
     setLoading(true);
+    setError('');
     try {
-      const data = await createCheckout();
-      if (data.dev_mode) {
-        onComplete();
-      } else if (data.checkout_url) {
+      const data = await createCheckout(sessionId);
+      if (data.checkout_url) {
+        // Session id is in localStorage — the journey resumes after Stripe redirects back
         window.location.href = data.checkout_url;
+      } else if (data.paid || data.already_paid) {
+        onComplete();
       }
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Payment failed');
-    } finally {
+      setError(e instanceof ApiError ? e.message : 'Payment failed — please try again');
       setLoading(false);
     }
   }
-
-  async function handleManualPay() {
-    if (!method) return;
-    setLoading(true);
-    try {
-      await manualPay(method);
-      onComplete();
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Payment failed');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function copyTag(text: string) {
-    navigator.clipboard.writeText(text);
-  }
-
-  const methods: Array<{ id: PayMethod; icon: string; name: string; tag: string; detail?: string; copyValue?: string }> = [
-    { id: 'card', icon: '💳', name: 'Card', tag: 'Visa, Mastercard, etc.' },
-    { id: 'cashapp', icon: '💵', name: 'Cash App', tag: 'Send $19.99', detail: '$AELabsCreditFix', copyValue: '$AELabsCreditFix' },
-    { id: 'chime', icon: '🏦', name: 'Chime', tag: 'Send $19.99', detail: '$AELabsPay', copyValue: '$AELabsPay' },
-  ];
 
   return (
     <div className="flex gap-6 items-start">
@@ -63,73 +58,76 @@ export function StepPay({ letterCount, onComplete }: Props) {
       <div className="flex-1 min-w-0">
         <Card className="!bg-[rgba(24,22,20,0.95)] !border-yellow-600/12 !shadow-[0_0_30px_rgba(200,170,80,0.04)]">
           <CardTitle className="!text-yellow-600 !drop-shadow-[0_0_16px_rgba(200,170,80,0.4)]">
-            Unlock Your Letters
+            Your Letters Are Ready
           </CardTitle>
-          <CardSub>Your dispute letters are ready. Choose how to pay.</CardSub>
+          <CardSub>Review a preview below, then unlock and mail your dispute package.</CardSub>
+
+          {/* Letter previews */}
+          {generating ? (
+            <div className="text-center py-8 text-sm text-gray-500">
+              Generating your FCRA dispute letters...
+            </div>
+          ) : (
+            <div className="space-y-2.5 mb-6">
+              {letters.map((ltr) => (
+                <div key={ltr.id} className="border border-white/[0.06] bg-white/[0.02] rounded-lg overflow-hidden">
+                  <button
+                    onClick={() => setPreview(preview?.id === ltr.id ? null : ltr)}
+                    className="w-full flex items-center justify-between px-4 py-3 cursor-pointer text-left hover:bg-white/[0.02] transition-colors"
+                  >
+                    <span className="text-sm font-bold text-gray-200">Dispute Letter — {ltr.target}</span>
+                    <span className="text-[11px] text-teal-400 uppercase tracking-wide">
+                      {preview?.id === ltr.id ? 'Hide preview' : 'Preview'}
+                    </span>
+                  </button>
+                  {preview?.id === ltr.id && (
+                    <div className="relative border-t border-white/[0.06]">
+                      <pre className="p-4 text-[12px] leading-relaxed whitespace-pre-wrap font-sans max-h-[220px] overflow-hidden text-gray-400">
+                        {ltr.text.slice(0, 600)}
+                      </pre>
+                      {/* Fade-out — full letters unlock after payment */}
+                      <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-[rgba(24,22,20,0.98)] to-transparent flex items-end justify-center pb-3">
+                        <span className="text-[11px] text-yellow-600 uppercase tracking-wider font-bold">
+                          Full letter unlocks after payment
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Price display */}
           <div className="text-center py-7 bg-yellow-600/[0.04] border border-yellow-600/12 rounded-xl mb-6">
-            <div className="font-bangers text-7xl text-yellow-600 tracking-wider leading-none drop-shadow-[0_0_20px_rgba(200,170,80,0.4)]">$19.99</div>
+            <div className="font-bangers text-7xl text-yellow-600 tracking-wider leading-none drop-shadow-[0_0_20px_rgba(200,170,80,0.4)]">
+              {PRICE_DISPLAY}
+            </div>
             <div className="text-[13px] text-gray-500 mt-1.5">One-time payment &middot; No subscription</div>
             <ul className="text-[12px] text-gray-500 mt-3 space-y-1 text-left max-w-xs mx-auto">
-              <li><span className="text-green-400">&#10003;</span> Personalized dispute letters for all 3 bureaus</li>
-              <li><span className="text-green-400">&#10003;</span> {letterCount} letters generated</li>
-              <li><span className="text-green-400">&#10003;</span> FCRA/FDCPA legal citations included</li>
-              <li><span className="text-green-400">&#10003;</span> Print-ready &mdash; just sign and mail</li>
+              <li><span className="text-green-400">&#10003;</span> {letters.length || 'Personalized'} dispute letter{letters.length !== 1 ? 's' : ''} with FCRA legal citations</li>
+              <li><span className="text-green-400">&#10003;</span> Mailed to the bureaus for you (First Class, round 1)</li>
+              <li><span className="text-green-400">&#10003;</span> Print-ready PDF packet emailed to you</li>
+              <li><span className="text-green-400">&#10003;</span> Escalating postage ladder on follow-up rounds</li>
             </ul>
           </div>
 
-          {/* Payment methods */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
-            {methods.map((m) => (
-              <button
-                key={m.id}
-                onClick={() => setMethod(m.id)}
-                className={`bg-white/[0.02] border-2 rounded-xl px-4 py-5 text-center cursor-pointer transition-all ${
-                  method === m.id
-                    ? 'border-yellow-600/40 bg-yellow-600/[0.06] shadow-[0_0_20px_rgba(200,170,80,0.12)]'
-                    : 'border-white/[0.06] hover:border-yellow-600/20'
-                }`}
-              >
-                <span className="text-3xl block mb-2">{m.icon}</span>
-                <div className="text-sm font-bold">{m.name}</div>
-                <div className="text-[11px] text-gray-500">{m.tag}</div>
-                {method === m.id && m.detail && (
-                  <div className="mt-3 text-[13px]">
-                    <div className="text-gray-400 mb-1">Send <strong>$19.99</strong> to:</div>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); copyTag(m.copyValue!); }}
-                      className="w-full bg-yellow-600/[0.04] border border-yellow-600/15 rounded-lg py-2.5 px-3 text-yellow-600 font-mono text-[15px] tracking-wider text-center cursor-pointer hover:bg-yellow-600/[0.08] transition-all"
-                    >
-                      {m.detail}
-                    </button>
-                    <div className="text-[11px] text-gray-500 mt-1">Click to copy &middot; Include your email in the note</div>
-                  </div>
-                )}
-              </button>
-            ))}
-          </div>
-
-          {method === 'card' && (
-            <Button full onClick={handleCardPay} disabled={loading}
-              className="!bg-gradient-to-br !from-yellow-600 !to-yellow-700 !shadow-[0_4px_24px_rgba(200,170,80,0.25)]">
-              {loading ? 'Connecting...' : 'Pay $19.99 with Card'}
-            </Button>
+          {error && <p className="text-sm text-red-400 mb-3" role="alert">{error}</p>}
+          {!generating && letters.length === 0 && !error && (
+            <p className="text-sm text-yellow-300 mb-3">No letters were generated — go back and confirm at least one dispute.</p>
           )}
-          {(method === 'cashapp' || method === 'chime') && (
-            <>
-              <div className="bg-green-400/[0.04] border border-green-400/15 rounded-lg px-4 py-3.5 text-[13px] text-gray-400 mb-4">
-                After sending payment, click below. We&apos;ll verify and unlock your letters.
-              </div>
-              <Button full onClick={handleManualPay} disabled={loading}
-                className="!bg-gradient-to-br !from-yellow-600 !to-yellow-700">
-                {loading ? 'Verifying...' : 'I Sent $19.99 — Unlock My Letters'}
-              </Button>
-            </>
-          )}
+          <Button
+            full
+            onClick={handlePay}
+            disabled={loading || generating || letters.length === 0}
+            className="!bg-gradient-to-br !from-yellow-600 !to-yellow-700 !shadow-[0_4px_24px_rgba(200,170,80,0.25)]"
+          >
+            {loading ? 'Connecting to secure checkout...' : `Pay ${PRICE_DISPLAY} — Mail My Letters`}
+          </Button>
 
-          {error && <p className="text-sm text-red-400 mt-3">{error}</p>}
-          <p className="text-center text-[11px] text-gray-500 mt-3">Your data is encrypted and never stored.</p>
+          <p className="text-center text-[11px] text-gray-500 mt-3">
+            Secure payment via Stripe. Your data is encrypted and deleted within 24 hours.
+          </p>
         </Card>
       </div>
     </div>

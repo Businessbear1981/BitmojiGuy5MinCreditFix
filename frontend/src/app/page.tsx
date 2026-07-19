@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Header } from '@/components/Header';
 import { ProgressBar } from '@/components/ProgressBar';
 import { StepInfo } from '@/components/steps/StepInfo';
@@ -8,13 +8,56 @@ import { StepUpload } from '@/components/steps/StepUpload';
 import { StepReview } from '@/components/steps/StepReview';
 import { StepPay } from '@/components/steps/StepPay';
 import { StepLetters } from '@/components/steps/StepLetters';
-import type { DisputeItem, ParsedDisputes } from '@/lib/types';
+import { getCaseStatus } from '@/lib/api';
+import { clearSession, loadSession, saveSession } from '@/lib/session';
+import type { Suggestion } from '@/lib/types';
 
 export default function Home() {
   const [step, setStep] = useState(1);
-  const [parsed, setParsed] = useState<ParsedDisputes>({});
-  const [items, setItems] = useState<DisputeItem[]>([]);
-  const [letterCount, setLetterCount] = useState(0);
+  const [sessionId, setSessionId] = useState('');
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [resuming, setResuming] = useState(true);
+  const [resumeNote, setResumeNote] = useState('');
+
+  // Resume: handles both a page refresh mid-journey and the Stripe redirect
+  // back (?session_id=...&paid=true). The session id lives in localStorage.
+  useEffect(() => {
+    async function resume() {
+      const params = new URLSearchParams(window.location.search);
+      const fromStripe = params.get('paid') === 'true';
+      const sid = params.get('session_id') || loadSession();
+      if (params.get('session_id')) saveSession(params.get('session_id')!);
+      if (sid) {
+        try {
+          // After the Stripe redirect the webhook can lag a beat — poll briefly
+          let status = await getCaseStatus(sid);
+          if (fromStripe && !status.paid) {
+            for (let i = 0; i < 5 && !status.paid; i++) {
+              await new Promise((r) => setTimeout(r, 1500));
+              status = await getCaseStatus(sid);
+            }
+          }
+          setSessionId(sid);
+          if (status.paid) {
+            setStep(5);
+          } else if (status.letters_count > 0 || status.items_count > 0) {
+            setStep(4);
+            if (fromStripe) setResumeNote('Payment was not completed — you can try again below.');
+          } else if (status.docs_complete) {
+            setStep(2);
+            setResumeNote('Welcome back — please re-upload your documents to continue securely.');
+          } else {
+            setStep(2);
+          }
+        } catch {
+          // Session expired (24h purge) or unknown — start fresh
+          clearSession();
+        }
+      }
+      setResuming(false);
+    }
+    resume();
+  }, []);
 
   return (
     <>
@@ -36,7 +79,8 @@ export default function Home() {
           Fix Your <span className="text-teal-400 drop-shadow-[0_0_20px_rgba(0,212,212,0.5)]">Credit</span> Now
         </h1>
         <p className="text-base text-gray-400/60 max-w-[500px] mx-auto leading-relaxed">
-          Upload your credit report. We auto-detect problems, generate dispute letters for all 3 bureaus, and get you ready to mail in 5 minutes.
+          Upload your credit report. We auto-detect problems, generate dispute letters
+          for all 3 bureaus, and mail them for you — in 5 minutes.
         </p>
       </section>
 
@@ -44,29 +88,67 @@ export default function Home() {
       <main className="relative z-[5] max-w-[720px] mx-auto px-5 pb-20">
         <ProgressBar current={step} />
 
-        {step === 1 && <StepInfo onComplete={() => setStep(2)} />}
-        {step === 2 && (
-          <StepUpload
-            onComplete={(p, i) => {
-              setParsed(p);
-              setItems(i);
-              setStep(3);
-            }}
-          />
+        {resumeNote && (
+          <div className="bg-yellow-600/[0.06] border border-yellow-600/20 rounded-lg px-4 py-3 mb-5 text-[13px] text-yellow-200/80">
+            {resumeNote}
+          </div>
         )}
-        {step === 3 && (
-          <StepReview
-            parsed={parsed}
-            items={items}
-            onComplete={(count) => {
-              setLetterCount(count);
-              setStep(4);
-            }}
-          />
+
+        {resuming ? (
+          <div className="text-center py-16 text-sm text-gray-500">Loading...</div>
+        ) : (
+          <>
+            {step === 1 && (
+              <StepInfo
+                onComplete={(sid) => {
+                  setSessionId(sid);
+                  setResumeNote('');
+                  setStep(2);
+                }}
+              />
+            )}
+            {step === 2 && (
+              <StepUpload
+                sessionId={sessionId}
+                onComplete={(sugg) => {
+                  setSuggestions(sugg);
+                  setResumeNote('');
+                  setStep(3);
+                }}
+              />
+            )}
+            {step === 3 && (
+              <StepReview
+                sessionId={sessionId}
+                suggestions={suggestions}
+                onComplete={() => setStep(4)}
+              />
+            )}
+            {step === 4 && (
+              <StepPay
+                sessionId={sessionId}
+                onComplete={() => {
+                  setResumeNote('');
+                  setStep(5);
+                }}
+              />
+            )}
+            {step === 5 && <StepLetters sessionId={sessionId} />}
+          </>
         )}
-        {step === 4 && <StepPay letterCount={letterCount} onComplete={() => setStep(5)} />}
-        {step === 5 && <StepLetters />}
       </main>
+
+      {/* Legal footer */}
+      <footer className="relative z-[5] max-w-[720px] mx-auto px-5 pb-10 text-center text-[11px] text-gray-600 leading-relaxed">
+        AE Labs is a self-help document preparation tool, not a law firm or credit
+        repair organization; nothing here is legal advice. Your data is encrypted
+        at rest and permanently deleted within 24 hours.
+        <div className="mt-2 flex justify-center gap-4">
+          <a href="/terms" className="underline hover:text-gray-400">Terms of Service</a>
+          <a href="/privacy" className="underline hover:text-gray-400">Privacy Policy</a>
+          <a href="/fishbowl" className="underline hover:text-gray-400">Learn</a>
+        </div>
+      </footer>
     </>
   );
 }

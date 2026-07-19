@@ -1,11 +1,17 @@
 import type { Metadata } from 'next';
-import { DM_Sans } from 'next/font/google';
+import { Bangers, DM_Sans } from 'next/font/google';
 import './globals.css';
 
 const dmSans = DM_Sans({
   variable: '--font-dm-sans',
   subsets: ['latin'],
   weight: ['400', '500', '700'],
+});
+
+const bangers = Bangers({
+  variable: '--font-bangers',
+  subsets: ['latin'],
+  weight: '400',
 });
 
 export const metadata: Metadata = {
@@ -15,12 +21,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${dmSans.variable} h-full`}>
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Bangers&display=swap" rel="stylesheet" />
-      </head>
+    <html lang="en" className={`${dmSans.variable} ${bangers.variable} h-full`}>
       <body className="min-h-full bg-[#050508] text-[#E0DDE6] font-sans antialiased overflow-x-hidden">
         {children}
       </body>
