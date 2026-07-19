@@ -64,7 +64,14 @@ class CaseRecord(Base):
 
 
 def init_db():
-    Base.metadata.create_all(bind=engine)
+    # create_all is not multi-worker safe on first boot — workers can race
+    # creating the same sequence/table. Treat "already exists" as success.
+    try:
+        Base.metadata.create_all(bind=engine)
+    except Exception as e:
+        msg = str(e).lower()
+        if "already exists" not in msg:
+            raise
 
 
 def get_db():
