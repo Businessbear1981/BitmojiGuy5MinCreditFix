@@ -298,49 +298,9 @@ export default function Home() {
           Begin Your Credit Fix &rarr;
         </button>
 
-        {/* Video placeholders — BitmojiGuy (left) + Atom Adam (right) */}
-        <div style={{
-          display: 'flex',
-          gap: '2rem',
-          marginTop: '2rem',
-          flexWrap: 'wrap',
-          justifyContent: 'center',
-        }}>
-          <div style={{
-            width: 240,
-            aspectRatio: '3 / 4',
-            border: '1px solid #C9A84C',
-            background: 'rgba(10,6,2,0.7)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#F0D080',
-            fontFamily: 'var(--font-cinzel-decorative), serif',
-            fontSize: 14,
-            letterSpacing: 2,
-            textShadow: '0 2px 8px rgba(0,0,0,0.8)',
-            backdropFilter: 'blur(3px)',
-          }}>
-            BitmojiGuy&trade; Intro
-          </div>
-          <div style={{
-            width: 240,
-            aspectRatio: '16 / 9',
-            border: '1px solid #33FFB8',
-            background: 'rgba(4,10,8,0.7)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#5CFFCC',
-            fontFamily: 'var(--font-cinzel-decorative), serif',
-            fontSize: 14,
-            letterSpacing: 2,
-            textShadow: '0 2px 8px rgba(0,0,0,0.8)',
-            backdropFilter: 'blur(3px)',
-          }}>
-            Atom Adam&trade;
-          </div>
-        </div>
+        {/* Intro-video slots (BitmojiGuy 3:4 + Atom Adam 16:9) are hidden until
+            Sean delivers the actual videos — empty placeholder frames read as
+            broken buttons to customers. Restore from git history when ready. */}
 
         {/* Admin access */}
         <button
