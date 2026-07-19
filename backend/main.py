@@ -475,9 +475,10 @@ async def create_checkout(session_id: str, request: Request, db: Session = Depen
         return {"already_paid": True, "session_id": session_id}
 
     if not config.STRIPE_SECRET_KEY:
-        if config.IS_PROD:
+        # DEMO_MODE allows completing the flow without Stripe (pre-keys launch).
+        # Real production charges require a live key — fail closed otherwise.
+        if not config.DEMO_MODE:
             raise HTTPException(503, "Payments are not configured")
-        # Dev/demo mode — mark as paid without Stripe
         record.paid = True
         db.commit()
         _post_payment(record, db)
