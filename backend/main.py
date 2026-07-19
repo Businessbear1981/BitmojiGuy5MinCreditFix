@@ -515,15 +515,18 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
     sig_header = request.headers.get("stripe-signature", "")
 
     if config.STRIPE_WEBHOOK_SECRET:
+        # Verify the signature only; read fields from the parsed JSON below.
+        # (construct_event returns a StripeObject whose dict interface differs
+        # across library versions — .get() on it 500'd in production.)
         try:
-            event = stripe.Webhook.construct_event(payload, sig_header, config.STRIPE_WEBHOOK_SECRET)
+            stripe.Webhook.construct_event(payload, sig_header, config.STRIPE_WEBHOOK_SECRET)
         except (ValueError, stripe.error.SignatureVerificationError):
             raise HTTPException(400, "Invalid webhook signature")
     elif config.IS_PROD:
         # Never accept unsigned payment events in production
         raise HTTPException(503, "Stripe webhook secret not configured")
-    else:
-        event = json.loads(payload)
+
+    event = json.loads(payload)
 
     if event.get("type") == "checkout.session.completed":
         session_data = event["data"]["object"]
