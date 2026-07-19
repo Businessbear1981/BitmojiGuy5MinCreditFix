@@ -6,13 +6,13 @@ import { useWizardStore } from '@/store/wizardStore'
 import { SceneLayout } from '@/components/scene/SceneLayout'
 import { TopNav } from '@/components/nav/TopNav'
 import { WizardSidebar } from '@/components/sidebar/WizardSidebar'
-import { sendCertified, getCaseStatus, setApiSessionId } from '@/lib/api'
+import { sendCertified, getCaseStatus, setApiSessionId, getDownloadPackageUrl } from '@/lib/api'
 
 const ACCENT = '#D94A3B'
 
 export default function GatePage() {
   const { navigateTo } = useShojiNav()
-  const { setPaid } = useWizardStore()
+  const { paid, setPaid } = useWizardStore()
   const [postage, setPostage] = useState<'first' | 'certified'>('certified')
   const [sending, setSending] = useState(false)
   const [confirmation, setConfirmation] = useState('')
@@ -226,6 +226,27 @@ export default function GatePage() {
               >
                 {sending ? 'Dispatching...' : '✉ Dispatch All Letters Through the Gate'}
               </button>
+            )}
+
+            {/* Paid users always get their packet, even before mailing is available */}
+            {paid && (
+              <a
+                href={getDownloadPackageUrl()}
+                download
+                style={{
+                  display: 'block', width: '100%', textAlign: 'center',
+                  boxSizing: 'border-box',
+                  fontFamily: 'var(--font-heading)', fontSize: 13, letterSpacing: 2,
+                  textTransform: 'uppercase', color: ACCENT,
+                  background: `${ACCENT}15`,
+                  padding: '12px 0', borderRadius: 4,
+                  border: `1px solid ${ACCENT}55`,
+                  textDecoration: 'none',
+                  marginBottom: 20,
+                }}
+              >
+                ⬇ Download Your Letters (PDF)
+              </a>
             )}
 
             <div style={{ display: 'flex', gap: 12, justifyContent: 'space-between' }}>

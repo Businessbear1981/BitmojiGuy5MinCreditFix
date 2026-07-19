@@ -35,16 +35,22 @@ export default function GardenPage() {
   const [progress, setProgress] = useState(0)
   const [modalLetter, setModalLetter] = useState<LetterDetail | null>(null)
   const [loadingLetter, setLoadingLetter] = useState(false)
+  const [letterError, setLetterError] = useState('')
 
   async function openLetter(index: number) {
     setLoadingLetter(true)
+    setLetterError('')
     try {
       const res = await getLetterById(index)
       if (res.ok) {
         const data = await res.json()
         setModalLetter(data.letter)
+      } else {
+        setLetterError('Could not load that letter — please try again.')
       }
-    } catch { /* Flask not running */ }
+    } catch {
+      setLetterError('Could not connect to the server — please try again.')
+    }
     setLoadingLetter(false)
   }
 
@@ -220,15 +226,22 @@ export default function GardenPage() {
                           background: `${ACCENT}15`,
                           border: `1px solid ${ACCENT}44`,
                           borderRadius: 3, padding: '5px 0',
-                          cursor: 'pointer',
+                          cursor: loadingLetter ? 'wait' : 'pointer',
+                          opacity: loadingLetter ? 0.6 : 1,
                           transition: 'background 0.2s',
                         }}
                       >
-                        View Letter
+                        {loadingLetter ? 'Opening\u2026' : 'View Letter'}
                       </button>
                     </div>
                   ))}
                 </div>
+
+                {letterError && (
+                  <p style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: '#FF5A5A', marginBottom: 12 }}>
+                    {letterError}
+                  </p>
+                )}
 
                 <div style={{
                   padding: '12px 16px',
