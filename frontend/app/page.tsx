@@ -30,7 +30,6 @@ export default function Home() {
           0%, 100% { opacity: 0.07; text-shadow: 0 0 60px rgba(201,168,76,0.35); }
           50%      { opacity: 0.11; text-shadow: 0 0 120px rgba(240,208,128,0.5); }
         }
-        /* Mobile optimizations */
         @media (max-width: 768px) {
           .orbit-ring { animation-duration: 120s !important; }
           .scene-button { min-width: 48px; min-height: 48px; }
@@ -38,7 +37,6 @@ export default function Home() {
         }
       `}</style>
 
-      {/* Lone Cypress Seascape — full bleed */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src="/seascape.jpg"
@@ -54,7 +52,6 @@ export default function Home() {
         }}
       />
 
-      {/* 悟 — enlightenment watermark centered */}
       <div style={{
         position: 'fixed',
         inset: 0,
@@ -76,7 +73,6 @@ export default function Home() {
         </span>
       </div>
 
-      {/* Orbital ring — 7 scene kanji rotate around 悟 */}
       <div style={{
         position: 'fixed',
         top: '50%',
@@ -155,7 +151,6 @@ export default function Home() {
         })}
       </div>
 
-      {/* Centered column */}
       <div
         style={{
           position: 'relative',
@@ -170,32 +165,35 @@ export default function Home() {
           gap: '1.25rem',
         }}
       >
-        {/* Stopwatch Logo */}
         <div style={{ marginBottom: '1rem', animation: 'pulse 3s ease-in-out infinite' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="BitmojiGuy 5 Min Credit Fix" style={{ height: 80, width: 80, filter: 'drop-shadow(0 0 20px rgba(201,168,76,0.4))' }} />
         </div>
 
-        {/* Dark backdrop for text */}
         <div
           style={{
-            background: 'linear-gradient(180deg, rgba(10,6,2,0.7), rgba(5,4,3,0.85))',
-            backdropFilter: 'blur(8px)',
-            padding: '2rem 2.5rem',
-            borderRadius: 8,
-            border: '1px solid rgba(201,168,76,0.2)',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.6), inset 0 1px 0 rgba(201,168,76,0.1)',
+            maxWidth: 720,
+            width: '100%',
+            padding: '0.5rem 1rem',
           }}
         >
-            <h1
+          <h1
             style={{
               fontFamily: 'var(--font-cinzel-decorative), serif',
-              fontSize: 'clamp(2rem, 5vw, 3.4rem)',
-              color: '#F0D080',
-              textShadow: '0 0 40px rgba(240,208,128,0.5), 0 0 20px rgba(201,168,76,0.3), 0 2px 10px rgba(0,0,0,0.9)',
-              letterSpacing: 4,
-              lineHeight: 1.1,
+              fontSize: 'clamp(1.6rem, 3.4vw, 2.5rem)',
+              color: '#FBF3DC',
+              textShadow: [
+                '0 2px 4px rgba(0,0,0,0.95)',
+                '0 4px 18px rgba(0,0,0,0.8)',
+                '0 0 14px rgba(255,240,205,0.55)',
+                '0 0 34px rgba(240,208,128,0.6)',
+                '0 0 70px rgba(201,168,76,0.45)',
+                '0 0 120px rgba(201,168,76,0.25)',
+              ].join(', '),
+              letterSpacing: 2,
+              lineHeight: 1.12,
               margin: 0,
+              textWrap: 'balance',
             }}
           >
             BitmojiGuy 5Min Credit Tool
@@ -204,11 +202,16 @@ export default function Home() {
           <p
             style={{
               fontFamily: 'var(--font-cinzel), serif',
-              fontSize: 'clamp(1rem, 2vw, 1.4rem)',
-              color: '#F5E6C8',
-              letterSpacing: 3,
-              textShadow: '0 0 20px rgba(201,168,76,0.3), 0 2px 10px rgba(0,0,0,0.9)',
-              margin: '0.5rem 0 0',
+              fontSize: 'clamp(0.85rem, 1.5vw, 1.05rem)',
+              color: '#F7EBD2',
+              letterSpacing: 2,
+              textShadow: [
+                '0 2px 4px rgba(0,0,0,0.95)',
+                '0 3px 14px rgba(0,0,0,0.8)',
+                '0 0 12px rgba(255,240,205,0.4)',
+                '0 0 28px rgba(201,168,76,0.4)',
+              ].join(', '),
+              margin: '0.4rem 0 0',
             }}
           >
             5 Min. 5 Clicks. Credit Tool.
@@ -216,12 +219,18 @@ export default function Home() {
           <p
             style={{
               fontFamily: 'var(--font-cinzel), serif',
-              fontSize: 'clamp(0.7rem, 1.4vw, 0.95rem)',
+              fontSize: 'clamp(0.65rem, 1vw, 0.82rem)',
               fontStyle: 'italic',
-              color: '#C9A84C',
-              letterSpacing: 2,
-              textShadow: '0 0 14px rgba(201,168,76,0.2), 0 2px 8px rgba(0,0,0,0.8)',
-              margin: '0.6rem 0 0',
+              color: '#E4CE96',
+              letterSpacing: 1.5,
+              lineHeight: 1.5,
+              textShadow: [
+                '0 1px 3px rgba(0,0,0,0.95)',
+                '0 2px 12px rgba(0,0,0,0.8)',
+                '0 0 18px rgba(201,168,76,0.35)',
+              ].join(', '),
+              margin: '0.5rem auto 0',
+              maxWidth: '46ch',
             }}
           >
             Your first step to understanding and improving your path to financial wellness
@@ -298,11 +307,6 @@ export default function Home() {
           Begin Your Credit Fix &rarr;
         </button>
 
-        {/* Intro-video slots (BitmojiGuy 3:4 + Atom Adam 16:9) are hidden until
-            Sean delivers the actual videos — empty placeholder frames read as
-            broken buttons to customers. Restore from git history when ready. */}
-
-        {/* Admin access */}
         <button
           onClick={() => navigateTo('/admin')}
           style={{
@@ -311,39 +315,37 @@ export default function Home() {
             fontSize: 11,
             letterSpacing: 3,
             textTransform: 'uppercase',
-            color: '#8A8278',
+            color: '#B0A99C',
             background: 'transparent',
             padding: '8px 24px',
             borderRadius: 4,
-            border: '1px solid rgba(138,130,120,0.25)',
+            border: '1px solid rgba(176,169,156,0.25)',
             cursor: 'pointer',
             transition: 'all 0.3s',
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.color = '#C9A84C'
             e.currentTarget.style.borderColor = 'rgba(201,168,76,0.5)'
-            e.currentTarget.style.textShadow = '0 0 10px rgba(201,168,76,0.4)'
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.color = '#8A8278'
-            e.currentTarget.style.borderColor = 'rgba(138,130,120,0.25)'
-            e.currentTarget.style.textShadow = 'none'
+            e.currentTarget.style.color = '#B0A99C'
+            e.currentTarget.style.borderColor = 'rgba(176,169,156,0.25)'
           }}
         >
           Admin Dashboard
         </button>
 
         <p style={{
-          maxWidth: 520,
+          maxWidth: 560,
           marginTop: '2rem',
           fontFamily: 'var(--font-rajdhani), sans-serif',
           fontSize: 10,
-          color: '#5A5A5A',
+          color: '#8A8278',
           lineHeight: 1.6,
           textAlign: 'center',
           letterSpacing: 0.5,
         }}>
-          This is a fintech tool only. We are not legal counsel, credit counselors, or credit repair organizations. We do not store your data in any way &mdash; everything runs locally on your device. No personal information is retained after your session ends. Use of this tool does not establish any professional relationship. Consult a licensed professional for legal or financial advice.
+          This is self-help document preparation software. We are not a credit repair organization, credit counselor, or law firm, and nothing here is legal or financial advice. No outcome is promised &mdash; accurate, verifiable information cannot be removed from a credit report by anyone. You may obtain your reports free at annualcreditreport.com and dispute directly with each bureau at no cost. Your information is encrypted while we hold it and permanently deleted within 24 hours.
         </p>
       </div>
     </>
