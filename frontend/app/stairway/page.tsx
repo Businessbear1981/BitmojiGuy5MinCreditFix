@@ -113,7 +113,7 @@ export default function StairwayPage() {
     <>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/scrollroom.jpg"
+        src="/stairway.png"
         alt=""
         style={{
           position: 'fixed',
