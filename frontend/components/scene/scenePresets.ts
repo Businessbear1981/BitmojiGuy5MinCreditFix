@@ -90,7 +90,7 @@ export const PRESETS: Record<ScenePresetKey, ScenePreset> = {
     breathing: { color: 'rgba(239,159,39,0.18)', motif: 'embers' },
   },
   nirvana: {
-    bg: '/dragonsgate.jpg',
+    bg: '/dragon-gate.png',
     accent: '#D94A3B',
     kanji: '門',
     overlay: 0.32,
