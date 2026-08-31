@@ -71,7 +71,7 @@ export default function DojoPage() {
     <>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/wartable.jpg"
+        src="/dojo.png"
         alt=""
         style={{
           position: 'fixed',
