@@ -93,7 +93,7 @@ export default function GardenPage() {
     <>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        /sandgarden.jpg
+        src="/sandgarden.jpg"
         alt=""
         style={{
           position: 'fixed',
