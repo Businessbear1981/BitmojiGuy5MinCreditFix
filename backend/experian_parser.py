@@ -465,6 +465,7 @@ def parse_experian(text: str) -> list[dict]:
             "implied_dofd": _implied_dofd(a["on_record_until"]),
             "falloff_status": falloff,
             "duplicate_note": a.get("duplicate_note", ""),
+            "duplicate_count": a.get("duplicate_count", 0),
             "categories": grounds,
             "category_count": len(grounds),
             "reason": a["status"] or "This item is inaccurate as reported.",
