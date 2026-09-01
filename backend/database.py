@@ -56,17 +56,48 @@ class CaseRecord(Base):
     # verifies receipt and releases. Code goes in the payment memo.
     manual_pay_method = Column(String(20), nullable=True)
     manual_pay_code = Column(String(24), nullable=True)
+    # The customer's own cashtag / Chime handle, so the admin can match the
+    # incoming payment to the case without decoding a memo field.
+    manual_pay_handle = Column(EncryptedString, nullable=True)
     manual_pay_requested_at = Column(DateTime, nullable=True)
     manual_pay_released_at = Column(DateTime, nullable=True)
     email_sent = Column(Boolean, default=False)
     mail_sent = Column(Boolean, default=False)
     mail_tracking = Column(EncryptedJSON, default=list)
+    # When round 1 actually went into the mail. The escalation ladder and the
+    # Watcher both measure from here, not from case creation — a case can sit
+    # unpaid for a week before anything is sent.
+    mail_dispatched_at = Column(DateTime, nullable=True)
+    # Highest tier mailed so far, so a re-run cannot silently repeat a round.
+    mail_tier = Column(Integer, default=0)
 
     # Per-session upload encryption key (itself encrypted at rest)
     cypher_key_enc = Column(EncryptedString, nullable=True)
 
     # Consent audit: timestamp only, no PII
     terms_accepted_at = Column(DateTime, nullable=True)
+    # Disclosure acknowledgements — which statements were affirmed, the version
+    # of the text shown, and when. No PII beyond a hashed IP.
+    acknowledgements = Column(EncryptedJSON, nullable=True)
+    acknowledged_at = Column(DateTime, nullable=True)
+    # The consumer's e-signature: the PNG mark plus the intent evidence that
+    # makes it meaningful under E-SIGN. Encrypted, purged with the case.
+    signature = Column(EncryptedJSON, nullable=True)
+    signed_at = Column(DateTime, nullable=True)
+
+    # ── The Watcher: 30/60/90-day tracking ──────────────────────────────
+    # `watcher_retain_until` is the only thing that exempts a case from the
+    # 24-hour purge, and it is only ever set by a consumer subscribing. See
+    # watcher.retention_notice() for the sentence they have to read first.
+    watcher_subscribed = Column(Boolean, default=False)
+    watcher_subscribed_at = Column(DateTime, nullable=True)
+    watcher_retain_until = Column(DateTime, nullable=True, index=True)
+    watcher_notify_method = Column(String(20), nullable=True)
+    # A contact handle is PII and is encrypted like every other identifier.
+    watcher_notify_handle = Column(EncryptedString, nullable=True)
+    # Tiers already generated, so a round is never silently rebuilt.
+    watcher_rounds = Column(EncryptedJSON, default=list)
+    watcher_notifications = Column(EncryptedJSON, default=list)
 
 
 def init_db():
@@ -88,6 +119,20 @@ _ADDED_COLUMNS = [
     ("manual_pay_code", "VARCHAR(24)"),
     ("manual_pay_requested_at", "TIMESTAMP"),
     ("manual_pay_released_at", "TIMESTAMP"),
+    ("mail_dispatched_at", "TIMESTAMP"),
+    ("mail_tier", "INTEGER"),
+    ("manual_pay_handle", "TEXT"),
+    ("acknowledgements", "TEXT"),
+    ("acknowledged_at", "TIMESTAMP"),
+    ("signature", "TEXT"),
+    ("signed_at", "TIMESTAMP"),
+    ("watcher_subscribed", "BOOLEAN"),
+    ("watcher_subscribed_at", "TIMESTAMP"),
+    ("watcher_retain_until", "TIMESTAMP"),
+    ("watcher_notify_method", "VARCHAR(20)"),
+    ("watcher_notify_handle", "TEXT"),
+    ("watcher_rounds", "TEXT"),
+    ("watcher_notifications", "TEXT"),
 ]
 
 

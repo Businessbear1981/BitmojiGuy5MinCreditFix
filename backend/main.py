@@ -1,11 +1,13 @@
 import asyncio
 import base64
+import hashlib
 import hmac
 import json
 import re
+import traceback
 import uuid
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import List, Optional
 
@@ -21,18 +23,31 @@ from sqlalchemy.orm import Session
 
 import config
 from ae_creditfix.case import Case, Client, Item, new_id
-from ae_creditfix.letters import gen_bureau_letters, gen_cover_sheet, gen_creditor_letters
+from ae_creditfix.letters import gen_cover_sheet, gen_followup_letters, gen_letters
 from ae_creditfix.templates import BUREAU_ADDRESSES
-from buckets import DISPUTE_BUCKETS, get_all_buckets
 from cleanup import cleanup_loop
+from watcher_loop import watcher_loop
+from dispute_engine import engine_manifest, ladder_summary, tier_for_day
+from dispute_engine.categories import DISPUTE_CATEGORIES, all_categories
 from cypher import encrypt_file_in_memory, generate_session_key
 from database import CaseRecord, get_db, init_db
 from email_sender import send_letters_email
 from fishbowl import check_beta_eligibility, get_fishbowl_status
+from disclosures import (
+    acknowledgement_record,
+    disclosure_payload,
+    missing_acknowledgements,
+)
+from letter_preview import preview_summary, redact_letters
+import print_packet
+import provenance
+import signature as sig
 from mail_service import send_all_letters, verify_webhook_signature
 from pdf_gen import build_letter_pdf
+import relief_pathways
 from report_parser import parse_credit_report_bytes
 from terms_token import issue_token, verify_token
+import watcher
 
 stripe.api_key = config.STRIPE_SECRET_KEY
 
@@ -51,9 +66,17 @@ if config.SENTRY_DSN:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    task = asyncio.create_task(cleanup_loop())
+    # Two background passes. Cleanup destroys expired cases; the watcher loop
+    # sends milestone reminders. The watcher has to run out here rather than
+    # in a request handler, because the consumer who most needs the reminder
+    # is precisely the one who never comes back to trigger it.
+    tasks = [
+        asyncio.create_task(cleanup_loop()),
+        asyncio.create_task(watcher_loop()),
+    ]
     yield
-    task.cancel()
+    for task in tasks:
+        task.cancel()
 
 
 app = FastAPI(title="AE 5-Min Credit Fix", lifespan=lifespan)
@@ -61,6 +84,11 @@ limiter = Limiter(key_func=get_remote_address, storage_uri=config.RATE_LIMIT_STO
 app.state.limiter = limiter
 
 init_db()
+# The audit chain lives in its own SQLite file, so init_db() does not reach it.
+# Every provenance.record() call reads the previous hash first, which means a
+# missing table throws on the first write rather than degrading — and two of
+# those call sites are on the payment path.
+provenance.init_audit()
 
 UPLOADS_DIR = Path(__file__).resolve().parent / "uploads"
 UPLOADS_DIR.mkdir(exist_ok=True)
@@ -111,7 +139,8 @@ def build_case_pdf(record: CaseRecord) -> bytes:
         "name": record.name, "address": record.address, "dob": record.dob,
         "ssn_last4": record.ssn_last4, "phone": record.phone, "email": record.email,
     }
-    return build_letter_pdf(record.session_id, client_dict, record.letters or [])
+    return build_letter_pdf(record.session_id, client_dict, record.letters or [],
+                            signature_record=record.signature or None)
 
 
 def _demo_tracking(letters: list) -> list:
@@ -185,6 +214,51 @@ class CreateCaseRequest(BaseModel):
         return v.strip()
 
 
+class ManualPayRequest(BaseModel):
+    method: str
+    # The customer's OWN Cash App cashtag or Chime handle. Matching a random
+    # code buried in a payment note is slow and error-prone; knowing who is
+    # about to send money makes the admin release a two-second check.
+    payer_handle: str = ""
+
+    @field_validator("method")
+    @classmethod
+    def validate_method(cls, v):
+        if v not in ("cashapp", "chime"):
+            raise ValueError("Method must be 'cashapp' or 'chime'")
+        return v
+
+    @field_validator("payer_handle")
+    @classmethod
+    def validate_payer_handle(cls, v):
+        v = (v or "").strip()
+        if not v:
+            return ""
+        if not v.startswith("$"):
+            v = "$" + v.lstrip("@$")
+        if len(v) > 32 or not re.match(r"^\$[A-Za-z0-9_.-]{1,30}$", v):
+            raise ValueError("Enter a valid cashtag, e.g. $yourname")
+        return v
+
+
+class SignatureRequest(BaseModel):
+    """A captured signature from the in-app signing pad."""
+    signature: str = ""      # data:image/png;base64,...
+    typed_name: str = ""     # full legal name, typed to confirm intent
+
+
+class AcknowledgeRequest(BaseModel):
+    """The consumer's affirmations from the consent screen."""
+    acknowledgements: dict = {}
+
+    @field_validator("acknowledgements")
+    @classmethod
+    def validate_acks(cls, v):
+        if not isinstance(v, dict):
+            return {}
+        return {str(k)[:48]: bool(val) for k, val in v.items()}
+
+
 class DisputeItem(BaseModel):
     type: str
     target: str
@@ -192,6 +266,38 @@ class DisputeItem(BaseModel):
     amount: Optional[float] = None
     opened: Optional[str] = None
     reason: str
+    # Dispute category from the engine taxonomy. Unknown values are dropped
+    # rather than rejected: the engine re-derives one from the reason text.
+    bucket: str = ""
+    # The consumer's own answers for this item. Only recognised affirmation
+    # keys survive; anything else is discarded.
+    affirmations: dict = {}
+
+    @field_validator("bucket")
+    @classmethod
+    def validate_bucket(cls, v):
+        return v if v in DISPUTE_CATEGORIES else ""
+
+    @field_validator("affirmations")
+    @classmethod
+    def validate_affirmations(cls, v):
+        if not isinstance(v, dict):
+            return {}
+        allowed = {
+            "not_recognized", "confirmed_fraud", "uncertain_chain",
+            "address_mismatch", "dofd_uncertain", "dates_inconsistent",
+            "name_not_mine", "no_validation_received", "ftc_report_number",
+            "exclude",
+        }
+        cleaned = {}
+        for key, val in v.items():
+            if key not in allowed:
+                continue
+            if key == "ftc_report_number":
+                cleaned[key] = str(val)[:64]
+            else:
+                cleaned[key] = bool(val)
+        return cleaned
 
     @field_validator("type")
     @classmethod
@@ -347,6 +453,8 @@ async def confirm_disputes(session_id: str, req: ConfirmDisputesRequest, request
             "reason": item.reason,
             "status": "open",
             "letters": [],
+            "bucket": item.bucket,
+            "affirmations": item.affirmations,
         })
     record.items = items
     db.commit()
@@ -357,32 +465,156 @@ async def confirm_disputes(session_id: str, req: ConfirmDisputesRequest, request
 # STEP 3 — Generate & review letters
 # ======================================================================
 
+@app.get("/api/disclosures")
+async def get_disclosures():
+    """What the consumer must be shown before they can generate letters."""
+    return disclosure_payload()
+
+
+@app.post("/api/case/{session_id}/acknowledge")
+@limiter.limit("10/minute")
+async def acknowledge(session_id: str, req: AcknowledgeRequest, request: Request,
+                      db: Session = Depends(get_db)):
+    """
+    Record the consumer's acknowledgements. Required before letters generate.
+
+    Stores only which statements were affirmed, the version of the text shown,
+    and a timestamp — no PII beyond a hashed IP.
+    """
+    record_row = get_case(session_id, db)
+    missing = missing_acknowledgements(req.acknowledgements)
+    if missing:
+        raise HTTPException(400, f"Missing acknowledgements: {', '.join(missing)}")
+
+    ack = acknowledgement_record(req.acknowledgements, get_remote_address(request))
+
+    record_row.acknowledgements = ack
+    record_row.acknowledged_at = datetime.utcnow()
+    db.commit()
+
+    provenance.record(session_id, "acknowledgements_given",
+                      {"version": ack["version"], "count": len(ack["acknowledged"])})
+    return {"ok": True, "acknowledged": ack["acknowledged"], "version": ack["version"]}
+
+
+@app.post("/api/case/{session_id}/sign")
+@limiter.limit("10/minute")
+async def sign_letters(session_id: str, req: SignatureRequest, request: Request,
+                       db: Session = Depends(get_db)):
+    """
+    Capture the consumer's signature once; every letter goes out signed.
+
+    This is what closes the mailing loop — without it the consumer would
+    have to print, sign and post the packet back before anything could be
+    mailed on their behalf.
+    """
+    record = get_case(session_id, db)
+    try:
+        rec = sig.signature_record(
+            req.signature,
+            req.typed_name,
+            client_ip=get_remote_address(request),
+            user_agent=request.headers.get("user-agent", ""),
+        )
+    except sig.SignatureError as e:
+        raise HTTPException(400, str(e))
+
+    record.signature = rec
+    record.signed_at = datetime.utcnow()
+    db.commit()
+
+    provenance.record(session_id, "letters_signed",
+                      {"bytes": rec["bytes"], "name_len": len(rec["typed_name"])})
+
+    return {
+        "ok": True,
+        "signed_at": rec["signed_at"],
+        "attestation": sig.attestation_line(rec),
+    }
+
+
+@app.get("/api/case/{session_id}/signature-status")
+async def signature_status(session_id: str, db: Session = Depends(get_db)):
+    """Whether this case has been signed — drives the gate page's UI."""
+    record = get_case(session_id, db)
+    rec = record.signature or None
+    return {
+        "signed": bool(rec),
+        "signed_at": rec.get("signed_at") if rec else None,
+        "typed_name": rec.get("typed_name") if rec else None,
+    }
+
+
 @app.post("/api/case/{session_id}/letters")
 @limiter.limit("5/minute")
 async def generate_letters(session_id: str, request: Request, db: Session = Depends(get_db)):
     record = get_case(session_id, db)
+
+    # Disclosures are not optional. A consumer cannot generate letters in
+    # their own name without first affirming they know what this is, what it
+    # is not, and that they could do it themselves for free.
+    ack = record.acknowledgements or {}
+    if not ack.get("complete"):
+        raise HTTPException(
+            428,
+            "Required disclosures have not been acknowledged. "
+            "GET /api/disclosures, then POST /api/case/{id}/acknowledge.",
+        )
+
     case = to_engine_case(record)
 
-    bureau = gen_bureau_letters(case)
-    creditor = gen_creditor_letters(case)
+    # Which round is due. Tier 1 until the first mailing goes out; after that
+    # the ladder advances on the elapsed days since dispatch.
+    tier = 1
+    if record.mail_sent and record.mail_dispatched_at:
+        elapsed = (datetime.utcnow() - record.mail_dispatched_at).days
+        tier = tier_for_day(elapsed)
+
+    prior_rounds = {
+        t.get("target"): t for t in (record.mail_tracking or []) if t.get("target")
+    }
+
+    letters_data = gen_letters(case, tier=tier, prior_rounds=prior_rounds)
+
+    # Every letter carries its own provenance: a visible case reference and
+    # timestamp, plus an invisible fingerprint that survives copy-paste.
+    issued = datetime.now(timezone.utc)
+    letters_data = [provenance.stamp_letter(l, session_id, issued) for l in letters_data]
+
     cover_text = gen_cover_sheet(case)
 
-    letters_data = [
-        {"id": ltr_id, "target": target, "text": text}
-        for ltr_id, target, text in bureau + creditor
-    ]
-
-    # Letters live only in the encrypted column; the PDF is built on demand
+    # Letters live only in the encrypted column; the PDF is built on demand.
+    # The full text is always stored — the gate is on what we hand back.
     record.letters = letters_data
     db.commit()
 
-    return {"letters": letters_data, "cover_sheet": cover_text, "total": len(letters_data)}
+    provenance.record(session_id, "letters_generated",
+                      {"count": len(letters_data), "tier": tier, "paid": record.paid})
+
+    return {
+        "letters": redact_letters(letters_data, record.paid),
+        "paid": record.paid,
+        "summary": preview_summary(letters_data),
+        "cover_sheet": cover_text,
+        "total": len(letters_data),
+        "tier": tier,
+        "ladder": ladder_summary(),
+    }
 
 
 @app.get("/api/case/{session_id}/letters")
 async def get_letters(session_id: str, db: Session = Depends(get_db)):
+    """
+    Unpaid callers get a preview: their own audit and the statutes, with the
+    theory arguments and demands withheld. Paid callers get the real thing.
+    """
     record = get_case(session_id, db)
-    return {"letters": record.letters or []}
+    letters = record.letters or []
+    return {
+        "letters": redact_letters(letters, record.paid),
+        "paid": record.paid,
+        "summary": preview_summary(letters),
+    }
 
 
 # ======================================================================
@@ -412,7 +644,8 @@ async def send_mail(session_id: str, request: Request, db: Session = Depends(get
     if not letters:
         raise HTTPException(400, "No letters generated yet")
 
-    results = send_all_letters(record.name, record.address, letters, session_id, round_number=1)
+    tier = max((ltr.get("tier", 1) for ltr in letters), default=1)
+    results = send_all_letters(record.name, record.address, letters, session_id, round_number=tier)
 
     if not results and config.DEMO_MODE:
         demo_results = _demo_tracking(letters)
@@ -422,8 +655,16 @@ async def send_mail(session_id: str, request: Request, db: Session = Depends(get
             "message": f"DEMO MODE: {len(demo_results)} letter(s) staged. Connect Lob API key to send real mail.",
         }
 
+    if results:
+        record.mail_tracking = results
+        record.mail_sent = True
+        record.mail_dispatched_at = record.mail_dispatched_at or datetime.utcnow()
+        record.mail_tier = max(record.mail_tier or 0, tier)
+        db.commit()
+
     return {
         "sent": len(results),
+        "tier": tier,
         "tracking": results,
         "message": f"Sent {len(results)} letter(s) via USPS" if results
                    else "Lob not configured — print and mail manually (see instructions)",
@@ -508,17 +749,6 @@ async def create_checkout(session_id: str, request: Request, db: Session = Depen
     return {"checkout_url": checkout.url}
 
 
-class ManualPayRequest(BaseModel):
-    method: str
-
-    @field_validator("method")
-    @classmethod
-    def validate_method(cls, v):
-        if v not in ("cashapp", "chime"):
-            raise ValueError("Method must be 'cashapp' or 'chime'")
-        return v
-
-
 @app.post("/api/case/{session_id}/manual-pay")
 @limiter.limit("5/minute")
 async def manual_pay(session_id: str, body: ManualPayRequest, request: Request, db: Session = Depends(get_db)):
@@ -536,8 +766,12 @@ async def manual_pay(session_id: str, body: ManualPayRequest, request: Request, 
     if not record.manual_pay_code:
         record.manual_pay_code = f"CF-{uuid.uuid4().hex[:6].upper()}"
     record.manual_pay_method = body.method
+    record.manual_pay_handle = body.payer_handle or None
     record.manual_pay_requested_at = datetime.utcnow()
     db.commit()
+
+    provenance.record(session_id, "payment_requested",
+                      {"method": body.method, "has_handle": bool(body.payer_handle)})
 
     handle = config.CASHAPP_CASHTAG if body.method == "cashapp" else config.CHIME_TAG
     return {
@@ -545,6 +779,7 @@ async def manual_pay(session_id: str, body: ManualPayRequest, request: Request, 
         "confirmation": record.manual_pay_code,
         "method": body.method,
         "handle": handle,
+        "payer_handle": record.manual_pay_handle or "",
         "amount": config.PRICE_DISPLAY,
     }
 
@@ -587,7 +822,12 @@ def _post_payment(record: CaseRecord, db: Session):
     """Actions after successful payment: mail letters (round 1), email PDF."""
     letters = record.letters or []
     if letters and not record.mail_sent:
-        results = send_all_letters(record.name, record.address, letters, record.session_id, round_number=1)
+        # Postage comes off the letter's own tier, so round 2 goes certified
+        # without anyone having to remember to say so.
+        tier = max((ltr.get("tier", 1) for ltr in letters), default=1)
+        results = send_all_letters(
+            record.name, record.address, letters, record.session_id, round_number=tier
+        )
 
         if results:
             record.mail_tracking = results
@@ -595,6 +835,10 @@ def _post_payment(record: CaseRecord, db: Session):
         elif config.DEMO_MODE:
             record.mail_tracking = _demo_tracking(letters)
             record.mail_sent = True
+
+        if record.mail_sent:
+            record.mail_dispatched_at = record.mail_dispatched_at or datetime.utcnow()
+            record.mail_tier = max(record.mail_tier or 0, tier)
 
         db.commit()
 
@@ -669,6 +913,212 @@ async def case_status(session_id: str, db: Session = Depends(get_db)):
 
 
 # ======================================================================
+# The Watcher — 30/60/90-day tracking
+# ======================================================================
+
+class WatcherSubscribeRequest(BaseModel):
+    notify_method: str = "email"
+    notify_handle: str = ""
+    # The consumer has to actively agree to their case being kept past the
+    # 24-hour purge. Defaulting this to True would make the retention notice
+    # decorative, so the endpoint refuses without it.
+    accept_retention: bool = False
+
+
+@app.get("/api/case/{session_id}/watcher")
+async def watcher_status(session_id: str, db: Session = Depends(get_db)):
+    """
+    The tracker's whole state: clock, milestones, channels, retention.
+
+    Assembled here rather than in the browser because the milestone
+    arithmetic must have exactly one implementation. The frontend had a
+    second one that counted from case creation instead of from delivery, and
+    it was wrong in the dangerous direction — it would have told people to
+    send a missed-deadline letter while the bureau was still inside its
+    thirty days.
+    """
+    record = get_case(session_id, db)
+    return {"ok": True, "tracking": watcher.status_payload(record)}
+
+
+@app.post("/api/case/{session_id}/watcher/subscribe")
+@limiter.limit("10/hour")
+async def watcher_subscribe(
+    request: Request,
+    session_id: str,
+    body: WatcherSubscribeRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Turn the Watcher on for this case.
+
+    Order of checks matters and is deliberate: validate the channel *before*
+    taking money, so nobody pays for reminders to an address we cannot
+    deliver to. Snapchat, TikTok and Instagram are refused by name with the
+    reason — see `watcher.CHANNELS`.
+    """
+    record = get_case(session_id, db)
+
+    if not record.paid:
+        raise HTTPException(402, "Complete your first round before turning on tracking.")
+
+    ok, error = watcher.validate_handle(body.notify_method, body.notify_handle)
+    if not ok:
+        return {"ok": False, "error": error, "channels": watcher.available_channels()}
+
+    if not body.accept_retention:
+        return {
+            "ok": False,
+            "needs_retention_consent": True,
+            "retention_notice": watcher.retention_notice(record),
+            "error": "Please confirm you want your case kept for the tracking period.",
+        }
+
+    if record.watcher_subscribed:
+        return {"ok": True, "already": True,
+                "tracking": watcher.status_payload(record)}
+
+    # Beta: tracking is included rather than sold separately. When a price is
+    # configured, this is where checkout goes — and until then the page must
+    # not display a price it does not charge.
+    if config.WATCHER_PRICE_CENTS:
+        raise HTTPException(
+            501,
+            "Paid tracking is not wired to checkout yet. Unset "
+            "WATCHER_PRICE_CENTS to include it in the base price.",
+        )
+
+    record.watcher_subscribed = True
+    record.watcher_subscribed_at = datetime.utcnow()
+    record.watcher_notify_method = body.notify_method
+    record.watcher_notify_handle = body.notify_handle.strip()
+    record.watcher_retain_until = watcher.retention_until(record)
+    db.commit()
+    db.refresh(record)
+
+    return {"ok": True, "subscribed": True,
+            "tracking": watcher.status_payload(record)}
+
+
+@app.post("/api/case/{session_id}/watcher/cancel")
+async def watcher_cancel(session_id: str, db: Session = Depends(get_db)):
+    """
+    Turn tracking off — and give up the retention that came with it.
+
+    Clearing `watcher_retain_until` puts the case back under the normal
+    24-hour purge, so a cancelled case is collected on the next cleanup pass
+    rather than lingering. That is the promise made when they subscribed.
+    """
+    record = get_case(session_id, db)
+    record.watcher_subscribed = False
+    record.watcher_retain_until = None
+    record.watcher_notify_handle = None
+    db.commit()
+    return {"ok": True, "cancelled": True,
+            "purge_note": "Your case returns to the normal schedule and is "
+                          "destroyed within 24 hours of its creation time."}
+
+
+@app.post("/api/case/{session_id}/watcher/followup/{day}")
+async def watcher_followup(session_id: str, day: int, db: Session = Depends(get_db)):
+    """
+    Build the escalation round that has come due at this milestone.
+
+    Refuses to build early. A method-of-verification demand sent on day 12
+    tells the bureau the sender does not know the statute, and a file that
+    reads as uninformed is a file that gets treated as frivolous. The refusal
+    says how many days are left and why.
+    """
+    record = get_case(session_id, db)
+
+    if not record.paid:
+        raise HTTPException(402, "Payment required")
+    if not record.watcher_subscribed:
+        return {"ok": False, "error": "Turn on the Watcher to generate follow-up rounds."}
+
+    allowed, reason, tier = watcher.can_generate(record, day)
+    if not allowed:
+        return {"ok": False, "error": reason, "day": day, "tier": tier}
+
+    case = to_engine_case(record)
+    prior = {"rounds_sent": sorted(record.watcher_rounds or [])}
+    try:
+        letters = gen_followup_letters(case, days_since_dispatch=day, prior_rounds=prior)
+    except Exception:
+        traceback.print_exc()
+        raise HTTPException(500, "Could not build the follow-up round.")
+
+    # Record the tier so the same round is never silently rebuilt with
+    # different content — a bureau that receives two different "day 30"
+    # letters has been handed a reason to call the file frivolous.
+    rounds = sorted(set(record.watcher_rounds or []) | {tier})
+    record.watcher_rounds = rounds
+    db.commit()
+
+    return {
+        "ok": True,
+        "day": day,
+        "tier": tier,
+        "letters": letters,
+        "next_step": "Print, sign in blue ink, and mail these certified. "
+                     "Keep the receipt — from here the mailing record is "
+                     "part of your evidence.",
+    }
+
+
+# ======================================================================
+# Relief pathways — the routes that are not a dispute letter
+# ======================================================================
+
+@app.get("/api/case/{session_id}/relief")
+async def case_relief(session_id: str, db: Session = Depends(get_db)):
+    """
+    Forgiveness, assistance and consolidation routes implied by the file.
+
+    Deliberately **not** behind the paywall. This endpoint hands a consumer
+    the addresses of free government and hospital programmes; charging for
+    that, or hiding it until they pay, would be indefensible. The paywall is
+    on the letters, which is the work this platform actually does.
+
+    Returns `available: false` with empty sections when the report shows no
+    student loans and no medical accounts — the frontend renders nothing at
+    all in that case rather than an empty panel.
+    """
+    record = get_case(session_id, db)
+    items = record.items or []
+
+    profile = {
+        "name": record.name or "",
+        # Occupation sharpens which student-loan programmes surface first and
+        # is read defensively — absent is the normal case.
+        "occupation": getattr(record, "occupation", "") or "",
+        "employer": getattr(record, "employer", "") or "",
+    }
+
+    try:
+        return relief_pathways.find_relief(items, profile)
+    except Exception as exc:  # never let this break the review screen
+        traceback.print_exc()
+        return {
+            "available": False,
+            "sections": [],
+            "error": "Could not check relief routes right now.",
+            "detail": "" if config.IS_PROD else str(exc)[:200],
+        }
+
+
+@app.get("/api/case/{session_id}/relief/summary")
+async def case_relief_summary(session_id: str, db: Session = Depends(get_db)):
+    """Just enough for the review screen to decide whether to show the card."""
+    record = get_case(session_id, db)
+    try:
+        return relief_pathways.entry_point(record.items or [])
+    except Exception:
+        traceback.print_exc()
+        return {"available": False, "label": "", "kinds": []}
+
+
+# ======================================================================
 # Admin endpoints
 # ======================================================================
 
@@ -684,16 +1134,18 @@ def verify_admin(request: Request):
 @app.get("/api/admin/buckets")
 async def admin_buckets(request: Request):
     verify_admin(request)
-    return get_all_buckets()
+    return all_categories()
 
 
 @app.get("/api/admin/templates")
 async def admin_templates(request: Request):
+    """
+    What the engine can currently argue — categories, theories and the tier
+    ladder. Deliberately does NOT return letter bodies: the composed argument
+    is the product, and dumping it behind one shared key is how it walks.
+    """
     verify_admin(request)
-    return [
-        {"bucket": k, "label": v["label"], "body": v["letter_body"]}
-        for k, v in DISPUTE_BUCKETS.items()
-    ]
+    return engine_manifest()
 
 
 @app.get("/api/admin/stats")
@@ -734,6 +1186,10 @@ async def admin_pending_payments(request: Request, db: Session = Depends(get_db)
                 "name": r.name,
                 "email": r.email,
                 "method": r.manual_pay_method,
+                # Who is sending the money, in their words. Matching this
+                # against the Cash App feed is faster than hunting for the
+                # confirmation code in a payment memo.
+                "payer_handle": r.manual_pay_handle or "",
                 "confirmation": r.manual_pay_code,
                 "requested_at": r.manual_pay_requested_at.isoformat() if r.manual_pay_requested_at else None,
                 "amount": config.PRICE_DISPLAY,
@@ -742,6 +1198,52 @@ async def admin_pending_payments(request: Request, db: Session = Depends(get_db)
             for r in records
         ]
     }
+
+
+@app.post("/api/admin/print-token/{session_id}")
+async def admin_print_token(session_id: str, request: Request, db: Session = Depends(get_db)):
+    """
+    Mint a 10-minute token for the print view.
+
+    The print packet has to open in a normal browser tab so it can be sent
+    to a printer, and a URL is the only way to do that — but the admin key
+    must never ride in a query string where it lands in history and logs.
+    A short-lived, single-case token does the job without that exposure.
+    """
+    verify_admin(request)
+    get_case(session_id, db)
+    return {
+        "token": print_packet.issue_print_token(session_id),
+        "expires_in": print_packet.TOKEN_TTL_SECONDS,
+        "url": f"/api/admin/print/{session_id}?t={print_packet.issue_print_token(session_id)}",
+    }
+
+
+@app.get("/api/admin/print/{session_id}")
+async def admin_print(session_id: str, t: str = "", db: Session = Depends(get_db)):
+    """Printable packet: checklist, window covers, letters, stickers, labels."""
+    if not print_packet.verify_print_token(session_id, t):
+        raise HTTPException(401, "Invalid or expired print link. Reopen it from /admin.")
+
+    record = get_case(session_id, db)
+    letters = record.letters or []
+    if not letters:
+        raise HTTPException(404, "No letters generated for this case yet")
+
+    tier = max((ltr.get("tier", 1) for ltr in letters), default=1)
+    tier_name = next((ltr.get("tier_name", "") for ltr in letters if ltr.get("tier_name")), "")
+
+    provenance.record(session_id, "print_packet_opened", {"letters": len(letters), "tier": tier})
+
+    html_doc = print_packet.build_print_packet(
+        name=record.name,
+        client_address=record.address,
+        letters=letters,
+        confirmation=record.manual_pay_code or "",
+        tier=tier,
+        tier_name=tier_name,
+    )
+    return Response(content=html_doc, media_type="text/html")
 
 
 @app.post("/api/admin/release/{session_id}")
@@ -758,5 +1260,11 @@ async def admin_release_payment(session_id: str, request: Request, db: Session =
     record.paid = True
     record.manual_pay_released_at = datetime.utcnow()
     db.commit()
+
+    provenance.record(session_id, "payment_released",
+                      {"method": record.manual_pay_method,
+                       "handle": record.manual_pay_handle or "",
+                       "code": record.manual_pay_code or ""})
+
     _post_payment(record, db)
     return {"ok": True, "released": True, "session_id": session_id}

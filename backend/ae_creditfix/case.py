@@ -27,6 +27,12 @@ class Item:
     reason: str = ""
     status: str = "open"
     letters: List[str] = field(default_factory=list)
+    # Dispute category id from dispute_engine.categories. Drives which
+    # violation theories the analyst tests and which statutes get cited.
+    bucket: str = ""
+    # Consumer's answers to the review questions for this item, keyed by
+    # affirmation name (not_recognized, dofd_uncertain, confirmed_fraud, …).
+    affirmations: Dict[str, Any] = field(default_factory=dict)
 
 @dataclass
 class Letter:

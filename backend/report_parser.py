@@ -11,7 +11,13 @@ import os
 import re
 from typing import List
 
-from buckets import DISPUTE_BUCKETS
+from dispute_engine.categories import (
+    DISPUTE_CATEGORIES,
+    guess_category,
+    prompt_taxonomy,
+    reason_for,
+)
+from equifax_parser import looks_like_equifax, parse_equifax
 
 # --- PDF text extraction ---
 try:
@@ -63,30 +69,33 @@ def extract_text_from_bytes(content: bytes, suffix: str) -> str:
 
 SYSTEM_PROMPT = """You are a credit report analysis engine for a consumer credit dispute platform.
 
-Your job is to extract every negative, inaccurate, or disputable item from a credit report and classify each into the correct dispute bucket.
+Extract every negative, inaccurate, incomplete or otherwise disputable item from the report and classify each into exactly one dispute category.
 
-Available dispute buckets:
-- collection: Collection accounts, debts sold/transferred to collectors
-- late_payment: Late payment notations (30/60/90/120 days)
-- charge_off: Charged-off accounts, profit/loss write-offs
-- identity_error: Accounts that don't belong to the consumer, mixed files
-- inquiry: Unauthorized hard inquiries
-- medical_debt: Medical collections or medical-related debt
-- creditor_direct: Items best disputed directly with the creditor under §623
-- obsolete: Items older than 7 years that should have aged off
+Available dispute categories:
+{taxonomy}
 
 For each item found, return a JSON object with:
-- bucket: one of the bucket IDs above
-- type: "bureau" or "creditor"
-- target: the bureau name (Experian/Equifax/TransUnion) or creditor/collector name
-- account: account number or identifier
+- bucket: one of the category IDs above, exactly as written
+- type: "bureau" for items disputed with a credit bureau, "creditor" for items best disputed directly with the furnisher under FCRA 623
+- target: the bureau name (Experian/Equifax/TransUnion) when the item is bureau-side, otherwise the creditor, collector or inquiring entity
+- account: account number or identifier as printed, or "Unknown"
 - amount: dollar amount if found (number or null)
-- opened: date opened or date of first delinquency if found (string or null)
-- reason: a specific, actionable dispute reason for this item
+- opened: date opened, in YYYY-MM-DD when the report gives one, else null
+- dofd: date of first delinquency if the report states one separately, else null
+- original_creditor: named original creditor when the furnisher is a collector or debt buyer, else ""
+- reason: a specific, factual dispute reason written in the consumer's first-person voice
 - confidence: "high", "medium", or "low"
 
-Return ONLY a JSON array of items. No commentary. If no disputable items found, return [].
-Focus on items that are genuinely negative or inaccurate — don't flag normal positive tradelines."""
+Rules:
+- One item per tradeline, inquiry or public record. Do not merge two accounts into one item.
+- Report what the document says. Do not infer fraud, and never assert identity theft unless the report itself flags it — that claim carries legal weight the consumer has to make personally.
+- Where a debt appears both as a charge-off from the original creditor and as a collection from a buyer, return both, and mark the second as duplicate only if the balances match.
+- Prefer the more specific category: a hospital collection is medical_debt, not collection.
+- Skip positive tradelines that are current and accurately reported.
+
+Return ONLY a JSON array of items. No commentary. If nothing is disputable, return []."""
+
+SYSTEM_PROMPT = SYSTEM_PROMPT.format(taxonomy=prompt_taxonomy())
 
 
 def analyze_with_claude(report_text: str) -> List[dict]:
@@ -127,17 +136,25 @@ def analyze_with_claude(report_text: str) -> List[dict]:
         cleaned = []
         for item in items:
             bucket_id = item.get("bucket", "")
-            if bucket_id not in DISPUTE_BUCKETS:
+            if bucket_id not in DISPUTE_CATEGORIES:
                 bucket_id = _guess_bucket(item.get("reason", ""))
 
             cleaned.append({
                 "bucket": bucket_id,
-                "type": item.get("type", DISPUTE_BUCKETS.get(bucket_id, {}).get("type", "bureau")),
+                "type": item.get("type", DISPUTE_CATEGORIES.get(bucket_id, {}).get("type", "bureau")),
                 "target": item.get("target", "Unknown"),
                 "account": item.get("account", "Unknown"),
                 "amount": item.get("amount"),
                 "opened": item.get("opened"),
-                "reason": item.get("reason", "Disputed — verify accuracy"),
+                # Reported separately from date-opened when the report gives
+                # it. The re-aging and obsolescence matchers both key off it.
+                "dofd": item.get("dofd") or None,
+                "original_creditor": item.get("original_creditor") or "",
+                "reason": item.get("reason") or reason_for(
+                    bucket_id,
+                    target=item.get("target", ""),
+                    account=item.get("account", ""),
+                ),
                 "confidence": item.get("confidence", "medium"),
             })
         return cleaned[:25]
@@ -162,7 +179,7 @@ def analyze_with_keywords(report_text: str) -> List[dict]:
         if not line_lower:
             continue
 
-        for bucket_id, bucket in DISPUTE_BUCKETS.items():
+        for bucket_id, bucket in DISPUTE_CATEGORIES.items():
             for keyword in bucket["keywords"]:
                 if keyword in line_lower:
                     # Extract account number
@@ -194,9 +211,7 @@ def analyze_with_keywords(report_text: str) -> List[dict]:
                             "account": account,
                             "amount": amount,
                             "opened": None,
-                            "reason": bucket["reason_template"].format(
-                                account=account, target=target
-                            ),
+                            "reason": reason_for(bucket_id, target=target, account=account),
                             "confidence": "low",
                         })
                     break  # one bucket match per line
@@ -220,13 +235,9 @@ def _detect_target(lines: list, idx: int) -> str:
 
 
 def _guess_bucket(reason: str) -> str:
-    """Guess the best bucket from a reason string."""
-    reason_lower = reason.lower()
-    for bucket_id, bucket in DISPUTE_BUCKETS.items():
-        for kw in bucket["keywords"]:
-            if kw in reason_lower:
-                return bucket_id
-    return "collection"  # default
+    """Deprecated alias — the taxonomy owns this now."""
+    return guess_category(reason)
+
 
 
 # ======================================================================
@@ -235,18 +246,58 @@ def _guess_bucket(reason: str) -> str:
 
 def parse_credit_report_bytes(content: bytes, suffix: str) -> List[dict]:
     """
-    Parse a credit report from in-memory bytes and extract dispute items.
-    Uses Claude API if configured, falls back to keyword scanning.
+    Parse a credit report and extract dispute items.
+
+    Order matters. A structured parser that recognises the report's own
+    labels beats a model guessing from prose, costs nothing per report, and
+    is reproducible — so it runs first. Claude is the fallback for layouts
+    we have not written a parser for, and the keyword scanner is the last
+    resort for scanned or mangled text.
     """
     text = extract_text_from_bytes(content, suffix)
     if not text.strip():
         return []
 
-    # Try AI-powered analysis first
+    # 1. Structured parser — Equifax is the format we ask consumers to pull.
+    if looks_like_equifax(text):
+        parsed = parse_equifax(text)
+        items = parsed.get("accounts", [])
+        if items:
+            # Carry the file-level signals through on the first item so the
+            # analyst can see address variance, repeat furnishers and
+            # transferred-debt flags without re-reading the PDF.
+            items[0]["_report_meta"] = parsed.get("report_meta", {})
+            items[0]["_data_quality_flags"] = parsed.get("data_quality_flags", [])
+            items[0]["_consumer_profile"] = parsed.get("consumer_profile", {})
+            return items
+
+    # 2. Claude, for formats without a dedicated parser.
     if ANTHROPIC_API_KEY and HAS_ANTHROPIC:
         items = analyze_with_claude(text)
         if items:
             return items
 
-    # Fall back to keyword scanner
+    # 3. Keyword scanner — scanned images, unusual layouts, damaged text.
     return analyze_with_keywords(text)
+
+
+def parse_report_full(content: bytes, suffix: str) -> dict:
+    """
+    Full structured parse, for callers that want the whole picture rather
+    than just the dispute items — the client dashboard, the analyst, and
+    the outcome ledger all want the file-level context.
+    """
+    text = extract_text_from_bytes(content, suffix)
+    if not text.strip():
+        return {"accounts": [], "report_meta": {}, "data_quality_flags": []}
+
+    if looks_like_equifax(text):
+        return parse_equifax(text)
+
+    return {
+        "file_metadata": {"bureau": "unknown", "parser": "fallback"},
+        "consumer_profile": {},
+        "accounts": parse_credit_report_bytes(content, suffix),
+        "report_meta": {},
+        "data_quality_flags": ["unrecognised_format: no structured parser matched"],
+    }

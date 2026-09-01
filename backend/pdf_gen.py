@@ -5,10 +5,13 @@ from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
-from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer
+from reportlab.platypus import Image as RLImage, PageBreak, Paragraph, SimpleDocTemplate, Spacer
+
+import signature as sig
 
 
-def build_letter_pdf(session_id: str, client: dict, letters: list) -> bytes:
+def build_letter_pdf(session_id: str, client: dict, letters: list,
+                     signature_record: dict | None = None) -> bytes:
     """
     Generate the dispute-letter packet PDF fully in memory.
     Returns raw PDF bytes — never written to disk (contains PII).
@@ -84,13 +87,23 @@ def build_letter_pdf(session_id: str, client: dict, letters: list) -> bytes:
     story.append(Paragraph(f"Generated: {datetime.utcnow().strftime('%B %d, %Y')}", styles["CoverInfo"]))
     story.append(Paragraph(f"Letters included: {len(letters)}", styles["CoverInfo"]))
     story.append(Spacer(1, 1 * inch))
-    story.append(Paragraph(
-        "This packet contains FCRA-compliant dispute letters referencing "
-        "15 U.S.C. §1681g (§609), §1681i (§611), and §1681s-2 (§623). "
-        "Print each letter, sign in blue ink, and mail via USPS Certified Mail "
-        "with Return Receipt Requested.",
-        styles["CoverInfo"],
-    ))
+    if signature_record:
+        story.append(Paragraph(
+            "This packet contains FCRA-compliant dispute letters referencing "
+            "15 U.S.C. §1681g (§609), §1681i (§611), and §1681s-2 (§623). "
+            "Each letter is already signed — print and mail via USPS Certified "
+            "Mail with Return Receipt Requested. Include a copy of your photo ID "
+            "and proof of address with each one.",
+            styles["CoverInfo"],
+        ))
+    else:
+        story.append(Paragraph(
+            "This packet contains FCRA-compliant dispute letters referencing "
+            "15 U.S.C. §1681g (§609), §1681i (§611), and §1681s-2 (§623). "
+            "Print each letter, sign in blue ink, and mail via USPS Certified Mail "
+            "with Return Receipt Requested.",
+            styles["CoverInfo"],
+        ))
     story.append(Spacer(1, 0.5 * inch))
     story.append(Paragraph("© Arden Edge Labs — AE 5-Min Credit Fix", styles["Footer"]))
     story.append(PageBreak())
@@ -114,11 +127,28 @@ def build_letter_pdf(session_id: str, client: dict, letters: list) -> bytes:
             else:
                 story.append(Paragraph(_esc(line), styles["LetterBody"]))
 
-        # Signature block
-        story.append(Spacer(1, 0.4 * inch))
-        story.append(Paragraph("_" * 40, styles["LetterBody"]))
-        story.append(Paragraph(f"{_esc(client['name'])} (sign above)", styles["LetterBody"]))
-        story.append(Paragraph("Date: _______________", styles["LetterBody"]))
+        # Signature block — the consumer's captured mark when they signed in
+        # the app, otherwise a ruled line for a wet signature.
+        story.append(Spacer(1, 0.35 * inch))
+        stream = sig.signature_bytes(signature_record)
+        if stream is not None:
+            try:
+                story.append(RLImage(stream, width=2.4 * inch, height=0.75 * inch,
+                                     kind="proportional"))
+            except Exception:
+                story.append(Paragraph("_" * 40, styles["LetterBody"]))
+            story.append(Paragraph(_esc(client["name"]), styles["LetterBody"]))
+            signed_on = (signature_record.get("signed_at") or "")[:10]
+            story.append(Paragraph(f"Date: {_esc(signed_on)}", styles["LetterBody"]))
+            story.append(Spacer(1, 4))
+            story.append(Paragraph(
+                f"<font size=7 color='#555555'>{_esc(sig.attestation_line(signature_record))}</font>",
+                styles["LetterBody"],
+            ))
+        else:
+            story.append(Paragraph("_" * 40, styles["LetterBody"]))
+            story.append(Paragraph(f"{_esc(client['name'])} (sign above)", styles["LetterBody"]))
+            story.append(Paragraph("Date: _______________", styles["LetterBody"]))
 
         if i < len(letters) - 1:
             story.append(PageBreak())

@@ -85,6 +85,17 @@ def test_full_lifecycle(client, terms_token):
     assert resp.status_code == 200
     assert resp.json()["items_count"] == 2
 
+    # Required disclosures gate letter generation (428 without them). Affirm
+    # every id the server requires rather than a fixed list, so adding a
+    # disclosure fails the endpoint rather than silently skipping it here.
+    from disclosures import REQUIRED_IDS
+
+    resp = client.post(
+        f"/api/case/{session_id}/acknowledge",
+        json={"acknowledgements": {aid: True for aid in REQUIRED_IDS}},
+    )
+    assert resp.status_code == 200
+
     # Generate letters: 1 bureau letter (Experian) + 1 creditor letter
     resp = client.post(f"/api/case/{session_id}/letters")
     assert resp.status_code == 200

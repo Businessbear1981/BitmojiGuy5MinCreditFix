@@ -30,13 +30,12 @@ LOB_API_KEY = os.environ.get("LOB_API_KEY", "")
 LOB_BASE_URL = "https://api.lob.com/v1"
 LOB_WEBHOOK_SECRET = os.environ.get("LOB_WEBHOOK_SECRET", "")
 
+# The ladder now lives with the letters that depend on it, so the legal
+# escalation and the postage escalation can never drift apart.
+from dispute_engine.tiers import TIER_LADDER, postage_for_tier  # noqa: E402
+
 # round number -> Lob extra_service (None = plain First Class)
-POSTAGE_LADDER = {
-    1: None,
-    2: "certified",
-    3: "certified_return_receipt",
-    4: "certified_return_receipt",
-}
+POSTAGE_LADDER = {t: spec["extra_service"] for t, spec in TIER_LADDER.items()}
 
 BUREAU_ADDRESSES = {
     "Experian": {
@@ -104,17 +103,14 @@ def send_letter(
         },
         "file": letter_html,
         "color": False,
-        "mail_type": "usps_first_class",
-        "return_envelope": True,
         "metadata": {
             "session_id": session_id,
             "target": target,
             "round": str(round_number),
         },
     }
-    extra_service = POSTAGE_LADDER.get(round_number, "certified_return_receipt")
-    if extra_service:
-        payload["extra_service"] = extra_service
+    # mail_type / return_envelope / extra_service all come from the tier.
+    payload.update(postage_for_tier(round_number))
 
     try:
         resp = httpx.post(

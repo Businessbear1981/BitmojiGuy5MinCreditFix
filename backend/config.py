@@ -54,6 +54,11 @@ if IS_PROD and STRIPE_SECRET_KEY and not STRIPE_WEBHOOK_SECRET:
 STRIPE_PRICE_CENTS = 2499
 PRICE_DISPLAY = "$24.99"
 
+# The Watcher. 0 means tracking is included in the base price, which is
+# what beta ships as. Set a value only once checkout is actually wired —
+# a price displayed but never charged is worse than no price at all.
+WATCHER_PRICE_CENTS = int(os.environ.get("WATCHER_PRICE_CENTS", "0"))
+
 # Manual pay (Cash App / Chime): customer sends money to Sean directly and the
 # admin releases their letters after verifying receipt. Tags confirmed with
 # Sean 2026-07-19 (Cash App cashtag = $5mincreditfix).
