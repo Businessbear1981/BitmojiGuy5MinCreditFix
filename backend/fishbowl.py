@@ -1,7 +1,7 @@
 """
 Trapdoor Fishbowl — zip-code-based workflow router.
 
-For the beta launch (TX, CA, WA), incoming cases are routed into
+For the beta launch, incoming cases are routed into
 regional "fishbowl" queues based on the user's zip code. This prevents
 any single queue from being overloaded and lets us scale letter generation
 and mailing by region.
@@ -18,11 +18,12 @@ from sqlalchemy.orm import Session
 from database import CaseRecord
 
 # Beta regions: state -> zip prefix ranges
-# TX: 750xx-799xx, CA: 900xx-961xx, WA: 980xx-994xx
+# TX: 750xx-799xx, CA: 900xx-961xx, WA: 980xx-994xx, MI: 480xx-499xx
 BETA_REGIONS = {
     "TX": {"name": "Texas", "zip_prefixes": list(range(750, 800)), "queue_limit": 100},
     "CA": {"name": "California", "zip_prefixes": list(range(900, 962)), "queue_limit": 150},
     "WA": {"name": "Washington", "zip_prefixes": list(range(980, 995)), "queue_limit": 80},
+    "MI": {"name": "Michigan", "zip_prefixes": list(range(480, 500)), "queue_limit": 80},
 }
 
 
@@ -77,7 +78,11 @@ def check_beta_eligibility(address: str, db: Session | None = None) -> dict:
     if not region:
         return {
             "eligible": False,
-            "reason": f"Zip code {zip_code} is not in a beta region (TX, CA, WA only)",
+            # Derived from BETA_REGIONS, never hardcoded — the old literal
+            # "(TX, CA, WA only)" was one of four places the state list was
+            # written out by hand, so opening a region left three of them lying.
+            "reason": f"Zip code {zip_code} is not in a beta region "
+                      f"({', '.join(sorted(BETA_REGIONS))} only)",
             "zip": zip_code,
             "region": None,
         }

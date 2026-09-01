@@ -215,7 +215,66 @@ def analyze_with_keywords(report_text: str) -> list[dict]:
                         })
                     break  # one bucket match per line
 
-    return items[:20]
+    return _select_strongest(items)
+
+
+# How many disputes one round may carry. A letter is read by a human at the
+# bureau; forty items in one envelope reads as a mail-merge and invites a
+# frivolousness finding under § 1681i(a)(3) on the whole letter.
+MAX_ITEMS_PER_ROUND = 20
+
+# Severity ranking used when a report yields more than one round's worth.
+# Higher is stronger: a closed statutory window is arithmetic, a "please
+# verify this" is an opinion.
+_ITEM_PRIORITY = {
+    "obsolete": 100,
+    "identity_theft": 95,
+    "identity_error": 95,
+    "deceased_indicator": 92,
+    "re_aging": 90,
+    "mixed_file": 88,
+    "duplicate": 85,
+    "bankruptcy": 82,
+    "judgment_lien": 80,
+    "debt_buyer": 78,
+    "foreclosure": 74,
+    "repossession": 72,
+    "collection": 70,
+    "medical_debt": 68,
+    "child_support": 66,
+    "rental_eviction": 64,
+    "student_loan": 60,
+    "charge_off": 55,
+    "inquiry": 50,
+    "status_inaccuracy": 45,
+    "balance_inaccuracy": 40,
+    "late_payment": 35,
+    "personal_info": 30,
+    "creditor_direct": 25,
+}
+
+
+def _select_strongest(items: list[dict]) -> list[dict]:
+    """
+    Trim to one round's worth, strongest first.
+
+    This used to be `items[:20]` — the first twenty matches in DOCUMENT ORDER.
+    Every bureau report prints personal information first and public records
+    and inquiries last, so the budget was spent on header noise and a
+    bankruptcy or a judgment sitting in the text was never reached. Measured
+    on a synthetic Experian file: a Chapter 7 and a hard inquiry were both
+    present and both missed.
+
+    Ordering by severity instead means the twenty that survive are the twenty
+    worth arguing, wherever they appeared in the file.
+    """
+    if len(items) <= MAX_ITEMS_PER_ROUND:
+        return items
+    ranked = sorted(
+        items,
+        key=lambda it: -_ITEM_PRIORITY.get(it.get("bucket", ""), 0),
+    )
+    return ranked[:MAX_ITEMS_PER_ROUND]
 
 
 def _detect_target(lines: list, idx: int) -> str:

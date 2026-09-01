@@ -82,7 +82,7 @@ export default function Step1Page() {
     // their letters had gone out.
     if (!formData.city.trim()) { setSubmitError('Please enter your city.'); return }
     if (!/^\d{5}(-\d{4})?$/.test(formData.zip.trim())) {
-      setSubmitError('Please enter a 5-digit ZIP code (ZIP+4 is fine). The beta is open in TX, CA & WA.')
+      setSubmitError('Please enter a 5-digit ZIP code (ZIP+4 is fine). The beta is open in TX, CA, WA & MI.')
       return
     }
     setSubmitting(true)
@@ -186,6 +186,7 @@ export default function Step1Page() {
                         <option value="TX">TX</option>
                         <option value="CA">CA</option>
                         <option value="WA">WA</option>
+                        <option value="MI">MI</option>
                       </select>
                     </div>
                     <div>

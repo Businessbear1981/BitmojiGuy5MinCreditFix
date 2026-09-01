@@ -202,7 +202,11 @@ def test_fishbowl_status(client):
     resp = client.get("/api/fishbowl/status")
     assert resp.status_code == 200
     body = resp.json()
-    assert set(body.keys()) == {"TX", "CA", "WA"}
+    # Assert against the single source of truth rather than a literal, so
+    # opening a region does not silently leave this test asserting the old set.
+    from fishbowl import BETA_REGIONS
+    assert set(body.keys()) == set(BETA_REGIONS)
+    assert "MI" in body, "Michigan should be an open beta region"
     assert all("available" in v for v in body.values())
 
 
