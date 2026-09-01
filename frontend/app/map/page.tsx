@@ -55,11 +55,13 @@ export default function Step1Page() {
     firstName: '',
     lastName: '',
     address: '',
+    city: '',
+    zip: '',
     phone: '',
     email: '',
     dob: '',
     ssnLast4: '',
-    state: 'CA',
+    state: 'TX',
     bureau: 'All Three',
     disputeReason: 'Identity theft',
   })
@@ -74,10 +76,13 @@ export default function Step1Page() {
   async function handleSubmit() {
     if (!formData.firstName || !formData.email) return
     if (!consent) { setSubmitError('Please review and accept the terms below to continue.'); return }
-    // The backend routes cases by the 5-digit zip inside the address — catch a
-    // missing zip here with a friendlier message than the server's.
-    if (!/\b\d{5}\b/.test(formData.address)) {
-      setSubmitError('Please include your 5-digit zip code in the address (e.g. 123 Main St, Austin, TX 78701). The beta is currently open in TX, CA & WA.')
+    // City, state and ZIP are what the mail carrier needs as separate fields.
+    // An address that cannot be addressed cannot be mailed, and that failure
+    // used to be invisible — the carrier rejected it and the customer was told
+    // their letters had gone out.
+    if (!formData.city.trim()) { setSubmitError('Please enter your city.'); return }
+    if (!/^\d{5}(-\d{4})?$/.test(formData.zip.trim())) {
+      setSubmitError('Please enter a 5-digit ZIP code (ZIP+4 is fine). The beta is open in TX, CA & WA.')
       return
     }
     setSubmitting(true)
@@ -88,6 +93,9 @@ export default function Step1Page() {
         email: formData.email,
         phone: formData.phone,
         address: formData.address,
+        city: formData.city,
+        state: formData.state,
+        zip: formData.zip,
         dob: formData.dob,
         ssn_last4: formData.ssnLast4,
       })
@@ -155,11 +163,40 @@ export default function Step1Page() {
                     onChange={(e) => update('lastName', e.target.value)} />
                 </div>
                 <div style={{ gridColumn: '1 / -1' }}>
-                  <label style={labelStyle}>Address</label>
+                  <label style={labelStyle}>Street Address</label>
                   <input type="text" style={inputStyle}
-                    placeholder="123 Main St, City, ST 12345"
+                    placeholder="123 Main St, Apt 4"
                     value={formData.address}
                     onChange={(e) => update('address', e.target.value)} />
+                </div>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '0 1.2rem' }}>
+                    <div>
+                      <label style={labelStyle}>City</label>
+                      <input type="text" style={inputStyle}
+                        placeholder="Austin"
+                        value={formData.city}
+                        onChange={(e) => update('city', e.target.value)} />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>State</label>
+                      <select style={inputStyle}
+                        value={formData.state}
+                        onChange={(e) => update('state', e.target.value)}>
+                        <option value="TX">TX</option>
+                        <option value="CA">CA</option>
+                        <option value="WA">WA</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={labelStyle}>ZIP</label>
+                      <input type="text" inputMode="numeric" style={inputStyle}
+                        placeholder="78701"
+                        maxLength={10}
+                        value={formData.zip}
+                        onChange={(e) => update('zip', e.target.value)} />
+                    </div>
+                  </div>
                 </div>
                 <div>
                   <label style={labelStyle}>Phone</label>

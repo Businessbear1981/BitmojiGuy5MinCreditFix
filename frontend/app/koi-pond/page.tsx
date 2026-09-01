@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react'
 import { useShojiNav } from '@/lib/shojiNav'
 import { TopNav } from '@/components/nav/TopNav'
 import { WizardSidebar } from '@/components/sidebar/WizardSidebar'
-import { getDisputes, reviewDisputes } from '@/lib/api'
+import { getDisputes, reviewDisputes, getDisclosures } from '@/lib/api'
+import type { DisclosureAck } from '@/lib/api'
 
 const ACCENT = '#33FFB8'
 
@@ -46,6 +47,11 @@ export default function KoiPondPage() {
   const [fetchedReal, setFetchedReal] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  // Required acknowledgements. The backend refuses to generate letters until
+  // each is affirmed, and they are the consumer's own statements — nothing
+  // here may default them to true.
+  const [acks, setAcks] = useState<DisclosureAck[]>([])
+  const [checked, setChecked] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     (async () => {
@@ -60,13 +66,17 @@ export default function KoiPondPage() {
             setFetchedReal(true)
           }
         }
+        const disclosures = await getDisclosures()
+        if (disclosures) setAcks(disclosures.acknowledgements || [])
       } catch {
-        // Flask not running
+        // Backend unreachable — surfaced by the error state below.
       } finally {
         setLoading(false)
       }
     })()
   }, [])
+
+  const allAcked = acks.length > 0 && acks.every((a) => checked[a.id])
 
   function toggle(index: number) {
     setItems((prev) => prev.map((d, i) => i === index ? { ...d, dispute: !d.dispute } : d))
@@ -76,10 +86,17 @@ export default function KoiPondPage() {
 
   async function handleContinue() {
     if (authorizedCount === 0) return
+    if (!allAcked) {
+      setError('Please read and confirm each statement below before generating your letters.')
+      return
+    }
     setSubmitting(true)
     setError('')
     try {
       const authorized = items.filter((d) => d.dispute).map((d) => ({
+        // Carries the row's identity through to the backend. Without it every
+        // authorised row collapsed onto the first parsed suggestion.
+        suggestion_index: d.suggestion_index,
         type: d.dispute_box || d.type || 'unknown_accounts',
         text: d.creditor
           ? `${d.creditor} ${d.account_number} ${d.amount} ${d.date}`.trim()
@@ -88,7 +105,7 @@ export default function KoiPondPage() {
         account_number: d.account_number || '',
         amount: d.amount || '',
       }))
-      const res = await reviewDisputes(authorized, [])
+      const res = await reviewDisputes(authorized, [], checked)
       const data = await res.json()
       if (data.ok) {
         navigateTo('/garden')
@@ -278,6 +295,51 @@ export default function KoiPondPage() {
                 </div>
               )}
 
+              {acks.length > 0 && (
+                <div style={{
+                  marginBottom: 24, padding: '16px 18px',
+                  background: 'rgba(0,0,0,0.45)', borderRadius: 6,
+                  border: `1px solid ${allAcked ? ACCENT + '55' : 'rgba(201,168,76,0.45)'}`,
+                }}>
+                  <p style={{
+                    fontFamily: 'var(--font-cinzel), serif', fontSize: 12,
+                    letterSpacing: 2, textTransform: 'uppercase',
+                    color: allAcked ? ACCENT : '#C9A84C', margin: '0 0 4px',
+                  }}>
+                    Before your letters are written
+                  </p>
+                  <p style={{
+                    fontFamily: 'var(--font-body)', fontSize: 12, color: '#8A8278',
+                    fontStyle: 'italic', margin: '0 0 14px',
+                  }}>
+                    These are your letters, signed in your name. Please confirm each
+                    statement — all {acks.length} are required.
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {acks.map((a) => (
+                      <label key={a.id} style={{
+                        display: 'grid', gridTemplateColumns: '22px 1fr', gap: 12,
+                        alignItems: 'start', cursor: 'pointer',
+                      }}>
+                        <input
+                          type="checkbox"
+                          checked={!!checked[a.id]}
+                          onChange={(e) =>
+                            setChecked((prev) => ({ ...prev, [a.id]: e.target.checked }))}
+                          style={{ width: 18, height: 18, marginTop: 2, accentColor: ACCENT, cursor: 'pointer' }}
+                        />
+                        <span style={{
+                          fontFamily: 'var(--font-body)', fontSize: 12.5,
+                          color: checked[a.id] ? '#F0EBE0' : '#A9A29A', lineHeight: 1.5,
+                        }}>
+                          {a.label}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {error && (
                 <p style={{
                   fontFamily: 'var(--font-body)', fontSize: 13, color: '#FF4444',
@@ -301,20 +363,22 @@ export default function KoiPondPage() {
                 </button>
                 <button
                   onClick={handleContinue}
-                  disabled={authorizedCount === 0 || submitting}
+                  disabled={authorizedCount === 0 || !allAcked || submitting}
                   style={{
                     fontFamily: 'var(--font-heading)', fontSize: 14, letterSpacing: 3,
                     textTransform: 'uppercase', color: '#050403',
-                    background: authorizedCount === 0
+                    background: (authorizedCount === 0 || !allAcked)
                       ? 'rgba(100,100,100,0.3)'
                       : `linear-gradient(135deg, ${ACCENT}, #1ADB8E)`,
                     padding: '12px 40px', borderRadius: 4, border: 'none',
-                    cursor: authorizedCount === 0 || submitting ? 'not-allowed' : 'pointer',
-                    boxShadow: authorizedCount > 0 ? `0 4px 20px ${ACCENT}55` : 'none',
-                    opacity: authorizedCount === 0 ? 0.5 : 1,
+                    cursor: (authorizedCount === 0 || !allAcked || submitting) ? 'not-allowed' : 'pointer',
+                    boxShadow: (authorizedCount > 0 && allAcked) ? `0 4px 20px ${ACCENT}55` : 'none',
+                    opacity: (authorizedCount === 0 || !allAcked) ? 0.5 : 1,
                   }}
                 >
-                  {submitting ? 'Generating Letters...' : `Generate 3 Letters (1 per bureau) \u2192`}
+                  {submitting
+                    ? 'Generating Letters...'
+                    : `Generate ${authorizedCount > 0 ? '' : ''}Letters \u2192`}
                 </button>
               </div>
             </div>

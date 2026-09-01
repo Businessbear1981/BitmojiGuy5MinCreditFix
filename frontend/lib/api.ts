@@ -97,7 +97,13 @@ export interface IntakeData {
   name: string
   email: string
   phone: string
+  // Street line only. The mail carrier needs city, state and ZIP as their own
+  // fields — recovering them by splitting a free-text address put the unit
+  // number in the city field and dropped the mailing silently.
   address: string
+  city: string
+  state: string
+  zip: string
   dob: string
   ssn_last4: string
 }
@@ -213,7 +219,11 @@ interface ReviewedItem {
   amount?: string
 }
 
-export async function reviewDisputes(items: object[], customItems: object[]): Promise<Response> {
+export async function reviewDisputes(
+  items: object[],
+  customItems: object[],
+  acknowledgements?: Record<string, boolean>,
+): Promise<Response> {
   if (!_sessionId) {
     return jsonResponse({ ok: false, error: 'No active session — please complete the intake first.' }, 400)
   }
@@ -254,6 +264,21 @@ export async function reviewDisputes(items: object[], customItems: object[]): Pr
   const data = await readJson(res)
   if (!res.ok) {
     return jsonResponse({ ok: false, error: detailMessage(data, 'Could not save your disputes.') }, res.status)
+  }
+
+  // Record the consumer's acknowledgements before asking for letters. The
+  // backend returns 428 without them, which is what dead-ended this step:
+  // the disputes above were saved and the letter call then failed, so every
+  // retry appended another copy of the item list.
+  if (acknowledgements) {
+    const ackRes = await acknowledgeDisclosures(acknowledgements)
+    if (!ackRes.ok) {
+      const ackData = await readJson(ackRes)
+      return jsonResponse(
+        { ok: false, error: ackData.error || 'Could not record your acknowledgements.' },
+        ackRes.status,
+      )
+    }
   }
 
   // Generate the letters now so the garden page can simply fetch them.
