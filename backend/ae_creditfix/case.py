@@ -1,8 +1,10 @@
 
 from __future__ import annotations
-from dataclasses import dataclass, asdict, field
-from typing import List, Optional, Dict, Any
+
 import uuid
+from dataclasses import asdict, dataclass, field
+from typing import Any
+
 
 def new_id(prefix: str) -> str:
     return f"{prefix}{uuid.uuid4().hex[:6].upper()}"
@@ -22,17 +24,17 @@ class Item:
     type: str            # 'bureau' or 'creditor'
     target: str
     account: str
-    amount: Optional[float] = None
-    opened: Optional[str] = None
+    amount: float | None = None
+    opened: str | None = None
     reason: str = ""
     status: str = "open"
-    letters: List[str] = field(default_factory=list)
+    letters: list[str] = field(default_factory=list)
     # Dispute category id from dispute_engine.categories. Drives which
     # violation theories the analyst tests and which statutes get cited.
     bucket: str = ""
     # Consumer's answers to the review questions for this item, keyed by
     # affirmation name (not_recognized, dofd_uncertain, confirmed_fraud, …).
-    affirmations: Dict[str, Any] = field(default_factory=dict)
+    affirmations: dict[str, Any] = field(default_factory=dict)
 
 @dataclass
 class Letter:
@@ -41,19 +43,19 @@ class Letter:
     target: str
     path: str
     date: str            # YYYY-MM-DD
-    item_ids: List[str]
-    tracking: Optional[str] = None
+    item_ids: list[str]
+    tracking: str | None = None
 
 @dataclass
 class Case:
     client: Client
-    attachments: List[str] = field(default_factory=list)
-    items: List[Item] = field(default_factory=list)
-    letters: List[Letter] = field(default_factory=list)
-    logs: Dict[str, List[Dict[str, Any]]] = field(default_factory=lambda: {"mail": [], "responses": []})
-    phases: Dict[str, Any] = field(default_factory=lambda: {"p1_docs_complete": False})
+    attachments: list[str] = field(default_factory=list)
+    items: list[Item] = field(default_factory=list)
+    letters: list[Letter] = field(default_factory=list)
+    logs: dict[str, list[dict[str, Any]]] = field(default_factory=lambda: {"mail": [], "responses": []})
+    phases: dict[str, Any] = field(default_factory=lambda: {"p1_docs_complete": False})
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "client": asdict(self.client),
             "attachments": list(self.attachments),
@@ -64,7 +66,7 @@ class Case:
         }
 
     @staticmethod
-    def from_dict(d: Dict[str, Any]) -> "Case":
+    def from_dict(d: dict[str, Any]) -> Case:
         c = Client(**d["client"])
         items = [Item(**x) for x in d.get("items", [])]
         letters = [Letter(**x) for x in d.get("letters", [])]

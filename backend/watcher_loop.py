@@ -80,7 +80,7 @@ def send_due_notifications() -> int:
             channel = watcher.CHANNELS.get(method, {})
 
             milestones = watcher.milestones_for(record)
-            for key, ms in milestones.items():
+            for ms in milestones.values():
                 day = ms["day"]
                 if not ms["reached"] or _already_sent(record, day):
                     continue
@@ -102,7 +102,7 @@ def send_due_notifications() -> int:
                         milestone=ms,
                         frontend_url=config.FRONTEND_URL,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 - boundary must degrade, not crash; type logged
                     print(f"[watcher] send error: {type(e).__name__}")
 
                 entries = list(record.watcher_notifications or [])
@@ -128,6 +128,6 @@ async def watcher_loop():
     while True:
         try:
             send_due_notifications()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - boundary must degrade, not crash; type logged
             print(f"[watcher] error: {type(e).__name__}")
         await asyncio.sleep(CHECK_INTERVAL_SECONDS)

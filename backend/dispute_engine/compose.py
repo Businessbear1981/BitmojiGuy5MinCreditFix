@@ -23,7 +23,6 @@ is the only function the application layer needs.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from . import adapter, tiers
 from .analyst import analyze
@@ -34,7 +33,6 @@ from .letter_generator import (
     generate_collector_letter,
     sanitize_letter,
 )
-
 
 # ── Category fallback section ───────────────────────────────────────────────
 
@@ -52,8 +50,8 @@ def _category_section(items: list[dict], start_index: int = 0) -> str:
     lines = [
         "SECTION 4B — ADDITIONAL DISPUTED ITEMS",
         "",
-        "The following items are disputed on the accuracy grounds stated for each. "
-        "Each is independent of the theories set out above.",
+        ("The following items are disputed on the accuracy grounds stated for each. "
+        "Each is independent of the theories set out above."),
         "",
     ]
 
@@ -139,13 +137,13 @@ def _summary_close(items: list[dict]) -> str:
     lines = [
         "SECTION 9 — ITEMS CONTESTED ON MULTIPLE INDEPENDENT GROUNDS",
         "",
-        "Several of the items above are disputed for more than one reason. The "
+        ("Several of the items above are disputed for more than one reason. The "
         "grounds are independent of each other: each stands on its own, and any "
-        "one of them, if correct, requires deletion or correction of the item.",
+        "one of them, if correct, requires deletion or correction of the item."),
         "",
-        "I raise this because resolving the narrowest ground does not dispose of "
+        ("I raise this because resolving the narrowest ground does not dispose of "
         "the others. An item contested on three grounds has not been reinvestigated "
-        "until all three have been addressed.",
+        "until all three have been addressed."),
         "",
     ]
 
@@ -190,8 +188,8 @@ def generate_case_letters(
     items: list[dict],
     state_code: str = "",
     tier: int = 1,
-    consumer_affirmations: Optional[dict[str, dict]] = None,
-    prior_rounds: Optional[dict[str, dict]] = None,
+    consumer_affirmations: dict[str, dict] | None = None,
+    prior_rounds: dict[str, dict] | None = None,
 ) -> list[dict]:
     """
     Generate every letter this case needs, at the requested tier.
@@ -346,9 +344,9 @@ def _shell_letter(
         "",
         f"Dear {recipient_name},",
         "",
-        "I am writing to formally dispute information appearing on my credit file "
+        ("I am writing to formally dispute information appearing on my credit file "
         "under the Fair Credit Reporting Act. The items identified below are "
-        "inaccurate, incomplete, or unverifiable as reported.",
+        "inaccurate, incomplete, or unverifiable as reported."),
         "",
         "=" * 60,
         "",

@@ -8,7 +8,6 @@ import hashlib
 import hmac
 import time
 from datetime import datetime, timezone
-from typing import Optional
 
 from config import TERMS_TOKEN_SECRET
 
@@ -26,7 +25,7 @@ def issue_token() -> tuple[str, datetime]:
     return f"{ts}.{_sign(ts)}", datetime.fromtimestamp(now, tz=timezone.utc)
 
 
-def verify_token(token: str) -> Optional[datetime]:
+def verify_token(token: str) -> datetime | None:
     """Returns the acceptance timestamp if the token is valid and fresh."""
     try:
         ts, sig = token.split(".", 1)

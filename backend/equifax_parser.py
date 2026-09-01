@@ -28,7 +28,6 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
-from typing import Optional
 
 # ── Account-block boundaries ────────────────────────────────────────────────
 # Equifax opens each tradeline with an indented "NAME - Open|Closed" line.
@@ -51,7 +50,7 @@ def _field(block: str, label: str) -> str:
 _MONEY = re.compile(r"-?[\d,]+(?:\.\d{2})?")
 
 
-def _money(raw: str) -> Optional[float]:
+def _money(raw: str) -> float | None:
     if not raw:
         return None
     m = _MONEY.search(raw.replace("$", ""))
@@ -134,7 +133,7 @@ def _categories(atype: str, status: str, past_due, dofd: str, opened: str,
     if "charge" in blob and "off" in blob or grid.get("CO"):
         n = grid.get("CO", 0)
         add("charge_off", "moderate",
-            f"charge-off status reported" + (f" across {n} months" if n else ""))
+            "charge-off status reported" + (f" across {n} months" if n else ""))
     if "repossess" in blob or grid.get("R"):
         add("repossession", "moderate", "repossession reported")
     if "foreclos" in blob or grid.get("F"):
@@ -262,7 +261,7 @@ def _payment_grid(block: str) -> dict:
     C=collection, CO=charge-off, 30/60/90/120/150/180=days late,
     R=repossession, F=foreclosure, B=bankruptcy, V=voluntary surrender.
     """
-    m = re.search(r"Payment History(.*?)(?:24 Month History|Narrative|\Z)", block, re.S)
+    m = re.search(r"Payment History(.*?)(?:24 Month History|Narrative|\Z)", block, re.DOTALL)
     if not m:
         return {}
     seg = m.group(1)
@@ -435,9 +434,9 @@ def _quality_flags(text: str, accounts: list[dict]) -> list[str]:
     # An account opened *after* its own first delinquency is a chain-of-custody
     # signal: the debt predates the tradeline, i.e. it was transferred.
     for a in accounts:
-        if a["date_opened"] and a["date_of_first_delinquency"]:
-            if a["date_of_first_delinquency"] < a["date_opened"]:
-                flags.append(
+        if (a["date_opened"] and a["date_of_first_delinquency"]
+                and a["date_of_first_delinquency"] < a["date_opened"]):
+            flags.append(
                     f"transferred_debt: {a['account_name']} opened {a['date_opened']} "
                     f"but reports delinquency from {a['date_of_first_delinquency']}")
 

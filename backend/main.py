@@ -1,6 +1,5 @@
 import asyncio
 import base64
-import hashlib
 import hmac
 import json
 import re
@@ -9,7 +8,6 @@ import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import List, Optional
 
 import stripe
 from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
@@ -22,32 +20,32 @@ from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 
 import config
+import print_packet
+import provenance
+import relief_pathways
+import signature as sig
+import watcher
 from ae_creditfix.case import Case, Client, Item, new_id
 from ae_creditfix.letters import gen_cover_sheet, gen_followup_letters, gen_letters
 from ae_creditfix.templates import BUREAU_ADDRESSES
 from cleanup import cleanup_loop
-from watcher_loop import watcher_loop
-from dispute_engine import engine_manifest, ladder_summary, tier_for_day
-from dispute_engine.categories import DISPUTE_CATEGORIES, all_categories
 from cypher import encrypt_file_in_memory, generate_session_key
 from database import CaseRecord, get_db, init_db
-from email_sender import send_letters_email
-from fishbowl import check_beta_eligibility, get_fishbowl_status
 from disclosures import (
     acknowledgement_record,
     disclosure_payload,
     missing_acknowledgements,
 )
+from dispute_engine import engine_manifest, ladder_summary, tier_for_day
+from dispute_engine.categories import DISPUTE_CATEGORIES, all_categories
+from email_sender import send_letters_email
+from fishbowl import check_beta_eligibility, get_fishbowl_status
 from letter_preview import preview_summary, redact_letters
-import print_packet
-import provenance
-import signature as sig
 from mail_service import send_all_letters, verify_webhook_signature
 from pdf_gen import build_letter_pdf
-import relief_pathways
 from report_parser import parse_credit_report_bytes
 from terms_token import issue_token, verify_token
-import watcher
+from watcher_loop import watcher_loop
 
 stripe.api_key = config.STRIPE_SECRET_KEY
 
@@ -263,8 +261,8 @@ class DisputeItem(BaseModel):
     type: str
     target: str
     account: str
-    amount: Optional[float] = None
-    opened: Optional[str] = None
+    amount: float | None = None
+    opened: str | None = None
     reason: str
     # Dispute category from the engine taxonomy. Unknown values are dropped
     # rather than rejected: the engine re-derives one from the reason text.
@@ -315,7 +313,7 @@ class DisputeItem(BaseModel):
 
 
 class ConfirmDisputesRequest(BaseModel):
-    items: List[DisputeItem]
+    items: list[DisputeItem]
 
 
 # ======================================================================
@@ -1044,7 +1042,7 @@ async def watcher_followup(session_id: str, day: int, db: Session = Depends(get_
     prior = {"rounds_sent": sorted(record.watcher_rounds or [])}
     try:
         letters = gen_followup_letters(case, days_since_dispatch=day, prior_rounds=prior)
-    except Exception:
+    except Exception:  # noqa: BLE001 - boundary must degrade, not crash; type logged
         traceback.print_exc()
         raise HTTPException(500, "Could not build the follow-up round.")
 
@@ -1097,7 +1095,7 @@ async def case_relief(session_id: str, db: Session = Depends(get_db)):
 
     try:
         return relief_pathways.find_relief(items, profile)
-    except Exception as exc:  # never let this break the review screen
+    except Exception as exc:  # never let this break the review screen  # noqa: BLE001 - boundary must degrade, not crash; type logged
         traceback.print_exc()
         return {
             "available": False,
@@ -1113,7 +1111,7 @@ async def case_relief_summary(session_id: str, db: Session = Depends(get_db)):
     record = get_case(session_id, db)
     try:
         return relief_pathways.entry_point(record.items or [])
-    except Exception:
+    except Exception:  # noqa: BLE001 - boundary must degrade, not crash; type logged
         traceback.print_exc()
         return {"available": False, "label": "", "kinds": []}
 

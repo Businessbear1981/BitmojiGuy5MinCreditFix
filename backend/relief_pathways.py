@@ -38,8 +38,6 @@ Two things it says without hedging, because both protect the consumer:
 """
 from __future__ import annotations
 
-from typing import Optional
-
 import medical_relief
 import student_loans
 
@@ -84,10 +82,10 @@ STUDENT_OTHER_ROUTES: dict[str, dict] = {
             "happens to the default notation on the credit report, are set "
             "by the Department of Education.",
         "documents_to_gather": [
-            "Written confirmation from the holder that the loan is in "
-            "default, and who currently holds it",
-            "Your income documentation, since a rehabilitation payment is "
-            "usually set against it",
+            ("Written confirmation from the holder that the loan is in "
+            "default, and who currently holds it"),
+            ("Your income documentation, since a rehabilitation payment is "
+            "usually set against it"),
         ],
         "verify_at": "https://studentaid.gov",
         "cost":
@@ -108,8 +106,8 @@ STUDENT_OTHER_ROUTES: dict[str, dict] = {
             "goes unanswered, a forbearance applied without request.",
         "documents_to_gather": [
             "Every written exchange with the servicer, with dates",
-            "The servicer's stated payment history, and your own records "
-            "where they disagree",
+            ("The servicer's stated payment history, and your own records "
+            "where they disagree"),
         ],
         "verify_at": "https://studentaid.gov/feedback-center",
         "cost": "Free.",
@@ -176,8 +174,8 @@ def _student_extra_signals(items: list[dict]) -> list[dict]:
 
 
 def find_relief(items: list[dict],
-                profile: Optional[dict] = None,
-                consumer_marked_medical: Optional[list] = None) -> dict:
+                profile: dict | None = None,
+                consumer_marked_medical: list | None = None) -> dict:
     """
     Everything worth raising with someone other than a credit bureau.
 
@@ -259,8 +257,8 @@ def find_relief(items: list[dict],
 
 
 def entry_point(items: list[dict],
-                profile: Optional[dict] = None,
-                consumer_marked_medical: Optional[list] = None) -> dict:
+                profile: dict | None = None,
+                consumer_marked_medical: list | None = None) -> dict:
     """
     The cheap check the review screen calls to decide whether to show the card.
 

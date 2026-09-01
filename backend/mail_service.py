@@ -20,7 +20,6 @@ import hashlib
 import hmac
 import os
 from datetime import datetime
-from typing import Optional
 
 import httpx
 
@@ -32,7 +31,7 @@ LOB_WEBHOOK_SECRET = os.environ.get("LOB_WEBHOOK_SECRET", "")
 
 # The ladder now lives with the letters that depend on it, so the legal
 # escalation and the postage escalation can never drift apart.
-from dispute_engine.tiers import TIER_LADDER, postage_for_tier  # noqa: E402
+from dispute_engine.tiers import TIER_LADDER, postage_for_tier
 
 # round number -> Lob extra_service (None = plain First Class)
 POSTAGE_LADDER = {t: spec["extra_service"] for t, spec in TIER_LADDER.items()}
@@ -69,7 +68,7 @@ def send_letter(
     letter_html: str,
     session_id: str,
     round_number: int = 1,
-) -> Optional[dict]:
+) -> dict | None:
     """
     Send a letter via Lob, with postage escalating by dispute round.
     Returns Lob letter object with tracking info, or None if not configured.
@@ -129,7 +128,7 @@ def send_letter(
             "status": "mailed",
             "created_at": datetime.utcnow().isoformat(),
         }
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - boundary must degrade, not crash; type logged
         print(f"Lob API error: {type(e).__name__}")
         return None
 

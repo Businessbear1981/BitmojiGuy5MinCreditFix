@@ -45,14 +45,14 @@ in `outcomes.score_deltas()`, with its sample size attached.
 from __future__ import annotations
 
 import math
-from typing import Optional
+import sqlite3
 
 import scoring
 
 try:
     import outcomes
     HAS_OUTCOMES = True
-except Exception:
+except ImportError:
     HAS_OUTCOMES = False
 
 
@@ -122,8 +122,10 @@ def calibrated_probability(category: str, strength: str,
             obs = outcomes.removal_rate(category=category, bureau=bureau)
             trials = obs.get("n", 0) or 0
             successes = obs.get("deleted", 0) or 0
-        except Exception:
-            pass
+        except sqlite3.Error as e:
+            # No observations readable: the posterior is then just the prior.
+            print(f"[calibration] ledger unreadable ({type(e).__name__}); "
+                  f"posterior for {category}/{strength} falls back to the prior")
 
     post = beta_posterior(prior_p, weight, successes, trials)
     post.update({
@@ -236,7 +238,9 @@ def suggest_prior_updates(min_n: int = 40) -> list[dict]:
     for (category, strength), prior_p in scoring.PRIORS.items():
         try:
             obs = outcomes.removal_rate(category=category)
-        except Exception:
+        except sqlite3.Error as e:
+            print(f"[calibration] skipping {category}: ledger unreadable "
+                  f"({type(e).__name__})")
             continue
         n = obs.get("n", 0) or 0
         if n < min_n or obs.get("rate") is None:

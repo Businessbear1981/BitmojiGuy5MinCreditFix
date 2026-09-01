@@ -5,7 +5,8 @@ from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
-from reportlab.platypus import Image as RLImage, PageBreak, Paragraph, SimpleDocTemplate, Spacer
+from reportlab.platypus import Image as RLImage
+from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer
 
 import signature as sig
 
@@ -122,7 +123,7 @@ def build_letter_pdf(session_id: str, client: dict, letters: list,
                 story.append(Paragraph(_esc(line), styles["LetterHeader"]))
             elif line.startswith("Re:"):
                 story.append(Paragraph(_esc(line), styles["LetterSubject"]))
-            elif line.startswith("•") or line.startswith("-"):
+            elif line.startswith(("•", "-")):
                 story.append(Paragraph(f"&bull; {_esc(line.lstrip('•- '))}", styles["LetterBody"]))
             else:
                 story.append(Paragraph(_esc(line), styles["LetterBody"]))
@@ -135,7 +136,7 @@ def build_letter_pdf(session_id: str, client: dict, letters: list,
             try:
                 story.append(RLImage(stream, width=2.4 * inch, height=0.75 * inch,
                                      kind="proportional"))
-            except Exception:
+            except Exception:  # noqa: BLE001 - boundary must degrade, not crash; type logged
                 story.append(Paragraph("_" * 40, styles["LetterBody"]))
             story.append(Paragraph(_esc(client["name"]), styles["LetterBody"]))
             signed_on = (signature_record.get("signed_at") or "")[:10]

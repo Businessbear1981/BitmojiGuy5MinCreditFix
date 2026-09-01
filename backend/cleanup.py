@@ -75,7 +75,7 @@ async def cleanup_loop():
     while True:
         try:
             purge_expired_sessions()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - boundary must degrade, not crash; type logged
             # Log error type only, never data contents
             print(f"[cleanup] error: {type(e).__name__}")
         await asyncio.sleep(CLEANUP_INTERVAL_SECONDS)

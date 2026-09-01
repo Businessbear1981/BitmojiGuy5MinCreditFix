@@ -9,7 +9,6 @@ Fallback: keyword-based scanner if Claude API is not configured.
 import json
 import os
 import re
-from typing import List
 
 from dispute_engine.categories import (
     DISPUTE_CATEGORIES,
@@ -48,7 +47,7 @@ def extract_text_from_pdf_bytes(content: bytes) -> str:
             text += page.get_text() + "\n"
         doc.close()
         return text
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - boundary must degrade, not crash; type logged
         print(f"PDF extraction error: {type(e).__name__}")
         return ""
 
@@ -98,7 +97,7 @@ Return ONLY a JSON array of items. No commentary. If nothing is disputable, retu
 SYSTEM_PROMPT = SYSTEM_PROMPT.format(taxonomy=prompt_taxonomy())
 
 
-def analyze_with_claude(report_text: str) -> List[dict]:
+def analyze_with_claude(report_text: str) -> list[dict]:
     """Use Claude API to analyze credit report text and extract dispute items."""
     if not HAS_ANTHROPIC or not ANTHROPIC_API_KEY:
         return []
@@ -159,7 +158,7 @@ def analyze_with_claude(report_text: str) -> List[dict]:
             })
         return cleaned[:25]
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - boundary must degrade, not crash; type logged
         print(f"Claude API analysis error: {e}")
         return []
 
@@ -168,7 +167,7 @@ def analyze_with_claude(report_text: str) -> List[dict]:
 # Keyword Fallback Scanner
 # ======================================================================
 
-def analyze_with_keywords(report_text: str) -> List[dict]:
+def analyze_with_keywords(report_text: str) -> list[dict]:
     """Fallback keyword-based scanner when Claude API is not available."""
     items = []
     lines = report_text.split("\n")
@@ -244,7 +243,7 @@ def _guess_bucket(reason: str) -> str:
 # Main entry point
 # ======================================================================
 
-def parse_credit_report_bytes(content: bytes, suffix: str) -> List[dict]:
+def parse_credit_report_bytes(content: bytes, suffix: str) -> list[dict]:
     """
     Parse a credit report and extract dispute items.
 

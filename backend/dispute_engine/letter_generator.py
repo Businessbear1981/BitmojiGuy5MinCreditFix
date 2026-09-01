@@ -11,12 +11,14 @@ Rules:
 """
 
 from datetime import datetime
-from .legal_library import (
-    get_theory, get_verified_cases, get_verified_statutes,
-    get_removal_authority, get_escalation_paths, get_state_law,
-    VIOLATION_THEORIES,
-)
 
+from .legal_library import (
+    get_escalation_paths,
+    get_removal_authority,
+    get_theory,
+    get_verified_cases,
+    get_verified_statutes,
+)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # BUREAU ADDRESSES
@@ -240,18 +242,18 @@ def _build_section_5_requests(analyst_report: dict) -> str:
         lines.append(f'Request {req_num} (re: Section 4.{letter_label} — {theory["title"]}):')
         lines.append(f'  (a) Conduct a reinvestigation of all items identified in Section 4.{letter_label}, '
                      f'contacting each furnisher to verify the disputed information with documentation.')
-        lines.append(f'  (b) If the furnisher cannot verify the information with documentation, '
-                     f'delete the item(s) from my file per 15 U.S.C. § 1681i(a)(5)(A).')
-        lines.append(f'  (c) Provide me with a description of the procedure used to determine accuracy '
-                     f'and completeness, including the name, address, and telephone number of each '
-                     f'furnisher contacted, per 15 U.S.C. § 1681i(a)(6)(B)(iii).')
+        lines.append('  (b) If the furnisher cannot verify the information with documentation, '
+                     'delete the item(s) from my file per 15 U.S.C. § 1681i(a)(5)(A).')
+        lines.append('  (c) Provide me with a description of the procedure used to determine accuracy '
+                     'and completeness, including the name, address, and telephone number of each '
+                     'furnisher contacted, per 15 U.S.C. § 1681i(a)(6)(B)(iii).')
         lines.append('')
 
     # General procedural request
-    lines.append(f'General Procedural Request:')
-    lines.append(f'  Complete all reinvestigations within 30 days of receipt of this letter as '
-                 f'required by 15 U.S.C. § 1681i(a)(1). Provide me with written results including '
-                 f'a notice of any changes made to my file.')
+    lines.append('General Procedural Request:')
+    lines.append('  Complete all reinvestigations within 30 days of receipt of this letter as '
+                 'required by 15 U.S.C. § 1681i(a)(1). Provide me with written results including '
+                 'a notice of any changes made to my file.')
     lines.append('')
 
     return '\n'.join(lines)
@@ -344,7 +346,7 @@ def generate_bureau_letter(
     consumer_name: str,
     consumer_address: str,
     bureau_key: str,
-    parsed_data: dict = None,
+    parsed_data: dict | None = None,
 ) -> dict:
     """
     Generate one comprehensive letter for one bureau from the analyst report.
@@ -382,9 +384,9 @@ def generate_bureau_letter(
         '',
         f'Dear {bureau["name"]},',
         '',
-        'I am writing to formally dispute information on my credit report under the Fair Credit '
+        ('I am writing to formally dispute information on my credit report under the Fair Credit '
         'Reporting Act. I have reviewed my report and identified specific items that I believe are '
-        'inaccurate, unverifiable, or otherwise do not meet the standards required by federal law.',
+        'inaccurate, unverifiable, or otherwise do not meet the standards required by federal law.'),
         '',
         '=' * 60,
         '',
@@ -577,8 +579,8 @@ def sanitize_letter(letter: dict) -> dict:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 if __name__ == '__main__':
-    from .parsing_engine import parse_report
     from .analyst import analyze
+    from .parsing_engine import parse_report
 
     filepath = r'C:\Users\sgill\Downloads\Annual Credit Report - Experian.html'
     filename = 'Annual Credit Report - Experian.html'

@@ -1,2 +1,2 @@
 
-__all__ = ["case", "templates", "letters"]
+__all__ = ["case", "letters", "templates"]

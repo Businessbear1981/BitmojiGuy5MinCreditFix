@@ -42,7 +42,7 @@ _GATED_SECTIONS = (
     "SECTION 8",   # tier escalation (MOV / pre-litigation / regulatory)
 )
 
-_SECTION_RE = re.compile(r"^SECTION [0-9]+[A-Z]?\s*—\s*(.+)$", re.M)
+_SECTION_RE = re.compile(r"^SECTION [0-9]+[A-Z]?\s*—\s*(.+)$", re.MULTILINE)
 
 _TOLL_NOTICE = """
 ────────────────────────────────────────────────────────────

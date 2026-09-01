@@ -43,11 +43,12 @@ an explicit affirmation no matter what the file looks like.
 """
 
 from datetime import datetime, timedelta
+
 from .legal_library import VIOLATION_THEORIES, get_state_law
 
 try:
     import scoring
-except Exception:  # letters must still build if the scorer is unavailable
+except ImportError:  # letters must still build if the scorer is unavailable
     scoring = None
 
 # Known debt buyer / collection entity list
@@ -166,9 +167,9 @@ def _theory_for_category(cat: dict):
     name = cat.get('category', '')
     if name in PARSER_CATEGORY_THEORIES:
         return PARSER_CATEGORY_THEORIES[name]
-    if name in CONDITIONAL_CATEGORY_THEORY:
-        if _reads_as_inconsistency(cat.get('evidence', '')):
-            return CONDITIONAL_CATEGORY_THEORY[name]
+    if (name in CONDITIONAL_CATEGORY_THEORY
+            and _reads_as_inconsistency(cat.get('evidence', ''))):
+        return CONDITIONAL_CATEGORY_THEORY[name]
     return None
 
 
@@ -589,9 +590,8 @@ def analyze(
     bureau = parsed_data.get('file_metadata', {}).get('bureau', 'unknown')
 
     violation_theory_blocks = []
-    for tid in theory_groups:
+    for tid, items_in_theory in theory_groups.items():
         theory_def = VIOLATION_THEORIES.get(tid, {})
-        items_in_theory = theory_groups[tid]
 
         # Common factual pattern across items
         all_notes = [n for item in items_in_theory for n in item['factual_notes']]
@@ -678,8 +678,8 @@ def _find_common_pattern(notes: list) -> str:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 if __name__ == '__main__':
+
     from .parsing_engine import parse_report
-    import json
 
     filepath = r'C:\Users\sgill\Downloads\Annual Credit Report - Experian.html'
     filename = 'Annual Credit Report - Experian.html'

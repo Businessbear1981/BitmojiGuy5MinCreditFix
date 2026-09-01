@@ -22,7 +22,6 @@ rewrites the framing, without rebuilding the underlying analysis.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from .legal_library import get_escalation_paths, get_state_law, get_theory
 
@@ -120,7 +119,7 @@ def ladder_summary() -> list[dict]:
 
 # ── Escalation sections ─────────────────────────────────────────────────────
 
-def _prior_round_reference(prior: Optional[dict]) -> list[str]:
+def _prior_round_reference(prior: dict | None) -> list[str]:
     """Cite the previous round so the recipient cannot treat this as a new dispute."""
     if not prior:
         return [
@@ -153,29 +152,29 @@ def _section_mov(analyst_report: dict) -> str:
     lines = [
         "SECTION 8 — DEMAND FOR METHOD OF VERIFICATION",
         "",
-        "You have reported that the disputed items were verified. Under 15 U.S.C. "
+        ("You have reported that the disputed items were verified. Under 15 U.S.C. "
         "§ 1681i(a)(6)(B)(iii), I am entitled to a description of the procedure used "
         "to determine the accuracy and completeness of the disputed information, "
         "including the business name, address, and telephone number of each furnisher "
-        "contacted. I am requesting that description now.",
+        "contacted. I am requesting that description now."),
         "",
         "For each item still appearing on my file, provide in writing:",
         "",
         "  (a) The name, address, and telephone number of the furnisher contacted.",
         "  (b) The date the furnisher was contacted and the method of contact.",
-        "  (c) The name and title of the individual at your organization who conducted "
-        "the reinvestigation.",
-        "  (d) Every document the furnisher supplied in response, or a statement that "
-        "no documents were supplied.",
-        "  (e) The specific steps taken to resolve the discrepancies identified in my "
-        "prior letter, beyond transmitting an automated dispute code.",
+        ("  (c) The name and title of the individual at your organization who conducted "
+        "the reinvestigation."),
+        ("  (d) Every document the furnisher supplied in response, or a statement that "
+        "no documents were supplied."),
+        ("  (e) The specific steps taken to resolve the discrepancies identified in my "
+        "prior letter, beyond transmitting an automated dispute code."),
         "",
-        "A response consisting only of the word 'verified', or of an e-OSCAR response "
+        ("A response consisting only of the word 'verified', or of an e-OSCAR response "
         "code, does not describe a procedure and does not satisfy the statute. "
         "Cushman v. Trans Union Corp., 115 F.3d 220 (3d Cir. 1997), holds that a "
         "reinvestigation must be reasonable, and that merely restating a furnisher's "
         "position is not enough where the consumer has identified specific reasons to "
-        "doubt it.",
+        "doubt it."),
         "",
     ]
 
@@ -204,26 +203,26 @@ def _section_pre_litigation(analyst_report: dict, state_code: str = "") -> str:
     lines = [
         "SECTION 8 — NOTICE OF NONCOMPLIANCE",
         "",
-        "This is my third written communication regarding these items. I have "
+        ("This is my third written communication regarding these items. I have "
         "identified specific inaccuracies, requested a reinvestigation, and requested "
-        "the method of verification. The items remain on my file.",
+        "the method of verification. The items remain on my file."),
         "",
         "Two provisions of the Act are now engaged:",
         "",
-        "  15 U.S.C. § 1681o — negligent noncompliance. A consumer reporting agency "
+        ("  15 U.S.C. § 1681o — negligent noncompliance. A consumer reporting agency "
         "that negligently fails to comply with the Act is liable for actual damages "
-        "together with costs and reasonable attorney's fees.",
+        "together with costs and reasonable attorney's fees."),
         "",
-        "  15 U.S.C. § 1681n — willful noncompliance. Where the failure is willful, "
+        ("  15 U.S.C. § 1681n — willful noncompliance. Where the failure is willful, "
         "which includes reckless disregard of the statutory obligation, liability "
         "extends to actual damages or statutory damages of $100 to $1,000 per "
         "violation, together with punitive damages, costs and fees. Safeco Ins. Co. "
         "of America v. Burr, 551 U.S. 47 (2007), holds that recklessness suffices "
-        "for willfulness under this section.",
+        "for willfulness under this section."),
         "",
-        "Continuing to report information after a consumer has twice identified "
+        ("Continuing to report information after a consumer has twice identified "
         "specific grounds for doubting it, and after failing to describe any "
-        "procedure used to verify it, is the pattern those provisions address.",
+        "procedure used to verify it, is the pattern those provisions address."),
         "",
     ]
 
@@ -264,8 +263,8 @@ def _section_regulatory(analyst_report: dict, recipient_type: str = "bureau") ->
     lines = [
         "SECTION 8 — REGULATORY ESCALATION",
         "",
-        "Ninety days have passed since my first dispute. The items remain on my file "
-        "and no adequate description of the verification procedure has been provided.",
+        ("Ninety days have passed since my first dispute. The items remain on my file "
+        "and no adequate description of the verification procedure has been provided."),
         "",
         "Copies of this letter and the full correspondence record are being filed with:",
         "",
@@ -275,8 +274,8 @@ def _section_regulatory(analyst_report: dict, recipient_type: str = "bureau") ->
         "    600 Pennsylvania Avenue NW, Washington, DC 20580",
         "  - The Attorney General of my state of residence",
         "",
-        "The correspondence record accompanying those complaints includes the mailing "
-        "dates, USPS certified tracking numbers and return receipts for every round.",
+        ("The correspondence record accompanying those complaints includes the mailing "
+        "dates, USPS certified tracking numbers and return receipts for every round."),
         "",
     ]
 
@@ -311,7 +310,7 @@ def apply_tier(
     tier: int,
     analyst_report: dict,
     state_code: str = "",
-    prior_round: Optional[dict] = None,
+    prior_round: dict | None = None,
     recipient_type: str = "bureau",
 ) -> dict:
     """

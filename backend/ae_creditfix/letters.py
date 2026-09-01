@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
-from typing import List, Optional, Tuple
 
 from dispute_engine import generate_case_letters, tier_for_day
 
@@ -56,7 +55,7 @@ def _client_dict(case: Case) -> dict:
     }
 
 
-def _open_items(case: Case) -> List[dict]:
+def _open_items(case: Case) -> list[dict]:
     """Open items in the shape the engine's adapter expects."""
     out = []
     for it in case.items:
@@ -76,7 +75,7 @@ def _open_items(case: Case) -> List[dict]:
     return out
 
 
-def make_items_block(items: List[Item]) -> str:
+def make_items_block(items: list[Item]) -> str:
     """Human-readable item list, used on the cover sheet."""
     lines = []
     for it in items:
@@ -95,9 +94,9 @@ def make_items_block(items: List[Item]) -> str:
 def gen_letters(
     case: Case,
     tier: int = 1,
-    consumer_affirmations: Optional[dict] = None,
-    prior_rounds: Optional[dict] = None,
-) -> List[dict]:
+    consumer_affirmations: dict | None = None,
+    prior_rounds: dict | None = None,
+) -> list[dict]:
     """
     Generate every letter this case needs at the given tier.
 
@@ -145,7 +144,7 @@ def gen_letters(
     return letters
 
 
-def gen_followup_letters(case: Case, days_since_dispatch: int, prior_rounds: Optional[dict] = None) -> List[dict]:
+def gen_followup_letters(case: Case, days_since_dispatch: int, prior_rounds: dict | None = None) -> list[dict]:
     """Generate the round that is due at this point in the case."""
     return gen_letters(case, tier=tier_for_day(days_since_dispatch), prior_rounds=prior_rounds)
 
@@ -154,7 +153,7 @@ def gen_followup_letters(case: Case, days_since_dispatch: int, prior_rounds: Opt
 # main.py and the tests still call these. They now return tier-1 output from
 # the merged engine rather than the old two-template stub.
 
-def gen_bureau_letters(case: Case) -> List[Tuple[str, str, str]]:
+def gen_bureau_letters(case: Case) -> list[tuple[str, str, str]]:
     """[(letter_id, bureau, letter_text)] — bureau-directed letters only."""
     return [
         (ltr["id"], ltr["target"], ltr["text"])
@@ -163,7 +162,7 @@ def gen_bureau_letters(case: Case) -> List[Tuple[str, str, str]]:
     ]
 
 
-def gen_creditor_letters(case: Case) -> List[Tuple[str, str, str]]:
+def gen_creditor_letters(case: Case) -> list[tuple[str, str, str]]:
     """[(letter_id, furnisher, letter_text)] — direct § 623 letters only."""
     return [
         (ltr["id"], ltr["target"], ltr["text"])
@@ -187,7 +186,13 @@ def gen_cover_sheet(case: Case) -> str:
 
 
 __all__ = [
-    "gen_letters", "gen_followup_letters", "gen_bureau_letters",
-    "gen_creditor_letters", "gen_cover_sheet", "make_items_block",
-    "state_from_address", "today_str", "BUREAU_ADDRESSES",
+    "BUREAU_ADDRESSES",
+    "gen_bureau_letters",
+    "gen_cover_sheet",
+    "gen_creditor_letters",
+    "gen_followup_letters",
+    "gen_letters",
+    "make_items_block",
+    "state_from_address",
+    "today_str",
 ]

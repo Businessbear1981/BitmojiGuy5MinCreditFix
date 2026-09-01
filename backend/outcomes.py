@@ -41,13 +41,11 @@ size, so the number can never be quoted without its own uncertainty.
 from __future__ import annotations
 
 import hashlib
-import json
 import os
 import sqlite3
 import statistics
 import threading
 from datetime import datetime, timezone
-from typing import Optional
 
 import config
 
@@ -137,7 +135,7 @@ def _balance_band(amount) -> str:
     return "10k+"
 
 
-def _age_days(opened: Optional[str]) -> Optional[int]:
+def _age_days(opened: str | None) -> int | None:
     if not opened:
         return None
     for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%Y/%m/%d"):
@@ -204,7 +202,9 @@ def record_result(session_id: str, item: dict, bureau: str, outcome: str,
         try:
             started = datetime.fromisoformat(row["created_at"])
             days = (now - started).days
-        except Exception:
+        except (ValueError, TypeError):
+            # Unparseable or absent created_at: record the outcome without a
+            # day count rather than losing the outcome itself.
             days = None
 
         c.execute("""
@@ -236,7 +236,7 @@ def record_score(session_id: str, bureau: str, before: int, after: int,
 # ── Reading ─────────────────────────────────────────────────────────────────
 
 def removal_rate(category: str = "", bureau: str = "", theory: str = "",
-                 tier: Optional[int] = None) -> dict:
+                 tier: int | None = None) -> dict:
     """
     Observed deletion rate for a slice of history.
 

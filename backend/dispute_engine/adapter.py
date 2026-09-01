@@ -13,7 +13,7 @@ Two directions:
 from __future__ import annotations
 
 import re
-from typing import Any, Optional
+from typing import Any
 
 from .categories import DISPUTE_CATEGORIES, affirmations_for, guess_category
 
@@ -41,7 +41,7 @@ def bureau_key(display_name: str) -> str:
     return BUREAU_KEYS.get(display_name, (display_name or "").strip().lower())
 
 
-def normalize_bureau(target: str) -> Optional[str]:
+def normalize_bureau(target: str) -> str | None:
     """Map a free-text target onto a canonical bureau name, or None."""
     key = (target or "").strip().lower()
     if not key:
@@ -95,7 +95,7 @@ def to_parsed_data(
     items: list[dict],
     client: dict,
     bureau: str = "",
-    data_quality_flags: Optional[list[str]] = None,
+    data_quality_flags: list[str] | None = None,
 ) -> dict:
     """
     Build the engine's `parsed_data` from case items.
@@ -156,7 +156,7 @@ def to_parsed_data(
 
 def to_affirmations(
     items: list[dict],
-    consumer_input: Optional[dict[str, dict]] = None,
+    consumer_input: dict[str, dict] | None = None,
 ) -> dict[str, dict]:
     """
     Build `consumer_affirmations` keyed by item_id.

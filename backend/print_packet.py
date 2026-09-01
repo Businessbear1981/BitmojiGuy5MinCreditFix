@@ -24,7 +24,6 @@ import hashlib
 import hmac
 import html
 import time
-from typing import Optional
 
 import config
 

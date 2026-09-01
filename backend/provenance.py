@@ -31,7 +31,6 @@ import os
 import sqlite3
 import threading
 from datetime import datetime, timezone
-from typing import Optional
 
 import config
 
@@ -39,7 +38,7 @@ import config
 # Three invisible codepoints give us base-3; we use two for a clean base-2.
 # ZWSP and ZWNJ render as nothing in every mail client, browser and word
 # processor, and survive a copy-paste into a plain text field.
-_ZERO = "​"   # ZERO WIDTH SPACE          -> bit 0
+_ZERO = "\u200b"   # ZERO WIDTH SPACE          -> bit 0
 _ONE = "‌"    # ZERO WIDTH NON-JOINER     -> bit 1
 _MARK = "‍"   # ZERO WIDTH JOINER         -> start/end sentinel
 
@@ -48,7 +47,7 @@ _ZW_ALL = (_ZERO, _ONE, _MARK)
 FINGERPRINT_BITS = 48  # 6 bytes — enough to identify a case, short enough to hide
 
 
-def fingerprint(session_id: str, issued_at: Optional[datetime] = None) -> str:
+def fingerprint(session_id: str, issued_at: datetime | None = None) -> str:
     """
     Short, non-reversible case fingerprint.
 
@@ -102,7 +101,7 @@ def embed_invisible(text: str, fp: str) -> str:
     return "".join(out)
 
 
-def extract_invisible(text: str) -> Optional[str]:
+def extract_invisible(text: str) -> str | None:
     """
     Recover a fingerprint from a letter found in the wild.
 
@@ -147,7 +146,7 @@ software. Not legal advice. Retain this reference for your records.
 
 
 def provenance_footer(session_id: str, tier: int = 1, tier_name: str = "",
-                      issued_at: Optional[datetime] = None) -> str:
+                      issued_at: datetime | None = None) -> str:
     """The visible block that goes at the foot of every letter."""
     issued_at = issued_at or datetime.now(timezone.utc)
     return _FOOTER.format(
@@ -158,7 +157,7 @@ def provenance_footer(session_id: str, tier: int = 1, tier_name: str = "",
     )
 
 
-def stamp_letter(letter: dict, session_id: str, issued_at: Optional[datetime] = None) -> dict:
+def stamp_letter(letter: dict, session_id: str, issued_at: datetime | None = None) -> dict:
     """
     Apply both marks to one letter: visible footer, invisible fingerprint.
 
@@ -269,7 +268,7 @@ def verify_chain() -> dict:
     return {"ok": True, "entries": len(rows), "broken_at": None}
 
 
-def history(session_id: Optional[str] = None, limit: int = 100) -> list[dict]:
+def history(session_id: str | None = None, limit: int = 100) -> list[dict]:
     """Read the trail, newest first. Scoped to one case when given."""
     sql = "SELECT seq, ts, session_id, event, detail, hash FROM audit_chain"
     args: tuple = ()
@@ -283,7 +282,7 @@ def history(session_id: Optional[str] = None, limit: int = 100) -> list[dict]:
         return [dict(r) for r in c.execute(sql, args).fetchall()]
 
 
-def identify(letter_text: str, candidates: list[tuple[str, datetime]]) -> Optional[str]:
+def identify(letter_text: str, candidates: list[tuple[str, datetime]]) -> str | None:
     """
     Given a letter found in the wild and a list of (session_id, issued_at)
     candidates, return the session it was generated for.

@@ -12,7 +12,6 @@ Queue occupancy is derived from the database (open unpaid cases per region)
 so it is correct across multiple workers and restarts.
 """
 import re
-from typing import Optional
 
 from sqlalchemy.orm import Session
 
@@ -32,7 +31,7 @@ def _active_count(db: Session, region: str) -> int:
     return db.query(CaseRecord).filter_by(region=region, paid=False).count()
 
 
-def extract_zip(address: str) -> Optional[str]:
+def extract_zip(address: str) -> str | None:
     """Extract 5-digit zip from an address.
 
     Prefer a ZIP at the end of the string (US mailing format). Falling back
@@ -47,7 +46,7 @@ def extract_zip(address: str) -> Optional[str]:
     return matches[-1] if matches else None
 
 
-def get_region(zip_code: str) -> Optional[str]:
+def get_region(zip_code: str) -> str | None:
     """Map a zip code to a beta region. Returns state code or None."""
     try:
         prefix = int(zip_code[:3])
@@ -59,7 +58,7 @@ def get_region(zip_code: str) -> Optional[str]:
     return None
 
 
-def check_beta_eligibility(address: str, db: Optional[Session] = None) -> dict:
+def check_beta_eligibility(address: str, db: Session | None = None) -> dict:
     """
     Check if an address is in a beta-eligible region.
     Returns eligibility status and region info. Pass a db session to also

@@ -59,7 +59,6 @@ owes anyone $1,000. The copy in `MILESTONES` is written to that line.
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Optional
 
 from dispute_engine.tiers import TIER_LADDER
 
@@ -181,7 +180,7 @@ MILESTONES = {
 }
 
 
-def _delivery_date(mail_tracking: Optional[list]) -> Optional[datetime]:
+def _delivery_date(mail_tracking: list | None) -> datetime | None:
     """
     The latest confirmed delivery across the mailed letters, if any.
 
@@ -240,7 +239,7 @@ def clock_start(record) -> dict:
     }
 
 
-def milestones_for(record, now: Optional[datetime] = None) -> dict:
+def milestones_for(record, now: datetime | None = None) -> dict:
     """
     Every milestone with its real date, keyed `day_30` / `day_60` / `day_90`.
 
@@ -281,7 +280,7 @@ def milestones_for(record, now: Optional[datetime] = None) -> dict:
     return out
 
 
-def due_tier(record, now: Optional[datetime] = None) -> int:
+def due_tier(record, now: datetime | None = None) -> int:
     """
     The highest tier whose date has passed. 1 when nothing is due yet.
 
@@ -300,7 +299,7 @@ def due_tier(record, now: Optional[datetime] = None) -> int:
     return due
 
 
-def can_generate(record, day: int, now: Optional[datetime] = None) -> tuple[bool, str, int]:
+def can_generate(record, day: int, now: datetime | None = None) -> tuple[bool, str, int]:
     """
     May the consumer pull the round for this milestone yet? (ok, reason, tier)
 
@@ -325,7 +324,7 @@ def can_generate(record, day: int, now: Optional[datetime] = None) -> tuple[bool
 
 # ── Retention ───────────────────────────────────────────────────────────────
 
-def retention_until(record, now: Optional[datetime] = None) -> datetime:
+def retention_until(record, now: datetime | None = None) -> datetime:
     """How long a subscribed case must survive: last milestone plus a tail."""
     now = now or datetime.utcnow()
     start = clock_start(record)["start"] or now
@@ -353,7 +352,7 @@ def retention_notice(record=None) -> str:
 
 # ── Status payload ──────────────────────────────────────────────────────────
 
-def status_payload(record, now: Optional[datetime] = None) -> dict:
+def status_payload(record, now: datetime | None = None) -> dict:
     """
     Everything the Watcher screen renders, in one shape.
 

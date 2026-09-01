@@ -32,7 +32,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import pytest
 from fastapi.testclient import TestClient
 
-import main  # noqa: E402
+import main
 
 
 @pytest.fixture(scope="session")

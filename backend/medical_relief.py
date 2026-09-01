@@ -42,7 +42,6 @@ financial advisor. Nothing here is eligibility advice or legal advice.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 # ── Recognising medical debt on a credit report ────────────────────────────
 # Medical collections are frequently reported under the collector's name with
@@ -140,8 +139,8 @@ RELIEF_ROUTES: dict[str, dict] = {
             "confirm to the bureau either.",
         "documents_to_gather": [
             "The itemised statement, with CPT/HCPCS billing codes",
-            "Your insurer's Explanation of Benefits (EOB) for the same dates "
-            "of service",
+            ("Your insurer's Explanation of Benefits (EOB) for the same dates "
+            "of service"),
             "Any bill you already paid toward the same visit",
         ],
         "verify_at": "",
@@ -163,11 +162,11 @@ RELIEF_ROUTES: dict[str, dict] = {
             "collections. Ask about their policy on accounts already placed "
             "with a collector.",
         "documents_to_gather": [
-            "The hospital's Financial Assistance Policy and its application "
+            ("The hospital's Financial Assistance Policy and its application "
             "form — they are required to be publicly available; ask billing "
-            "or look on the hospital's own website",
-            "Proof of household income (pay stubs, tax return, benefit award "
-            "letters)",
+            "or look on the hospital's own website"),
+            ("Proof of household income (pay stubs, tax return, benefit award "
+            "letters)"),
             "Household size and any other medical costs you are carrying",
         ],
         "verify_at": "",
@@ -197,13 +196,13 @@ RELIEF_ROUTES: dict[str, dict] = {
             "— it is a debt to have withdrawn, which also removes the "
             "grounds for reporting it.",
         "documents_to_gather": [
-            "The bill, and the name and network status of every provider who "
-            "billed you for that visit",
+            ("The bill, and the name and network status of every provider who "
+            "billed you for that visit"),
             "Your insurer's EOB showing how the claim was processed",
-            "Any good-faith estimate you were given before the care, or a "
-            "note that you were given none",
-            "Any consent form you were asked to sign waiving these "
-            "protections — read it, because some care cannot be waived",
+            ("Any good-faith estimate you were given before the care, or a "
+            "note that you were given none"),
+            ("Any consent form you were asked to sign waiving these "
+            "protections — read it, because some care cannot be waived"),
         ],
         "verify_at": "https://www.cms.gov/nosurprises",
         "cost": "Free. There is a federal complaint line and a "
@@ -227,10 +226,10 @@ RELIEF_ROUTES: dict[str, dict] = {
             "being disputed.",
         "documents_to_gather": [
             "Dates of service for every bill you are carrying",
-            "Income and household documentation for those months, not for "
-            "today",
-            "The provider's billing contact, so they can rebill if coverage "
-            "is granted",
+            ("Income and household documentation for those months, not for "
+            "today"),
+            ("The provider's billing contact, so they can rebill if coverage "
+            "is granted"),
         ],
         "verify_at": "https://www.medicaid.gov/about-us/where-can-people-get-help-medicaid-chip",
         "cost": "Free to apply through your state agency.",
@@ -270,10 +269,10 @@ RELIEF_ROUTES: dict[str, dict] = {
             "It is not the same as a debt-consolidation loan or a debt "
             "settlement company — see the caution below.",
         "documents_to_gather": [
-            "The itemised bill and the final balance after any financial "
-            "assistance is applied",
-            "A written copy of the plan terms before you sign, including "
-            "whether the provider will recall the account from collections",
+            ("The itemised bill and the final balance after any financial "
+            "assistance is applied"),
+            ("A written copy of the plan terms before you sign, including "
+            "whether the provider will recall the account from collections"),
         ],
         "verify_at": "",
         "cost": "Usually free and interest-free. Get the terms in writing.",
@@ -340,7 +339,7 @@ def _furnisher(item: dict) -> str:
                       "target", default="Unknown"))
 
 
-def _money(item: dict) -> Optional[float]:
+def _money(item: dict) -> float | None:
     for k in ("amount", "balance", "current_balance"):
         v = item.get(k)
         if v in (None, ""):
@@ -352,7 +351,7 @@ def _money(item: dict) -> Optional[float]:
     return None
 
 
-def _date(item: dict, *keys) -> Optional[datetime]:
+def _date(item: dict, *keys) -> datetime | None:
     for k in keys:
         raw = str(item.get(k) or "")
         for fmt in ("%Y-%m-%d", "%m/%d/%Y"):
@@ -363,7 +362,7 @@ def _date(item: dict, *keys) -> Optional[datetime]:
     return None
 
 
-def is_medical(item: dict, consumer_marked: Optional[set] = None) -> bool:
+def is_medical(item: dict, consumer_marked: set | None = None) -> bool:
     """
     Does this tradeline look medical?
 
@@ -384,12 +383,10 @@ def is_medical(item: dict, consumer_marked: Optional[set] = None) -> bool:
         return True
     if any(m in blob for m in PROVIDER_MARKERS):
         return True
-    if any(m in blob for m in MEDICAL_COLLECTOR_MARKERS):
-        return True
-    return False
+    return any(m in blob for m in MEDICAL_COLLECTOR_MARKERS)
 
 
-def _detection_basis(item: dict, consumer_marked: Optional[set]) -> str:
+def _detection_basis(item: dict, consumer_marked: set | None) -> str:
     """Why we think this is medical — shown to the consumer so they can correct us."""
     ident = item.get("id") or item.get("item_id")
     if consumer_marked and ident in consumer_marked:
@@ -414,7 +411,7 @@ def _detection_basis(item: dict, consumer_marked: Optional[set]) -> str:
 # ── Analysis ───────────────────────────────────────────────────────────────
 
 def analyze_medical(items: list[dict],
-                    consumer_marked: Optional[list] = None) -> dict:
+                    consumer_marked: list | None = None) -> dict:
     """
     Which items look medical, and which relief routes are worth raising.
 

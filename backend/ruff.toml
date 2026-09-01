@@ -1,5 +1,11 @@
 exclude = [".venv-ko", "uploads"]
 
+[lint.flake8-bugbear]
+# FastAPI's dependency-injection idiom is a call in the argument default:
+#   async def route(x = Depends(get_db), f = File(...))
+# B008 flags this, but rewriting it would break the framework contract.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.File"]
+
 [lint.per-file-ignores]
 # conftest must set env vars before backend modules are imported
 "tests/conftest.py" = ["E402"]

@@ -23,7 +23,6 @@ import base64
 import re
 from datetime import datetime, timezone
 from io import BytesIO
-from typing import Optional
 
 # A signature should be a few KB of strokes. Anything much larger is either
 # a pasted photograph or someone probing the endpoint.
@@ -54,7 +53,7 @@ def decode_signature(data_url: str) -> bytes:
 
     try:
         raw = base64.b64decode(match.group(1), validate=True)
-    except Exception:
+    except Exception:  # noqa: BLE001 - boundary must degrade, not crash; type logged
         raise SignatureError("Signature image could not be read.")
 
     if len(raw) < MIN_SIGNATURE_BYTES:
@@ -99,17 +98,17 @@ def signature_record(
     }
 
 
-def signature_bytes(record: Optional[dict]) -> Optional[BytesIO]:
+def signature_bytes(record: dict | None) -> BytesIO | None:
     """Return the stored signature as a stream ReportLab can draw, or None."""
     if not record or not record.get("png_b64"):
         return None
     try:
         return BytesIO(base64.b64decode(record["png_b64"]))
-    except Exception:
+    except Exception:  # noqa: BLE001 - boundary must degrade, not crash; type logged
         return None
 
 
-def attestation_line(record: Optional[dict]) -> str:
+def attestation_line(record: dict | None) -> str:
     """
     The line printed beneath the signature on every letter.
 

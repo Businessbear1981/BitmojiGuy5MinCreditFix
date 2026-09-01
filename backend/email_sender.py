@@ -63,7 +63,7 @@ Your session ID is {session_id} — save this to re-download your letters anytim
             server.login(SMTP_USER, SMTP_PASS)
             server.send_message(msg)
         return True
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - boundary must degrade, not crash; type logged
         # Log the error type only — the exception could echo message content
         print(f"Email send failed: {type(e).__name__}")
         return False
@@ -125,6 +125,6 @@ your tracker to cancel; cancelling also deletes your case.
             server.login(SMTP_USER, SMTP_PASS)
             server.send_message(msg)
         return True
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - boundary must degrade, not crash; type logged
         print(f"Watcher reminder failed: {type(e).__name__}")
         return False

@@ -31,13 +31,24 @@ point on it.
 from __future__ import annotations
 
 import math
-from typing import Optional
+import sqlite3
 
 try:
     import outcomes
     HAS_OUTCOMES = True
-except Exception:  # ledger not initialised yet
+except ImportError:  # ledger module unavailable
     HAS_OUTCOMES = False
+
+_LEDGER_WARNED = False
+
+
+def _warn_ledger_unreadable(exc: sqlite3.Error) -> None:
+    """Report an unreadable outcome ledger once per process, not per score."""
+    global _LEDGER_WARNED
+    if not _LEDGER_WARNED:
+        _LEDGER_WARNED = True
+        print(f"[scoring] outcome ledger unreadable ({type(exc).__name__}); "
+              f"all probabilities are priors, not measurements")
 
 
 # ── Priors ──────────────────────────────────────────────────────────────────
@@ -98,8 +109,12 @@ def ground_probability(category: str, strength: str,
             obs = outcomes.removal_rate(category=category, bureau=bureau)
             if obs.get("confident") and obs.get("rate") is not None:
                 return float(obs["rate"]), f"measured (n={obs['n']})"
-        except Exception:
-            pass
+        except sqlite3.Error as e:
+            # The ledger is unreadable, so every number below is a prior, not a
+            # measurement. Report it once rather than degrading silently: a
+            # missing `dispute_outcomes` table means init_outcomes() was never
+            # called, and no outcome has ever been recorded.
+            _warn_ledger_unreadable(e)
 
     p = PRIORS.get((category, strength))
     if p is None:

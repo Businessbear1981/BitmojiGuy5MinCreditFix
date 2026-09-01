@@ -39,7 +39,6 @@ financial advisor. Nothing here is eligibility advice.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 # ── Who counts as a federal holder or servicer ─────────────────────────────
 # Name fragments, matched case-insensitively against the furnisher. This list
@@ -106,8 +105,8 @@ FORGIVENESS_PROGRAMS: dict[str, dict] = {
             "the Department of Education and has changed more than once.",
         "verify_at": VERIFY_AT,
         "documents_to_gather": [
-            "Employment records for every employer since you began repayment "
-            "(dates, employer name, employer tax status)",
+            ("Employment records for every employer since you began repayment "
+            "(dates, employer name, employer tax status)"),
             "Your loan servicer's full payment history",
             "Any PSLF employer-certification forms you have previously filed",
         ],
@@ -124,8 +123,8 @@ FORGIVENESS_PROGRAMS: dict[str, dict] = {
             "them, has changed repeatedly.",
         "verify_at": VERIFY_AT,
         "documents_to_gather": [
-            "Your servicer's payment history and the count of qualifying "
-            "payments they have credited to you",
+            ("Your servicer's payment history and the count of qualifying "
+            "payments they have credited to you"),
             "Records of any deferment or forbearance periods",
             "Tax returns or income documentation for the years in repayment",
         ],
@@ -144,8 +143,8 @@ FORGIVENESS_PROGRAMS: dict[str, dict] = {
         "verify_at": VERIFY_AT,
         "documents_to_gather": [
             "Employment verification from each school, with dates",
-            "Confirmation that each school appeared in the federal directory "
-            "of low-income schools for the years you taught there",
+            ("Confirmation that each school appeared in the federal directory "
+            "of low-income schools for the years you taught there"),
             "Your teaching certification records",
         ],
         "note":
@@ -161,8 +160,8 @@ FORGIVENESS_PROGRAMS: dict[str, dict] = {
             "certification.",
         "verify_at": VERIFY_AT,
         "documents_to_gather": [
-            "VA disability determination, or SSA award notice, or a "
-            "physician's certification, whichever applies to you",
+            ("VA disability determination, or SSA award notice, or a "
+            "physician's certification, whichever applies to you"),
             "Your loan list from studentaid.gov",
         ],
         "note":
@@ -177,11 +176,11 @@ FORGIVENESS_PROGRAMS: dict[str, dict] = {
             "conditions are set by the Department of Education.",
         "verify_at": VERIFY_AT,
         "documents_to_gather": [
-            "Enrollment and withdrawal dates from the school or its records "
-            "custodian",
+            ("Enrollment and withdrawal dates from the school or its records "
+            "custodian"),
             "Any notice you received about the closure",
-            "Transcripts, if you completed the program elsewhere — completing "
-            "the program elsewhere can affect this",
+            ("Transcripts, if you completed the program elsewhere — completing "
+            "the program elsewhere can affect this"),
         ],
         "note":
             "The Department maintains a list of closed schools and their "
@@ -196,9 +195,9 @@ FORGIVENESS_PROGRAMS: dict[str, dict] = {
             "times.",
         "verify_at": VERIFY_AT,
         "documents_to_gather": [
-            "Enrollment agreement, catalogue, and any advertising or "
+            ("Enrollment agreement, catalogue, and any advertising or "
             "recruiter claims about job placement, earnings, accreditation or "
-            "credit transfer",
+            "credit transfer"),
             "Emails, texts, or notes from conversations with recruiters",
             "Any state attorney general or CFPB action involving the school",
         ],
@@ -215,12 +214,12 @@ FORGIVENESS_PROGRAMS: dict[str, dict] = {
             "without authorisation.",
         "verify_at": VERIFY_AT,
         "documents_to_gather": [
-            "Your loan application and promissory note, and any signature on "
-            "them that is not yours",
-            "High-school diploma or equivalency record, if the school "
-            "certified one you do not have",
-            "A police report or FTC identity-theft report, if the loan was "
-            "taken in your name without your knowledge",
+            ("Your loan application and promissory note, and any signature on "
+            "them that is not yours"),
+            ("High-school diploma or equivalency record, if the school "
+            "certified one you do not have"),
+            ("A police report or FTC identity-theft report, if the loan was "
+            "taken in your name without your knowledge"),
         ],
         "note":
             "If the loan was taken in your name without your authorisation, "
@@ -244,7 +243,7 @@ def _first(item: dict, *keys, default=""):
     return default
 
 
-def _money(item: dict, *keys) -> Optional[float]:
+def _money(item: dict, *keys) -> float | None:
     """Read a money field that may arrive as a float, or as a string with $ and commas."""
     raw = _first(item, *keys, default=None)
     if raw is None:
@@ -260,7 +259,7 @@ def _money(item: dict, *keys) -> Optional[float]:
         return None
 
 
-def _date(item: dict, *keys) -> Optional[datetime]:
+def _date(item: dict, *keys) -> datetime | None:
     raw = _first(item, *keys, default="")
     if not raw:
         return None
@@ -434,8 +433,8 @@ def _detect_servicer_split(group: list[dict]) -> list[dict]:
         strength = "weak" if distinct_originals else "moderate"
 
         detail = [
-            f"{len(lines)} tradelines from {furnisher} all report a date opened "
-            f"of {opened}"
+            (f"{len(lines)} tradelines from {furnisher} all report a date opened "
+            f"of {opened}")
         ]
         if same_acct:
             detail.append(
@@ -532,7 +531,7 @@ def _detect_servicer_split(group: list[dict]) -> list[dict]:
     return findings
 
 
-def _detect_zero_balance_with_delinquency(item: dict) -> Optional[dict]:
+def _detect_zero_balance_with_delinquency(item: dict) -> dict | None:
     """
     A $0 balance reported alongside live delinquency markers.
 
@@ -601,7 +600,7 @@ def _detect_zero_balance_with_delinquency(item: dict) -> Optional[dict]:
     }
 
 
-def _detect_pause_period_check(item: dict) -> Optional[dict]:
+def _detect_pause_period_check(item: dict) -> dict | None:
     """
     Delinquent months that should be checked against deferment and forbearance.
 
@@ -670,7 +669,7 @@ def _detect_pause_period_check(item: dict) -> Optional[dict]:
     }
 
 
-def _detect_missing_dofd(item: dict) -> Optional[dict]:
+def _detect_missing_dofd(item: dict) -> dict | None:
     """
     A line that looks delinquent but states no date of first delinquency.
 
@@ -718,7 +717,7 @@ def _detect_missing_dofd(item: dict) -> Optional[dict]:
     }
 
 
-def _detect_possible_consolidation(group: list[dict]) -> Optional[dict]:
+def _detect_possible_consolidation(group: list[dict]) -> dict | None:
     """
     A later line from the same holder whose size is near the sum of the earlier ones.
 
@@ -898,7 +897,7 @@ def analyze_student_loans(items: list[dict]) -> dict:
     return payload
 
 
-def attach_findings(items: list[dict], analysis: Optional[dict] = None) -> list[dict]:
+def attach_findings(items: list[dict], analysis: dict | None = None) -> list[dict]:
     """
     Merge the student-loan findings onto the items themselves, in place.
 
@@ -952,7 +951,7 @@ def attach_findings(items: list[dict], analysis: Optional[dict] = None) -> list[
 
 
 def forgiveness_signals(items: list[dict],
-                        profile: Optional[dict] = None) -> list[dict]:
+                        profile: dict | None = None) -> list[dict]:
     """
     Which programs are worth the consumer *asking about*, based on the file only.
 
@@ -1038,14 +1037,14 @@ def forgiveness_signals(items: list[dict],
     # circumstances behind them are real.
     if any(_has_delinquency(it) for it in federal):
         for key, observed in (
-            ("tpd", "A federal loan on this report carries delinquency or "
-                    "default markers."),
-            ("borrower_defense", "A federal loan on this report carries "
-                                 "delinquency or default markers."),
-            ("closed_school", "A federal loan on this report carries "
-                              "delinquency or default markers."),
-            ("false_certification", "A federal loan on this report carries "
-                                    "delinquency or default markers."),
+            ("tpd", ("A federal loan on this report carries delinquency or "
+                    "default markers.")),
+            ("borrower_defense", ("A federal loan on this report carries "
+                                 "delinquency or default markers.")),
+            ("closed_school", ("A federal loan on this report carries "
+                              "delinquency or default markers.")),
+            ("false_certification", ("A federal loan on this report carries "
+                                    "delinquency or default markers.")),
         ):
             add(key, observed,
                 "This is listed because delinquency is on the file, not "
@@ -1078,8 +1077,8 @@ def summary_lines(analysis: dict) -> list[str]:
     if not analysis.get("is_student_loan_file"):
         return []
     out = [
-        f"{analysis['loan_count']} student loan tradelines "
-        f"({analysis['federal_count']} from a federal holder or servicer)"
+        (f"{analysis['loan_count']} student loan tradelines "
+        f"({analysis['federal_count']} from a federal holder or servicer)")
     ]
     out.extend(f"{f['code']}: {f['summary']}" for f in analysis.get("findings", []))
     return out

@@ -8,7 +8,6 @@ Rules:
 - State law can be added incrementally per session
 """
 
-from datetime import date
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
