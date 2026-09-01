@@ -91,6 +91,26 @@ def _money(value: Any) -> str:
     return cleaned or ""
 
 
+def _categories_for(item: dict, category: str) -> list[dict]:
+    """
+    The grounds the analyst will argue for one item.
+
+    Prefer what the parser scored. Where it scored nothing, reconstruct a
+    single moderate ground from the item's own category so the item still
+    reaches a violation theory instead of the fallback section.
+    """
+    scored = item.get("categories") or []
+    if scored:
+        return [dict(c) for c in scored]
+    if not category:
+        return []
+    return [{
+        "category": category,
+        "strength": "moderate",
+        "evidence": item.get("reason", ""),
+    }]
+
+
 def to_parsed_data(
     items: list[dict],
     client: dict,
@@ -129,9 +149,18 @@ def to_parsed_data(
             # this field here silently collapsed a three-ground item into a
             # one-theory letter — the field is the whole reason the analyst can
             # stop re-deriving what the parser already read off the file.
-            "categories": [dict(c) for c in (item.get("categories") or [])],
+            #
+            # An item that arrives without the list still has to produce a
+            # letter. The consumer can confirm a dispute the parser never
+            # scored (or a client can post one directly), and with an empty
+            # list the analyst finds no theory, every item falls through to
+            # the "additional disputed items" section, and what gets mailed is
+            # an address block with no statutory basis and no demand. So fall
+            # back to the item's own category as a single ground, which is the
+            # same reconstruction `scoring.score_item` already makes.
+            "categories": _categories_for(item, category),
             "category_count": item.get("category_count")
-                              or len(item.get("categories") or []),
+                              or len(_categories_for(item, category)),
             # The parser's own falloff verdict, carried so the analyst does not
             # have to recompute the seven-year window from a re-parsed date.
             "falloff_status": item.get("falloff_status") or "",

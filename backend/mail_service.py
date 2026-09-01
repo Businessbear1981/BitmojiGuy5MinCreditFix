@@ -19,7 +19,7 @@ Docs: https://docs.lob.com/
 import hashlib
 import hmac
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 import httpx
 
@@ -126,7 +126,7 @@ def send_letter(
             "tracking_number": result.get("tracking_number"),
             "expected_delivery": result.get("expected_delivery_date"),
             "status": "mailed",
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
         }
     except Exception as e:  # noqa: BLE001 - boundary must degrade, not crash; type logged
         print(f"Lob API error: {type(e).__name__}")

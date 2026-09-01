@@ -10,7 +10,7 @@ Rules:
 - Honest position framing throughout
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .legal_library import (
     get_escalation_paths,
@@ -357,7 +357,7 @@ def generate_bureau_letter(
     if not bureau:
         raise ValueError(f'Unknown bureau: {bureau_key}')
 
-    date_str = datetime.now().strftime('%B %d, %Y')
+    date_str = datetime.now(timezone.utc).strftime('%B %d, %Y')
 
     # Enrich items with full account data from parsed_data
     if parsed_data:
@@ -439,7 +439,7 @@ def generate_collector_letter(
     collector_address: str,
 ) -> dict:
     """Generate a collector letter (FDCPA track) — parallel structure."""
-    date_str = datetime.now().strftime('%B %d, %Y')
+    date_str = datetime.now(timezone.utc).strftime('%B %d, %Y')
 
     # Filter to validation_failure theory only
     val_blocks = [b for b in analyst_report['violation_theory_blocks']

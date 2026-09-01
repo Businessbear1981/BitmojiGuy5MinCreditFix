@@ -148,7 +148,7 @@ def _demo_tracking(letters: list) -> list:
         results.append({
             "target": ltr.get("target", "Bureau"),
             "tracking_number": f"9400111899{uuid.uuid4().hex[:12].upper()}",
-            "expected_delivery": (datetime.utcnow() + timedelta(days=5)).strftime("%Y-%m-%d"),
+            "expected_delivery": (datetime.now(timezone.utc) + timedelta(days=5)).strftime("%Y-%m-%d"),
             "status": "demo — would mail via USPS",
         })
     return results
@@ -175,8 +175,8 @@ class CreateCaseRequest(BaseModel):
     @classmethod
     def validate_dob(cls, v):
         try:
-            dt = datetime.strptime(v, "%Y-%m-%d")
-            if dt.year < 1920 or dt > datetime.now():
+            dt = datetime.strptime(v, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            if dt.year < 1920 or dt > datetime.now(timezone.utc):
                 raise ValueError
         except ValueError:
             raise ValueError("DOB must be a valid date in YYYY-MM-DD format")
@@ -487,7 +487,7 @@ async def acknowledge(session_id: str, req: AcknowledgeRequest, request: Request
     ack = acknowledgement_record(req.acknowledgements, get_remote_address(request))
 
     record_row.acknowledgements = ack
-    record_row.acknowledged_at = datetime.utcnow()
+    record_row.acknowledged_at = datetime.now(timezone.utc)
     db.commit()
 
     provenance.record(session_id, "acknowledgements_given",
@@ -518,7 +518,7 @@ async def sign_letters(session_id: str, req: SignatureRequest, request: Request,
         raise HTTPException(400, str(e))
 
     record.signature = rec
-    record.signed_at = datetime.utcnow()
+    record.signed_at = datetime.now(timezone.utc)
     db.commit()
 
     provenance.record(session_id, "letters_signed",
@@ -565,7 +565,7 @@ async def generate_letters(session_id: str, request: Request, db: Session = Depe
     # the ladder advances on the elapsed days since dispatch.
     tier = 1
     if record.mail_sent and record.mail_dispatched_at:
-        elapsed = (datetime.utcnow() - record.mail_dispatched_at).days
+        elapsed = (datetime.now(timezone.utc) - record.mail_dispatched_at).days
         tier = tier_for_day(elapsed)
 
     prior_rounds = {
@@ -656,7 +656,7 @@ async def send_mail(session_id: str, request: Request, db: Session = Depends(get
     if results:
         record.mail_tracking = results
         record.mail_sent = True
-        record.mail_dispatched_at = record.mail_dispatched_at or datetime.utcnow()
+        record.mail_dispatched_at = record.mail_dispatched_at or datetime.now(timezone.utc)
         record.mail_tier = max(record.mail_tier or 0, tier)
         db.commit()
 
@@ -765,7 +765,7 @@ async def manual_pay(session_id: str, body: ManualPayRequest, request: Request, 
         record.manual_pay_code = f"CF-{uuid.uuid4().hex[:6].upper()}"
     record.manual_pay_method = body.method
     record.manual_pay_handle = body.payer_handle or None
-    record.manual_pay_requested_at = datetime.utcnow()
+    record.manual_pay_requested_at = datetime.now(timezone.utc)
     db.commit()
 
     provenance.record(session_id, "payment_requested",
@@ -835,7 +835,7 @@ def _post_payment(record: CaseRecord, db: Session):
             record.mail_sent = True
 
         if record.mail_sent:
-            record.mail_dispatched_at = record.mail_dispatched_at or datetime.utcnow()
+            record.mail_dispatched_at = record.mail_dispatched_at or datetime.now(timezone.utc)
             record.mail_tier = max(record.mail_tier or 0, tier)
 
         db.commit()
@@ -987,7 +987,7 @@ async def watcher_subscribe(
         )
 
     record.watcher_subscribed = True
-    record.watcher_subscribed_at = datetime.utcnow()
+    record.watcher_subscribed_at = datetime.now(timezone.utc)
     record.watcher_notify_method = body.notify_method
     record.watcher_notify_handle = body.notify_handle.strip()
     record.watcher_retain_until = watcher.retention_until(record)
@@ -1152,7 +1152,7 @@ async def admin_stats(request: Request, db: Session = Depends(get_db)):
     total = db.query(CaseRecord).count()
     paid = db.query(CaseRecord).filter_by(paid=True).count()
     today_count = db.query(CaseRecord).filter(
-        CaseRecord.created_at >= datetime.utcnow().replace(hour=0, minute=0, second=0)
+        CaseRecord.created_at >= datetime.now(timezone.utc).replace(hour=0, minute=0, second=0)
     ).count()
     pending_manual = db.query(CaseRecord).filter(
         CaseRecord.manual_pay_requested_at.isnot(None), CaseRecord.paid.is_(False)
@@ -1256,7 +1256,7 @@ async def admin_release_payment(session_id: str, request: Request, db: Session =
     if record.paid:
         return {"ok": True, "already_paid": True, "session_id": session_id}
     record.paid = True
-    record.manual_pay_released_at = datetime.utcnow()
+    record.manual_pay_released_at = datetime.now(timezone.utc)
     db.commit()
 
     provenance.record(session_id, "payment_released",

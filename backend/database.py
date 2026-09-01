@@ -1,10 +1,59 @@
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import Boolean, Column, DateTime, Integer, String, create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.types import TypeDecorator
 
 from crypto_fields import EncryptedJSON, EncryptedString
+
+
+def utcnow() -> datetime:
+    """The only clock this application reads. Always timezone-aware UTC."""
+    return datetime.now(timezone.utc)
+
+
+class UtcDateTime(TypeDecorator):
+    """
+    A DateTime that is timezone-aware UTC everywhere in Python, and stored on
+    disk in exactly the format the existing rows already use.
+
+    Two databases disagree about timezones: SQLite has no timezone type and
+    hands back naive values, while Postgres `timestamptz` hands back aware
+    ones. Left alone, that difference means a comparison which passes in dev
+    (SQLite, naive both sides) raises `TypeError: can't compare offset-naive
+    and offset-aware datetimes` in production — and the first place it would
+    bite is the 24-hour purge loop, which is the ADR-0002 guarantee.
+
+    So the conversion happens here, once, instead of at every call site:
+
+      * on write  — an aware value is converted to UTC and the tzinfo dropped,
+        so what lands on disk is naive UTC, byte-identical to every row
+        written before this change. No migration, no DDL change, no rewrite
+        of existing data.
+      * on read   — a naive value is stamped as UTC.
+
+    Naive values written by any remaining caller are assumed to be UTC, which
+    is what the codebase has always meant by a naive timestamp. Application
+    code above this layer can now assume every timestamp is aware.
+    """
+
+    impl = DateTime
+    cache_ok = True
+
+    def process_bind_param(self, value: datetime | None, dialect: object) -> datetime | None:
+        if value is None:
+            return None
+        if value.tzinfo is not None:
+            value = value.astimezone(timezone.utc)
+        return value.replace(tzinfo=None)
+
+    def process_result_value(self, value: datetime | None, dialect: object) -> datetime | None:
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./creditfix.db")
 
@@ -31,7 +80,7 @@ class CaseRecord(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     session_id = Column(String(24), unique=True, index=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    created_at = Column(UtcDateTime, default=utcnow, index=True)
 
     # Client PII — encrypted at rest
     name = Column(EncryptedString, nullable=False)
@@ -59,15 +108,15 @@ class CaseRecord(Base):
     # The customer's own cashtag / Chime handle, so the admin can match the
     # incoming payment to the case without decoding a memo field.
     manual_pay_handle = Column(EncryptedString, nullable=True)
-    manual_pay_requested_at = Column(DateTime, nullable=True)
-    manual_pay_released_at = Column(DateTime, nullable=True)
+    manual_pay_requested_at = Column(UtcDateTime, nullable=True)
+    manual_pay_released_at = Column(UtcDateTime, nullable=True)
     email_sent = Column(Boolean, default=False)
     mail_sent = Column(Boolean, default=False)
     mail_tracking = Column(EncryptedJSON, default=list)
     # When round 1 actually went into the mail. The escalation ladder and the
     # Watcher both measure from here, not from case creation — a case can sit
     # unpaid for a week before anything is sent.
-    mail_dispatched_at = Column(DateTime, nullable=True)
+    mail_dispatched_at = Column(UtcDateTime, nullable=True)
     # Highest tier mailed so far, so a re-run cannot silently repeat a round.
     mail_tier = Column(Integer, default=0)
 
@@ -75,23 +124,23 @@ class CaseRecord(Base):
     cypher_key_enc = Column(EncryptedString, nullable=True)
 
     # Consent audit: timestamp only, no PII
-    terms_accepted_at = Column(DateTime, nullable=True)
+    terms_accepted_at = Column(UtcDateTime, nullable=True)
     # Disclosure acknowledgements — which statements were affirmed, the version
     # of the text shown, and when. No PII beyond a hashed IP.
     acknowledgements = Column(EncryptedJSON, nullable=True)
-    acknowledged_at = Column(DateTime, nullable=True)
+    acknowledged_at = Column(UtcDateTime, nullable=True)
     # The consumer's e-signature: the PNG mark plus the intent evidence that
     # makes it meaningful under E-SIGN. Encrypted, purged with the case.
     signature = Column(EncryptedJSON, nullable=True)
-    signed_at = Column(DateTime, nullable=True)
+    signed_at = Column(UtcDateTime, nullable=True)
 
     # ── The Watcher: 30/60/90-day tracking ──────────────────────────────
     # `watcher_retain_until` is the only thing that exempts a case from the
     # 24-hour purge, and it is only ever set by a consumer subscribing. See
     # watcher.retention_notice() for the sentence they have to read first.
     watcher_subscribed = Column(Boolean, default=False)
-    watcher_subscribed_at = Column(DateTime, nullable=True)
-    watcher_retain_until = Column(DateTime, nullable=True, index=True)
+    watcher_subscribed_at = Column(UtcDateTime, nullable=True)
+    watcher_retain_until = Column(UtcDateTime, nullable=True, index=True)
     watcher_notify_method = Column(String(20), nullable=True)
     # A contact handle is PII and is encrypted like every other identifier.
     watcher_notify_handle = Column(EncryptedString, nullable=True)

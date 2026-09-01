@@ -4,7 +4,7 @@ Auto-cleanup: hard-delete all session data older than SESSION_TTL_HOURS
 """
 import asyncio
 import shutil
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from config import SESSION_TTL_HOURS
@@ -38,7 +38,7 @@ def purge_expired_sessions() -> int:
     passed is purged like any other, whether or not it is still marked
     subscribed.
     """
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     cutoff = now - timedelta(hours=SESSION_TTL_HOURS)
     db = SessionLocal()
 

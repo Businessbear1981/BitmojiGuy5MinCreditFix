@@ -27,7 +27,7 @@ Equifax, which is what we ask consumers to pull, this is the primary path.
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 
 # ── Account-block boundaries ────────────────────────────────────────────────
 # Equifax opens each tradeline with an indented "NAME - Open|Closed" line.
@@ -71,7 +71,8 @@ def _date(raw: str) -> str:
         return ""
     mm, dd, yyyy = m.groups()
     try:
-        return datetime(int(yyyy), int(mm), int(dd)).strftime("%Y-%m-%d")
+        return datetime(int(yyyy), int(mm), int(dd),
+                        tzinfo=timezone.utc).strftime("%Y-%m-%d")
     except ValueError:
         return ""
 
@@ -231,7 +232,7 @@ def _falloff(dofd: str, category: str) -> dict:
 
     years = _FALLOFF_YEARS.get(category, 7)
     try:
-        start = datetime.strptime(dofd, "%Y-%m-%d")
+        start = datetime.strptime(dofd, "%Y-%m-%d").replace(tzinfo=timezone.utc)
     except ValueError:
         return {"date": "", "days": None, "status": "unknown"}
 
@@ -241,7 +242,7 @@ def _falloff(dofd: str, category: str) -> dict:
     except ValueError:  # 29 Feb
         off = start.replace(year=start.year + years, day=28)
 
-    days = (off - datetime.now()).days
+    days = (off - datetime.now(timezone.utc)).days
     if days <= 0:
         status = "expired"          # already past the window — should be gone
     elif days <= 90:

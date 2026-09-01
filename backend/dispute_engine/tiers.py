@@ -21,7 +21,7 @@ rewrites the framing, without rebuilding the underlying analysis.
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .legal_library import get_escalation_paths, get_state_law, get_theory
 
@@ -364,5 +364,5 @@ def apply_tier(
     out["tier_name"] = spec["name"]
     out["postage"] = postage_for_tier(tier)
     out["subject"] = f"{_TIER_SUBJECTS[tier]} — {out.get('recipient_name', '')}".strip(" —")
-    out["escalated_at"] = datetime.utcnow().isoformat()
+    out["escalated_at"] = datetime.now(timezone.utc).isoformat()
     return out

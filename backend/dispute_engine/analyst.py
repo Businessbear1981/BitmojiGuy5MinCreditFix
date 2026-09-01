@@ -42,7 +42,7 @@ identity_theft_documented is never inferred from a category. It carries a
 an explicit affirmation no matter what the file looks like.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from .legal_library import VIOLATION_THEORIES, get_state_law
 
@@ -261,7 +261,10 @@ def _parse_date(date_str):
         return None
     for fmt in ('%m/%d/%Y', '%m/%d/%y', '%m/%Y', '%m/%y', '%Y-%m-%d', '%B %Y', '%b %Y'):
         try:
-            return datetime.strptime(date_str.strip(), fmt)
+            # Credit-report dates carry no zone; treat them as UTC so they can
+            # be compared with the aware clock the rest of the engine uses.
+            return datetime.strptime(date_str.strip(), fmt).replace(
+                tzinfo=timezone.utc)
         except (ValueError, TypeError):
             continue
     return None
@@ -285,7 +288,7 @@ def _days_until_falloff(account):
     if not dofd:
         return None
     falloff = dofd + timedelta(days=7 * 365.25)
-    remaining = (falloff - datetime.now()).days
+    remaining = (falloff - datetime.now(timezone.utc)).days
     return remaining
 
 

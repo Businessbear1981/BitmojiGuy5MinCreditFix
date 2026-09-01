@@ -6,7 +6,7 @@ import hashlib
 import hmac
 import json
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import text
 
@@ -95,11 +95,57 @@ def test_purge_deletes_expired_sessions(client, case_session):
     db = SessionLocal()
     try:
         record = db.query(CaseRecord).filter_by(session_id=case_session).first()
-        record.created_at = datetime.utcnow() - timedelta(hours=25)
+        record.created_at = datetime.now(timezone.utc) - timedelta(hours=25)
         db.commit()
     finally:
         db.close()
 
+    assert purge_expired_sessions() >= 1
+
+    db = SessionLocal()
+    try:
+        assert db.query(CaseRecord).filter_by(session_id=case_session).first() is None
+    finally:
+        db.close()
+
+
+def test_watcher_retention_defers_then_allows_purge(client, case_session):
+    """
+    The retain_until branch of the purge loop, both ways.
+
+    This is the one comparison in the codebase where an aware/naive mismatch
+    would be silent in dev and fatal in production: `watcher_retain_until` is
+    read back from the database and compared against the clock. The plain
+    purge test never reaches it, because a null retain_until short-circuits
+    the `and`. This one sets the field, so the comparison actually executes.
+    """
+    def _set(created_hours_ago: int, retain_delta: timedelta) -> None:
+        db = SessionLocal()
+        try:
+            record = db.query(CaseRecord).filter_by(session_id=case_session).first()
+            record.created_at = datetime.now(timezone.utc) - timedelta(hours=created_hours_ago)
+            record.watcher_subscribed = True
+            record.watcher_retain_until = datetime.now(timezone.utc) + retain_delta
+            db.commit()
+        finally:
+            db.close()
+
+    # Expired by age, but retained: the case must survive.
+    _set(created_hours_ago=25, retain_delta=timedelta(days=30))
+    purge_expired_sessions()
+
+    db = SessionLocal()
+    try:
+        held = db.query(CaseRecord).filter_by(session_id=case_session).first()
+        assert held is not None, "a retained case was purged before its retain_until"
+        # And what comes back out of the database is aware, on any backend.
+        assert held.created_at.tzinfo is not None
+        assert held.watcher_retain_until.tzinfo is not None
+    finally:
+        db.close()
+
+    # Retention now lapsed: the case is collected like any other.
+    _set(created_hours_ago=25, retain_delta=timedelta(days=-1))
     assert purge_expired_sessions() >= 1
 
     db = SessionLocal()

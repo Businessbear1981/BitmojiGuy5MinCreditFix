@@ -140,8 +140,8 @@ def _age_days(opened: str | None) -> int | None:
         return None
     for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%Y/%m/%d"):
         try:
-            dt = datetime.strptime(opened[:10], fmt)
-            return (datetime.now() - dt).days
+            dt = datetime.strptime(opened[:10], fmt).replace(tzinfo=timezone.utc)
+            return (datetime.now(timezone.utc) - dt).days
         except ValueError:
             continue
     return None

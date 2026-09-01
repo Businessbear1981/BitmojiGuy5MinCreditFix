@@ -12,7 +12,7 @@ only in the encrypted `letters` column of the case record (ADR-0002).
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 
 from dispute_engine import generate_case_letters, tier_for_day
 
@@ -24,7 +24,7 @@ _STATE_RE = re.compile(r"\b([A-Z]{2})\b(?=[,\s]+\d{5}(?:-\d{4})?\s*$)")
 
 
 def today_str() -> str:
-    return datetime.now().strftime("%Y-%m-%d")
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
 
 def state_from_address(address: str) -> str:

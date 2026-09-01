@@ -41,7 +41,7 @@ financial advisor. Nothing here is eligibility advice or legal advice.
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 # ── Recognising medical debt on a credit report ────────────────────────────
 # Medical collections are frequently reported under the collector's name with
@@ -356,7 +356,8 @@ def _date(item: dict, *keys) -> datetime | None:
         raw = str(item.get(k) or "")
         for fmt in ("%Y-%m-%d", "%m/%d/%Y"):
             try:
-                return datetime.strptime(raw[:10], fmt)
+                return datetime.strptime(raw[:10], fmt).replace(
+                    tzinfo=timezone.utc)
             except ValueError:
                 continue
     return None
@@ -491,7 +492,7 @@ def analyze_medical(items: list[dict],
                   if (d := _date(it, "opened", "date_opened")) is not None),
                  default=None)
     if newest is not None:
-        months = (datetime.now() - newest).days / 30.44
+        months = (datetime.now(timezone.utc) - newest).days / 30.44
         if months <= 36:
             when = newest.strftime("%Y-%m-%d")
             routes.append(route(

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from io import BytesIO
 
 from reportlab.lib.enums import TA_CENTER
@@ -85,7 +85,7 @@ def build_letter_pdf(session_id: str, client: dict, letters: list,
     story.append(Paragraph(f"Phone: {_esc(client['phone'])} | Email: {_esc(client['email'])}", styles["CoverInfo"]))
     story.append(Paragraph(f"DOB: {_esc(client['dob'])} | SSN last 4: {_esc(client['ssn_last4'])}", styles["CoverInfo"]))
     story.append(Spacer(1, 0.3 * inch))
-    story.append(Paragraph(f"Generated: {datetime.utcnow().strftime('%B %d, %Y')}", styles["CoverInfo"]))
+    story.append(Paragraph(f"Generated: {datetime.now(timezone.utc).strftime('%B %d, %Y')}", styles["CoverInfo"]))
     story.append(Paragraph(f"Letters included: {len(letters)}", styles["CoverInfo"]))
     story.append(Spacer(1, 1 * inch))
     if signature_record:

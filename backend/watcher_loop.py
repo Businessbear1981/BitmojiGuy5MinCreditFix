@@ -31,7 +31,7 @@ marked sent.
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 
 import config
 import watcher
@@ -55,7 +55,7 @@ def _log(record, db, day: int, method: str, delivered: bool, note: str = "") -> 
     entries.append({
         "day": day,
         "method": method,
-        "sent_at": datetime.utcnow().isoformat(timespec="seconds"),
+        "sent_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "delivered": delivered,
         "note": note,
     })

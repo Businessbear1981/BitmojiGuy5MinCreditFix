@@ -22,11 +22,17 @@ is the only function the application layer needs.
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from . import adapter, tiers
 from .analyst import analyze
-from .categories import DISPUTE_CATEGORIES, citations_for, get_category
+from .categories import (
+    DISPUTE_CATEGORIES,
+    FCRA_CITATIONS,
+    citations_for,
+    get_category,
+    guess_category,
+)
 from .letter_generator import (
     BUREAU_ADDRESSES,
     generate_bureau_letter,
@@ -247,7 +253,8 @@ def generate_case_letters(
             )
         else:
             # No theory fired anywhere — build the shell and let 4B carry it.
-            engine_letter = _shell_letter(bureau, consumer_name, consumer_address, report)
+            engine_letter = _shell_letter(bureau, consumer_name, consumer_address, report,
+                                          items=targeted)
 
         engine_letter["body"] = _splice_category_section(
             engine_letter["body"], _category_section(uncovered)
@@ -292,7 +299,7 @@ def generate_case_letters(
             )
         else:
             engine_letter = _shell_letter(furnisher, consumer_name, consumer_address, report,
-                                          is_bureau=False)
+                                          is_bureau=False, items=group)
 
         engine_letter["body"] = _splice_category_section(
             engine_letter["body"], _category_section(uncovered)
@@ -312,21 +319,67 @@ def generate_case_letters(
     return letters
 
 
+# The provisions that apply to a dispute regardless of which theory fired,
+# by recipient. A bureau owes reinvestigation and maximum possible accuracy;
+# a furnisher owes § 623 accuracy duties. These are the floor, not the
+# argument — a letter citing only these is still a valid dispute.
+_BASELINE_SECTIONS = {
+    True: ("611", "607b"),
+    False: ("623", "607b"),
+}
+
+
+def _shell_statutory_basis(items: list[dict], is_bureau: bool) -> str:
+    """
+    Section 2 for a letter that matched no violation theory.
+
+    `letter_generator._build_section_2_statutory_basis` derives its statutes
+    from the theories that fired, so with none it emits a heading over an
+    empty list. A dispute letter with no statutory basis is not a dispute
+    letter — a furnisher has no way to know what duty is being invoked. So
+    build the section from the recipient's baseline obligations plus whatever
+    each disputed item's own category cites.
+    """
+    cites: list[str] = [
+        FCRA_CITATIONS[s] for s in _BASELINE_SECTIONS[is_bureau] if s in FCRA_CITATIONS
+    ]
+    for item in items or []:
+        category = (item.get("bucket") or item.get("category")
+                    or guess_category(item.get("reason", "")))
+        if category:
+            cites.extend(citations_for(category))
+
+    seen: set[str] = set()
+    lines = ["SECTION 2 — STATUTORY BASIS FOR THIS DISPUTE", ""]
+    lines.append("This dispute is brought under the following provisions of federal law:")
+    lines.append("")
+    for cite in cites:
+        if cite in seen:
+            continue
+        seen.add(cite)
+        lines.append(f"- {cite}")
+    lines.append("")
+    return "\n".join(lines)
+
+
 def _shell_letter(
     target: str,
     consumer_name: str,
     consumer_address: str,
     report: dict,
     is_bureau: bool = True,
+    items: list[dict] | None = None,
 ) -> dict:
     """
     Minimal letter frame for the case where no violation theory matched.
 
     The category section still has to be delivered on letterhead with a
     salutation and a signature, so build the frame here rather than skipping
-    the item entirely.
+    the item entirely. "Minimal" means no theory argument — it does not mean
+    no statutory basis: this letter still gets mailed, and it has to say
+    under what law it is brought.
     """
-    date_str = datetime.now().strftime("%B %d, %Y")
+    date_str = datetime.now(timezone.utc).strftime("%B %d, %Y")
     recipient = BUREAU_ADDRESSES.get(adapter.bureau_key(target), {})
     recipient_name = recipient.get("name", target)
     recipient_address = recipient.get("address", "")
@@ -350,6 +403,7 @@ def _shell_letter(
         "",
         "=" * 60,
         "",
+        _shell_statutory_basis(items or [], is_bureau),
     ]
 
     return {

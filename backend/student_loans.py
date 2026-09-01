@@ -38,7 +38,7 @@ financial advisor. Nothing here is eligibility advice.
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 # ── Who counts as a federal holder or servicer ─────────────────────────────
 # Name fragments, matched case-insensitively against the furnisher. This list
@@ -265,7 +265,8 @@ def _date(item: dict, *keys) -> datetime | None:
         return None
     for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%Y/%m/%d"):
         try:
-            return datetime.strptime(str(raw)[:10], fmt)
+            return datetime.strptime(str(raw)[:10], fmt).replace(
+                tzinfo=timezone.utc)
         except ValueError:
             continue
     return None
@@ -487,8 +488,8 @@ def _detect_servicer_split(group: list[dict]) -> list[dict]:
         ((d, lines) for d, lines in by_date.items() if len(lines) == 1),
         key=lambda kv: kv[0])
     for i in range(len(dated) - 1):
-        d1 = datetime.strptime(dated[i][0], "%Y-%m-%d")
-        d2 = datetime.strptime(dated[i + 1][0], "%Y-%m-%d")
+        d1 = datetime.strptime(dated[i][0], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        d2 = datetime.strptime(dated[i + 1][0], "%Y-%m-%d").replace(tzinfo=timezone.utc)
         gap = (d2 - d1).days
         if 0 < gap <= NEAR_IDENTICAL_DAYS:
             lines = dated[i][1] + dated[i + 1][1]
@@ -1024,7 +1025,7 @@ def forgiveness_signals(items: list[dict],
              if (d := _date(it, "date_opened", "opened")) is not None]
     if opens:
         oldest = min(opens)
-        years = (datetime.now() - oldest).days / 365.25
+        years = (datetime.now(timezone.utc) - oldest).days / 365.25
         if years >= 10:
             signals[0]["observed_in_report"] += (
                 f" The oldest opened {oldest.strftime('%Y-%m-%d')}, roughly "

@@ -58,7 +58,7 @@ owes anyone $1,000. The copy in `MILESTONES` is written to that line.
 """
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from dispute_engine.tiers import TIER_LADDER
 
@@ -197,7 +197,9 @@ def _delivery_date(mail_tracking: list | None) -> datetime | None:
             continue
         for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
             try:
-                dates.append(datetime.strptime(str(raw)[:len(fmt) + 2].strip()[:19], fmt))
+                dates.append(
+                    datetime.strptime(str(raw)[:len(fmt) + 2].strip()[:19], fmt)
+                    .replace(tzinfo=timezone.utc))
                 break
             except ValueError:
                 continue
@@ -247,7 +249,7 @@ def milestones_for(record, now: datetime | None = None) -> dict:
     the bureau failed, and it does not mean the consumer should send anything
     — it means the next round has become available to send.
     """
-    now = now or datetime.utcnow()
+    now = now or datetime.now(timezone.utc)
     clock = clock_start(record)
     start = clock["start"]
     rounds_sent = set(getattr(record, "watcher_rounds", None) or [])
@@ -287,7 +289,7 @@ def due_tier(record, now: datetime | None = None) -> int:
     Deliberately not `dispute_engine.tier_for_day`: that helper counts from a
     raw day number, and this has to count from the receipt-based clock.
     """
-    now = now or datetime.utcnow()
+    now = now or datetime.now(timezone.utc)
     start = clock_start(record)["start"]
     if start is None:
         return 1
@@ -326,7 +328,7 @@ def can_generate(record, day: int, now: datetime | None = None) -> tuple[bool, s
 
 def retention_until(record, now: datetime | None = None) -> datetime:
     """How long a subscribed case must survive: last milestone plus a tail."""
-    now = now or datetime.utcnow()
+    now = now or datetime.now(timezone.utc)
     start = clock_start(record)["start"] or now
     return start + timedelta(days=max(MILESTONES) + RETENTION_TAIL_DAYS)
 
@@ -360,7 +362,7 @@ def status_payload(record, now: datetime | None = None) -> dict:
     arithmetic has exactly one implementation. The frontend had its own; the
     two disagreed, and the frontend's was the wrong one.
     """
-    now = now or datetime.utcnow()
+    now = now or datetime.now(timezone.utc)
     clock = clock_start(record)
     subscribed = bool(getattr(record, "watcher_subscribed", False))
     start = clock["start"]
