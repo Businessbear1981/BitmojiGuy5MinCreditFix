@@ -35,6 +35,7 @@ from .categories import (
 )
 from .letter_generator import (
     BUREAU_ADDRESSES,
+    _fmt_money,
     generate_bureau_letter,
     generate_collector_letter,
     sanitize_letter,
@@ -81,7 +82,7 @@ def _category_section(items: list[dict], start_index: int = 0) -> str:
         if account:
             lines.append(f"  Account reference: {account}")
         if item.get("amount") not in (None, ""):
-            lines.append(f"  Amount reported: {item['amount']}")
+            lines.append(f"  Amount reported: {_fmt_money(item['amount'])}")
         if item.get("opened"):
             lines.append(f"  Date shown: {item['opened']}")
         lines.append("")

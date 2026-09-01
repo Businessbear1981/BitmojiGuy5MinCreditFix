@@ -65,7 +65,7 @@ def _build_section_1_audit(analyst_report: dict) -> str:
             if item.get('account_number'):
                 lines.append(f'  Account Number: {item["account_number"]}')
             if item.get('current_balance'):
-                lines.append(f'  Reported Balance: {item["current_balance"]}')
+                lines.append(f'  Reported Balance: {_fmt_money(item["current_balance"])}')
             if item.get('status'):
                 lines.append(f'  Status: {item["status"]}')
             # Pull additional fields from the full account data
@@ -173,7 +173,7 @@ def _build_section_4_theory_blocks(analyst_report: dict) -> str:
             if item.get('account_number'):
                 item_desc += f' (Acct: {item["account_number"]})'
             if item.get('current_balance'):
-                item_desc += f' — {item["current_balance"]}'
+                item_desc += f' — {_fmt_money(item["current_balance"])}'
             if item.get('status'):
                 item_desc += f' [{item["status"]}]'
             lines.append(f'  - {item_desc}')
@@ -410,7 +410,7 @@ def generate_bureau_letter(
         consumer_name,
     ]
 
-    body = '\n'.join(sections) + '\n'.join(closing)
+    body = _assemble(sections + [''] + closing)
 
     # Item count for metadata
     seen = set()
@@ -429,6 +429,45 @@ def generate_bureau_letter(
         'framework': 'fcra',
         'date': date_str,
     }
+
+
+def _assemble(blocks: list[str]) -> str:
+    """
+    Join letter blocks with exactly one blank line between them.
+
+    The sections are built by separate functions, each with its own idea of how
+    it ends, and they were concatenated with a bare `'\\n'.join(...)`. That put
+    no blank line at all before `Sincerely,`, so the last disclaimer ran
+    straight into the signature block:
+
+        - ...and was not prepared by an attorney.
+        Sincerely,
+
+    A dispute letter is read by a person deciding whether the file is worth
+    taking seriously, and inconsistent spacing is the first thing that makes it
+    look machine-produced. Normalising here rather than at each call site means
+    a new section cannot reintroduce the problem: whatever trailing newlines a
+    block arrives with, it leaves with exactly one blank line after it.
+    """
+    cleaned = [b.rstrip() for b in blocks if b is not None and b.strip()]
+    return "\n\n".join(cleaned) + "\n"
+
+
+def _fmt_money(value) -> str:
+    """
+    One money format for the whole letter: $4,111.00.
+
+    Balances were reaching the page three different ways — `1284.00` from the
+    adapter, `6100.0` as a raw float, and a bare `0` — in a document whose
+    entire subject is money. A letter that cannot render a dollar amount
+    consistently invites the reader to doubt the rest of it.
+    """
+    if value is None or value == "":
+        return ""
+    try:
+        return f"${float(str(value).replace('$', '').replace(',', '')):,.2f}"
+    except (TypeError, ValueError):
+        return str(value)
 
 
 def generate_collector_letter(
@@ -472,7 +511,7 @@ I am writing to dispute the following account(s) and request validation of the d
         if item.get('account_number'):
             audit += f'  Account Number: {item["account_number"]}\n'
         if item.get('current_balance'):
-            audit += f'  Reported Balance: {item["current_balance"]}\n'
+            audit += f'  Reported Balance: {_fmt_money(item["current_balance"])}\n'
         audit += '\n'
 
     # Section 2 — statutory basis
