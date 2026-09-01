@@ -166,3 +166,61 @@ def test_fishbowl_status(client):
     body = resp.json()
     assert set(body.keys()) == {"TX", "CA", "WA"}
     assert all("available" in v for v in body.values())
+
+
+def test_outcome_ledger_records_a_dispatched_round(client, case_session):
+    """
+    The ledger has to actually receive a row, and scoring has to be able to
+    read it back.
+
+    Until `init_outcomes()` was called at startup, `dispute_outcomes` did not
+    exist: every lookup raised, the error was swallowed, and `scoring` served
+    hardcoded priors while advertising a "measured" label it could never
+    produce. A green suite proved nothing, because nothing wrote to the ledger.
+
+    Lob is unconfigured under test, so `send_all_letters` returns no results
+    and the mail route never reaches a real dispatch. This drives the recording
+    helper directly — the unit that a real dispatch calls.
+    """
+    import main
+    import outcomes
+    from database import CaseRecord, SessionLocal
+
+    items = [
+        {"type": "bureau", "target": "Experian", "account": "12345678",
+         "bucket": "collection", "amount": 1240.0, "reason": "Not mine"},
+    ]
+    resp = client.post(f"/api/case/{case_session}/disputes", json={"items": items})
+    assert resp.status_code == 200
+
+    before = outcomes.ledger_stats()["disputes_logged"]
+
+    db = SessionLocal()
+    try:
+        record = db.query(CaseRecord).filter_by(session_id=case_session).first()
+        main._record_dispatched_disputes(record, tier=1)
+    finally:
+        db.close()
+
+    after = outcomes.ledger_stats()
+    assert after["disputes_logged"] == before + 1, "a dispatched item did not reach the ledger"
+
+    # Re-dispatching the same round must not double-count it.
+    db = SessionLocal()
+    try:
+        record = db.query(CaseRecord).filter_by(session_id=case_session).first()
+        main._record_dispatched_disputes(record, tier=1)
+    finally:
+        db.close()
+    assert outcomes.ledger_stats()["disputes_logged"] == after["disputes_logged"]
+
+    # Closing the loop makes the row countable, and the rate is readable
+    # rather than raising the way it did before.
+    stored = {"account": "12345678", "target": "Experian"}
+    assert outcomes.record_result(case_session, stored, "Experian", "deleted") is True
+
+    rate = outcomes.removal_rate(category="collection", bureau="Experian")
+    assert rate["n"] >= 1
+    # One observation is not a measurement: below MIN_SAMPLE_FOR_RATE the
+    # ledger must refuse to call it confident, so scoring keeps using priors.
+    assert rate["confident"] is False

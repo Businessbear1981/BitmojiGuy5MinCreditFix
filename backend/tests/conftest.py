@@ -15,6 +15,10 @@ _tmpdir = tempfile.mkdtemp(prefix="creditfix-test-")
 os.environ.update({
     "ENVIRONMENT": "test",
     "DATABASE_URL": f"sqlite:///{_tmpdir}/test.db",
+    # The outcome ledger is a separate SQLite file read from the environment at
+    # import time. Without this the suite writes into backend/outcomes.db and
+    # every run inherits the last run's rows.
+    "OUTCOMES_DB": f"{_tmpdir}/outcomes.db",
     "PII_ENCRYPTION_KEY": _test_key,
     "TERMS_TOKEN_SECRET": "test-terms-secret",
     "CYPHER_SERVER_SECRET": "test-cypher-secret",

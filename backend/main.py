@@ -3,6 +3,7 @@ import base64
 import hmac
 import json
 import re
+import sqlite3
 import traceback
 import uuid
 from contextlib import asynccontextmanager
@@ -20,13 +21,19 @@ from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 
 import config
+import outcomes
 import print_packet
 import provenance
 import relief_pathways
 import signature as sig
 import watcher
 from ae_creditfix.case import Case, Client, Item, new_id
-from ae_creditfix.letters import gen_cover_sheet, gen_followup_letters, gen_letters
+from ae_creditfix.letters import (
+    gen_cover_sheet,
+    gen_followup_letters,
+    gen_letters,
+    state_from_address,
+)
 from ae_creditfix.templates import BUREAU_ADDRESSES
 from cleanup import cleanup_loop
 from cypher import encrypt_file_in_memory, generate_session_key
@@ -87,6 +94,11 @@ init_db()
 # missing table throws on the first write rather than degrading — and two of
 # those call sites are on the payment path.
 provenance.init_audit()
+# The outcome ledger is a third SQLite file and needs the same treatment. Until
+# this ran, `dispute_outcomes` did not exist, every `outcomes.removal_rate()`
+# lookup raised, and `scoring` silently fell back to its hardcoded priors while
+# still offering a "measured (n=…)" label it could never produce.
+outcomes.init_outcomes()
 
 UPLOADS_DIR = Path(__file__).resolve().parent / "uploads"
 UPLOADS_DIR.mkdir(exist_ok=True)
@@ -152,6 +164,39 @@ def _demo_tracking(letters: list) -> list:
             "status": "demo — would mail via USPS",
         })
     return results
+
+
+def _record_dispatched_disputes(record: CaseRecord, tier: int) -> None:
+    """
+    Log every item in a mailed round to the outcome ledger.
+
+    Called only where real postage was bought. A demo dispatch fabricates its
+    tracking numbers, and writing those would put disputes that were never
+    mailed into the denominator that every future removal rate is measured
+    against — the ledger would be reporting on letters nobody sent.
+
+    `record_dispute` inserts OR IGNORE on (case, item, tier), so re-running a
+    dispatch cannot double-count a round.
+
+    A ledger failure must never break a dispatch: by the time this runs the
+    letters are already with Lob, and the ledger is an observer, not part of
+    the transaction. So it is logged and swallowed rather than raised — losing
+    a statistic is recoverable, turning a successful mailing into a 500 on the
+    payment path is not.
+    """
+    state = state_from_address(record.address or "")
+    for item in record.items or []:
+        try:
+            outcomes.record_dispute(
+                record.session_id,
+                item,
+                bureau=item.get("target", ""),
+                tier=tier,
+                state=state,
+            )
+        except sqlite3.Error as e:
+            print(f"[outcomes] record_dispute failed ({type(e).__name__}); "
+                  f"dispatch unaffected")
 
 
 # --- Validation models ---
@@ -659,6 +704,7 @@ async def send_mail(session_id: str, request: Request, db: Session = Depends(get
         record.mail_dispatched_at = record.mail_dispatched_at or datetime.now(timezone.utc)
         record.mail_tier = max(record.mail_tier or 0, tier)
         db.commit()
+        _record_dispatched_disputes(record, tier)
 
     return {
         "sent": len(results),
@@ -839,6 +885,11 @@ def _post_payment(record: CaseRecord, db: Session):
             record.mail_tier = max(record.mail_tier or 0, tier)
 
         db.commit()
+
+        # Only a real dispatch reaches the ledger — `results` is empty in demo
+        # mode, where the tracking numbers above are generated, not bought.
+        if results:
+            _record_dispatched_disputes(record, tier)
 
     # Email PDF copy to client (PDF regenerated in memory)
     if letters and not record.email_sent:
