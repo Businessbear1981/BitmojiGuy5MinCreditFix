@@ -108,6 +108,12 @@ def _categories_for(item: dict, category: str) -> list[dict]:
         "category": category,
         "strength": "moderate",
         "evidence": item.get("reason", ""),
+        # Reconstructed here, not read off the credit file. The analyst skips
+        # its file-derived matchers when the parser has already read a
+        # tradeline, and this flag is how it tells the two apart. Without it
+        # every item looks like a parser reading, and obsolescence, re-aging
+        # and chain-of-ownership are silently never argued.
+        "derived": True,
     }]
 
 

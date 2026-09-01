@@ -160,6 +160,14 @@ export async function uploadDocument(file: File, type: 'id' | 'address' | 'repor
 
 /** Shape the koi-pond page renders. */
 interface DisputeItemView {
+  // Position in the cached suggestion list. The review screen round-trips
+  // this back so each authorised row maps to the item the customer actually
+  // ticked. It used to match on the display string `account || target`, and
+  // the parser writes "Unknown" into `account` for nearly every item — so
+  // every row carried the same key and `.find()` returned the first
+  // suggestion every time. Twelve selected accounts became eleven copies of
+  // one wrong creditor, mailed to three bureaus.
+  suggestion_index: number
   creditor: string
   account_number: string
   type: string
@@ -171,9 +179,13 @@ interface DisputeItemView {
   label?: string
 }
 
-function toDisputeView(s: Suggestion): DisputeItemView {
+function toDisputeView(s: Suggestion, index: number): DisputeItemView {
   return {
-    creditor: s.account || s.target,
+    suggestion_index: index,
+    // Prefer the furnisher name over the account number for display: the
+    // parser writes "Unknown" into `account` for most items, which made every
+    // row on the review screen read "Unknown".
+    creditor: s.target || s.account,
     account_number: '',
     type: s.type,
     amount: s.amount != null ? `$${s.amount}` : '',
@@ -186,10 +198,14 @@ function toDisputeView(s: Suggestion): DisputeItemView {
 }
 
 export async function getDisputes(): Promise<Response> {
-  return jsonResponse({ ok: true, dispute_items: loadSuggestions().map(toDisputeView) })
+  return jsonResponse({
+    ok: true,
+    dispute_items: loadSuggestions().map((s, i) => toDisputeView(s, i)),
+  })
 }
 
 interface ReviewedItem {
+  suggestion_index?: number
   type?: string
   text?: string
   creditor?: string
@@ -206,7 +222,9 @@ export async function reviewDisputes(items: object[], customItems: object[]): Pr
   // cached parser suggestions (the page round-trips `creditor` = suggestion.account).
   const suggestions = loadSuggestions()
   const confirmed = [...(items as ReviewedItem[]), ...(customItems as ReviewedItem[])].map((item) => {
-    const match = suggestions.find((s) => (s.account || s.target) === item.creditor)
+    const match = typeof item.suggestion_index === 'number'
+      ? suggestions[item.suggestion_index]
+      : undefined
     if (match) {
       return {
         type: match.type,
@@ -246,6 +264,69 @@ export async function reviewDisputes(items: object[], customItems: object[]): Pr
   }
 
   return jsonResponse({ ok: true, items_count: data.items_count, total: genData.total })
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// DISCLOSURES — the consent gate in front of letter generation
+// ═════════════════════════════════════════════════════════════════════════════
+
+// POST /letters returns 428 until every required acknowledgement is recorded.
+// These are CROA-relevant affirmations, so the consumer has to tick them
+// themselves — nothing here may default them to true or send them unread.
+
+export interface DisclosureSection {
+  id: string
+  heading: string
+  body: string
+}
+
+export interface DisclosureAck {
+  id: string
+  label: string
+}
+
+export interface DisclosurePayload {
+  version: string
+  sections: DisclosureSection[]
+  acknowledgements: DisclosureAck[]
+  fine_print: string
+  fine_print_short: string
+}
+
+/** The disclosure text and the acknowledgements the backend requires. */
+export async function getDisclosures(): Promise<DisclosurePayload | null> {
+  try {
+    const res = await fetch(`${API}/api/disclosures`)
+    if (!res.ok) return null
+    return (await res.json()) as DisclosurePayload
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Record what the consumer actually affirmed.
+ *
+ * `acks` is passed through exactly as given: the backend rejects the request
+ * unless every required id is present and true, and that check is the point.
+ */
+export async function acknowledgeDisclosures(acks: Record<string, boolean>): Promise<Response> {
+  if (!_sessionId) {
+    return jsonResponse({ ok: false, error: 'No active session.' }, 400)
+  }
+  const res = await fetch(`${API}/api/case/${_sessionId}/acknowledge`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ acknowledgements: acks }),
+  })
+  const data = await readJson(res)
+  if (!res.ok) {
+    return jsonResponse(
+      { ok: false, error: detailMessage(data, 'Could not record your acknowledgements.') },
+      res.status,
+    )
+  }
+  return jsonResponse({ ok: true })
 }
 
 // ═════════════════════════════════════════════════════════════════════════════

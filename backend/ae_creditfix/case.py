@@ -12,11 +12,17 @@ def new_id(prefix: str) -> str:
 @dataclass
 class Client:
     name: str
-    address: str
+    address: str          # street line only
     dob: str
     ssn_last4: str
     phone: str
     email: str
+    # Collected as their own intake fields. The letter needs a complete
+    # address block, and the state selects the tier-3 state-law authorities —
+    # both of which used to be recovered by pattern-matching free text.
+    city: str = ""
+    state: str = ""
+    zip_code: str = ""
 
 @dataclass
 class Item:

@@ -35,18 +35,42 @@ def test_case_requires_terms_token(client):
 
 
 def test_case_rejects_non_beta_zip(client, terms_token):
-    body = dict(TEST_CASE, address="9 Elm St, Portland, ME 04101")
+    body = dict(TEST_CASE, address="9 Elm St", city="Portland", state="ME", zip="04101")
     resp = client.post("/api/case", json=body, headers={"X-Terms-Token": terms_token})
     assert resp.status_code == 403
     assert "04101" in resp.json()["detail"]
 
 
-def test_case_uses_trailing_zip_not_street_number(client, terms_token):
-    """Street numbers can be 5 digits — eligibility must use the ZIP at the end."""
-    body = dict(TEST_CASE, address="15255 Main St, Dallas, TX 75201")
+def test_case_uses_zip_field_not_street_number(client, terms_token):
+    """A 5-digit street number must not be mistaken for the postcode."""
+    body = dict(TEST_CASE, address="15255 Main St")
     resp = client.post("/api/case", json=body, headers={"X-Terms-Token": terms_token})
     assert resp.status_code == 200
     assert resp.json()["region"] == "Texas"
+
+
+def test_case_requires_a_mailable_address(client, terms_token):
+    """
+    Every field the mail carrier needs is validated at intake.
+
+    A letter that cannot be addressed cannot be mailed, and the failure used
+    to be invisible: Lob rejected the payload, the error was swallowed, and
+    the customer was told their dispute had been posted.
+    """
+    for bad in (
+        dict(TEST_CASE, state="Texas"),      # full name, not the 2-letter code
+        dict(TEST_CASE, state="ZZ"),         # not a real state
+        dict(TEST_CASE, zip="ABCDE"),        # not digits
+        dict(TEST_CASE, zip="752"),          # too short
+        dict(TEST_CASE, city=" "),           # whitespace only
+    ):
+        resp = client.post("/api/case", json=bad, headers={"X-Terms-Token": terms_token})
+        assert resp.status_code == 422, f"accepted an unmailable address: {bad}"
+
+    # ZIP+4 is a valid postcode and must be accepted.
+    ok = dict(TEST_CASE, zip="75201-1234")
+    resp = client.post("/api/case", json=ok, headers={"X-Terms-Token": terms_token})
+    assert resp.status_code == 200
 
 
 def test_case_validates_pii_fields(client, terms_token):
@@ -101,10 +125,17 @@ def test_full_lifecycle(client, terms_token):
     assert resp.status_code == 200
     data = resp.json()
     assert data["total"] == 2
-    texts = [ltr["text"] for ltr in data["letters"]]
-    assert any("Experian" in t for t in texts)
-    assert any("1681s-2" in t for t in texts)  # FCRA 623 citation on creditor letter
     assert "MASTER COVER SHEET" in data["cover_sheet"]
+
+    # Unpaid: metadata only. This assertion used to read the letter text and
+    # look for the FCRA citation in it — which passed only because unpaid
+    # callers were being served the whole letter. The paywall is the product.
+    assert {ltr["target"] for ltr in data["letters"]} == {"Experian", "Capital One"}
+    for ltr in data["letters"]:
+        assert ltr["locked"] is True
+        assert "1681s-2" not in ltr["text"]
+        assert "SECTION" not in ltr["text"]
+        assert "Sincerely" not in ltr["text"]
 
     # Payment required before download / mail-status
     assert client.get(f"/api/case/{session_id}/download").status_code == 402
@@ -114,6 +145,13 @@ def test_full_lifecycle(client, terms_token):
     resp = client.post(f"/api/case/{session_id}/checkout")
     assert resp.status_code == 200
     assert resp.json()["paid"] is True
+
+    # Paid: the real letters, with the statutory basis on each.
+    resp = client.get(f"/api/case/{session_id}/letters")
+    assert resp.status_code == 200
+    texts = [ltr["text"] for ltr in resp.json()["letters"]]
+    assert any("Experian" in t for t in texts)
+    assert any("1681s-2" in t for t in texts)  # FCRA 623 citation
 
     # Download the PDF (regenerated in memory)
     resp = client.get(f"/api/case/{session_id}/download")

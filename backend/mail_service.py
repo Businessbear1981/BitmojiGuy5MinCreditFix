@@ -68,6 +68,9 @@ def send_letter(
     letter_html: str,
     session_id: str,
     round_number: int = 1,
+    client_city: str = "",
+    client_state: str = "",
+    client_zip: str = "",
 ) -> dict | None:
     """
     Send a letter via Lob, with postage escalating by dispute round.
@@ -82,13 +85,23 @@ def send_letter(
         print(f"WARN: No address for target '{target}', skipping")
         return None
 
-    # Parse client address into components (simple split)
-    addr_parts = [p.strip() for p in client_address.split(",")]
-    address_line1 = addr_parts[0] if addr_parts else client_address
-    city = addr_parts[1] if len(addr_parts) > 1 else ""
-    state_zip = addr_parts[2].strip().split(" ") if len(addr_parts) > 2 else ["", ""]
-    state = state_zip[0] if state_zip else ""
-    zip_code = state_zip[1] if len(state_zip) > 1 else ""
+    # City / state / ZIP arrive as discrete fields, collected as discrete
+    # boxes at intake. They used to be recovered by splitting the free-text
+    # address on commas, which put "Apt 3B" in the city field and "Austin" in
+    # the state field for any address with a unit number, and produced four
+    # empty fields for an address typed without commas. Lob rejected those,
+    # the 4xx was swallowed, and the customer was told the mail had gone.
+    address_line1 = (client_address or "").strip()
+    city = (client_city or "").strip()
+    state = (client_state or "").strip().upper()
+    zip_code = (client_zip or "").strip()
+
+    missing = [n for n, v in (("city", city), ("state", state), ("zip", zip_code))
+               if not v]
+    if missing:
+        # Refuse rather than hand Lob a payload it will reject silently.
+        print(f"WARN: cannot mail to {target} — missing {', '.join(missing)}")
+        return None
 
     payload = {
         "description": f"AE CreditFix dispute r{round_number} - {session_id[:8]} -> {target}",
@@ -139,18 +152,34 @@ def send_all_letters(
     letters: list,
     session_id: str,
     round_number: int = 1,
+    client_city: str = "",
+    client_state: str = "",
+    client_zip: str = "",
 ) -> list:
-    """Send all dispute letters via Lob. Returns list of tracking results."""
+    """
+    Send all dispute letters via Lob.
+
+    Returns (results, skipped): the tracking entries for what was actually
+    accepted, and one entry per letter that was not sent with the reason.
+    A partial send used to be indistinguishable from a full one — three
+    letters generated, two mailed, and the case still reported "sent".
+    """
     results = []
+    skipped = []
     for ltr in letters:
         target = ltr.get("target", "")
         text = ltr.get("text", "")
         # Convert plain text to simple HTML for Lob
         html = f"<html><body><pre style='font-family:Courier;font-size:11pt;'>{text}</pre></body></html>"
-        result = send_letter(client_name, client_address, target, html, session_id, round_number)
+        result = send_letter(
+            client_name, client_address, target, html, session_id, round_number,
+            client_city=client_city, client_state=client_state, client_zip=client_zip,
+        )
         if result:
             results.append(result)
-    return results
+        else:
+            skipped.append({"target": target, "reason": "not accepted by the mail carrier"})
+    return results, skipped
 
 
 def verify_webhook_signature(payload: bytes, signature: str) -> bool:

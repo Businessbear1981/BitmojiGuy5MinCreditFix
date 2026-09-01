@@ -9,6 +9,10 @@ import { getDisputes, reviewDisputes } from '@/lib/api'
 const ACCENT = '#33FFB8'
 
 interface DisputeItem {
+  // Identifies which parsed suggestion this row is. Must survive the round
+  // trip to reviewDisputes(), or every authorised row collapses onto the
+  // first suggestion in the list.
+  suggestion_index: number
   creditor: string
   account_number: string
   type: string

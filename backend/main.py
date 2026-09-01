@@ -136,6 +136,9 @@ def to_engine_case(record: CaseRecord) -> Case:
         ssn_last4=record.ssn_last4,
         phone=record.phone,
         email=record.email,
+        city=record.city or "",
+        state=record.state or "",
+        zip_code=record.zip_code or "",
     )
     items = [Item(**item) for item in (record.items or [])]
     case = Case(client=client, items=items, attachments=record.attachments or [])
@@ -184,7 +187,9 @@ def _record_dispatched_disputes(record: CaseRecord, tier: int) -> None:
     a statistic is recoverable, turning a successful mailing into a 500 on the
     payment path is not.
     """
-    state = state_from_address(record.address or "")
+    # `address` is the street line only now, so the state comes from its own
+    # column rather than being mined back out of free text.
+    state = (record.state or "") or state_from_address(record.address or "")
     for item in record.items or []:
         try:
             outcomes.record_dispute(
@@ -201,9 +206,17 @@ def _record_dispatched_disputes(record: CaseRecord, tier: int) -> None:
 
 # --- Validation models ---
 
+US_STATE_CODES = frozenset(["AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY", "DC", "AS", "GU", "MP", "PR", "VI", "AA", "AE", "AP"])
+
+
 class CreateCaseRequest(BaseModel):
     name: str
+    # Street line only — city/state/zip are collected separately so the mail
+    # carrier receives them as the discrete fields it requires.
     address: str
+    city: str
+    state: str
+    zip: str
     dob: str
     ssn_last4: str
     phone: str
@@ -253,8 +266,33 @@ class CreateCaseRequest(BaseModel):
     @classmethod
     def validate_address(cls, v):
         if len(v.strip()) < 5:
-            raise ValueError("Valid mailing address is required")
+            raise ValueError("Street address is required")
         return v.strip()
+
+    @field_validator("city")
+    @classmethod
+    def validate_city(cls, v):
+        if len(v.strip()) < 2:
+            raise ValueError("City is required")
+        return v.strip()
+
+    @field_validator("state")
+    @classmethod
+    def validate_state(cls, v):
+        # Two-letter USPS code. The mail carrier rejects anything else, and a
+        # rejected mailing is currently invisible to the customer.
+        code = v.strip().upper()
+        if code not in US_STATE_CODES:
+            raise ValueError("State must be a 2-letter US state code, e.g. TX")
+        return code
+
+    @field_validator("zip")
+    @classmethod
+    def validate_zip(cls, v):
+        code = v.strip()
+        if not re.fullmatch(r"\d{5}(-\d{4})?", code):
+            raise ValueError("ZIP must be 5 digits, or ZIP+4")
+        return code
 
 
 class ManualPayRequest(BaseModel):
@@ -395,7 +433,10 @@ async def create_case(req: CreateCaseRequest, request: Request, db: Session = De
         raise HTTPException(422, "You must accept the terms and disclaimer before proceeding")
 
     # Trapdoor Fishbowl — check beta region eligibility by zip code
-    eligibility = check_beta_eligibility(req.address, db)
+    # The ZIP is now its own validated field, so eligibility no longer has to
+    # guess which 5-digit run in a free-text address is the postcode rather
+    # than the street number.
+    eligibility = check_beta_eligibility(req.zip, db)
     if not eligibility["eligible"]:
         raise HTTPException(403, eligibility["reason"])
 
@@ -408,6 +449,9 @@ async def create_case(req: CreateCaseRequest, request: Request, db: Session = De
         session_id=session_id,
         name=req.name,
         address=req.address,
+        city=req.city,
+        state=req.state,
+        zip_code=req.zip,
         dob=req.dob,
         ssn_last4=req.ssn_last4,
         phone=req.phone,
@@ -688,7 +732,11 @@ async def send_mail(session_id: str, request: Request, db: Session = Depends(get
         raise HTTPException(400, "No letters generated yet")
 
     tier = max((ltr.get("tier", 1) for ltr in letters), default=1)
-    results = send_all_letters(record.name, record.address, letters, session_id, round_number=tier)
+    results, skipped = send_all_letters(
+        record.name, record.address, letters, session_id, round_number=tier,
+        client_city=record.city or "", client_state=record.state or "",
+        client_zip=record.zip_code or "",
+    )
 
     if not results and config.DEMO_MODE:
         demo_results = _demo_tracking(letters)
@@ -706,12 +754,24 @@ async def send_mail(session_id: str, request: Request, db: Session = Depends(get
         db.commit()
         _record_dispatched_disputes(record, tier)
 
+    # A partial send is not a send. Report exactly what went out and what did
+    # not, so "2 of 3 mailed" can never read as success.
+    if skipped and results:
+        message = (f"Sent {len(results)} letter(s) via USPS. "
+                   f"{len(skipped)} could not be mailed: "
+                   + ", ".join(s["target"] for s in skipped))
+    elif results:
+        message = f"Sent {len(results)} letter(s) via USPS"
+    else:
+        message = "Lob not configured — print and mail manually (see instructions)"
+
     return {
         "sent": len(results),
+        "skipped": skipped,
+        "complete": bool(results) and not skipped,
         "tier": tier,
         "tracking": results,
-        "message": f"Sent {len(results)} letter(s) via USPS" if results
-                   else "Lob not configured — print and mail manually (see instructions)",
+        "message": message,
     }
 
 
@@ -869,9 +929,16 @@ def _post_payment(record: CaseRecord, db: Session):
         # Postage comes off the letter's own tier, so round 2 goes certified
         # without anyone having to remember to say so.
         tier = max((ltr.get("tier", 1) for ltr in letters), default=1)
-        results = send_all_letters(
-            record.name, record.address, letters, record.session_id, round_number=tier
+        results, skipped = send_all_letters(
+            record.name, record.address, letters, record.session_id, round_number=tier,
+            client_city=record.city or "", client_state=record.state or "",
+            client_zip=record.zip_code or "",
         )
+        if skipped:
+            # Money has already been taken by this point. A letter that did not
+            # go out has to leave a trace someone can act on.
+            provenance.record(record.session_id, "mail_partial_failure",
+                              {"sent": len(results), "skipped": skipped, "tier": tier})
 
         if results:
             record.mail_tracking = results

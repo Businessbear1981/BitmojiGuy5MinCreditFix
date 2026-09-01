@@ -13,7 +13,34 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-ENVIRONMENT = os.environ.get("ENVIRONMENT", "development")
+_VALID_ENVIRONMENTS = ("production", "development", "test")
+
+ENVIRONMENT = os.environ.get("ENVIRONMENT", "").strip().lower()
+
+# This used to default to "development", and nothing in the Dockerfile,
+# railway.toml or nixpacks.toml ever set it. A deploy that simply forgot the
+# variable therefore ran as development, silently and with no signal on
+# /api/health — which meant the dev fallback keys below (a SHA-256 of a public
+# string, in a public repo), unsigned Stripe webhooks accepted as proof of
+# payment, unverified Lob webhooks, and no "*" check on ALLOWED_ORIGINS.
+#
+# Refusing to boot is the correct failure. An app that will not start is a
+# five-minute problem; an app serving customer PII under a key anyone can
+# compute from GitHub is not.
+if not ENVIRONMENT:
+    raise RuntimeError(
+        "ENVIRONMENT is not set. Set it to one of: "
+        f"{', '.join(_VALID_ENVIRONMENTS)}. Refusing to guess — the previous "
+        "default of 'development' silently enabled publicly-derivable "
+        "encryption keys and unsigned payment webhooks."
+    )
+if ENVIRONMENT not in _VALID_ENVIRONMENTS:
+    raise RuntimeError(
+        f"ENVIRONMENT={ENVIRONMENT!r} is not recognised. Expected one of: "
+        f"{', '.join(_VALID_ENVIRONMENTS)}. A typo such as 'Production' or "
+        "'prod' would previously have been treated as development."
+    )
+
 IS_PROD = ENVIRONMENT == "production"
 
 DEMO_MODE = os.environ.get("DEMO_MODE", "false").lower() in ("true", "1", "yes")

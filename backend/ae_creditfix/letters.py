@@ -107,7 +107,9 @@ def gen_letters(
     if not items:
         return []
 
-    state_code = state_from_address(case.client.address)
+    # Prefer the state the consumer actually selected; fall back to parsing
+    # the street line only for cases created before it was its own field.
+    state_code = case.client.state or state_from_address(case.client.address)
 
     # Per-item affirmations recorded at review time, overridden by anything
     # the caller passes explicitly.

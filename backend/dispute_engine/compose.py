@@ -294,8 +294,14 @@ def generate_case_letters(
         uncovered = [i for i in group if i["id"] not in covered]
 
         if report.get("violation_theory_blocks"):
+            # The fifth argument is `collector_address`, not parsed data. Passing
+            # `parsed` here f-string-interpolated the entire parsed_data dict —
+            # including the consumer's name and home address — into the
+            # recipient block of a letter that gets printed, PDF'd and mailed.
+            # There is no furnisher address book (BUREAU_ADDRESSES holds only the
+            # three bureaus), so the honest value is empty until one exists.
             engine_letter = generate_collector_letter(
-                report, consumer_name, consumer_address, furnisher, parsed
+                report, consumer_name, consumer_address, furnisher, ""
             )
         else:
             engine_letter = _shell_letter(furnisher, consumer_name, consumer_address, report,

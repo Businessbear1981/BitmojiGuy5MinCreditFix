@@ -1,134 +1,84 @@
 """
-Pre-payment letter preview.
+Pre-payment letter gating.
 
 The letters are the product. Before this module existed, `GET /letters`
-returned every letter in full to anyone holding a session id — all seven
-sections, the violation theories, the verified case law, the state-law
-block. A customer could run the flow, read everything, close the tab, and
-mail the letters themselves for the price of a stamp.
+returned every letter in full to anyone holding a session id — a customer
+could run the flow, read everything, close the tab, and mail the letters
+themselves for the price of a stamp.
 
-The preview has to do two jobs at once:
+── Why there is no partial preview ─────────────────────────────────────────
 
-  * Prove the work is real. A blurred rectangle proves nothing and reads as
-    a trick. The customer should see their own name, their own accounts, the
-    actual statutes being cited, and the shape of the argument.
-  * Withhold enough that it cannot be mailed. What is expensive here is the
-    reasoning: which theory applies to which tradeline, the case law behind
-    it, and the specific demands. That is what stays behind the toll.
+The first version of this module tried to show *part* of each letter: the
+audit and the statutory basis in full, the argument withheld. That is the
+nicer product, and it was quietly broken the whole time it shipped:
 
-So: headers, the audit of what their file says, and the statutory basis are
-shown in full. The theory arguments, the specific requests, the demand and
-the escalation paths are summarised and withheld.
+  * it split on section headings, so any letter whose headings did not match
+    the expected shape came back whole. The collector letters use plain
+    headings ("VALIDATION REQUESTS:"), matched nothing, and were served
+    complete to unpaid callers — the preview was longer than the letter.
+  * the heading pattern required one exact character, U+2014. A hyphen or an
+    en-dash leaked the section under it.
+  * open sections were matched by string prefix, so "SECTION 10" would have
+    been treated as "SECTION 1" and shown free the day a tenth was added.
+
+Each of those is the same failure: a redaction gate is a permanent obligation
+to keep getting a parser right, and every miss gives the product away. So the
+gate no longer parses anything. Unpaid callers get metadata about their
+letters and no letter text at all. There is nothing left to leak.
+
+What the customer still sees before paying: how many letters, addressed to
+whom, at what escalation tier, how many items each covers, and how long they
+are. That is enough to show the work is real. The words are the product.
 """
 from __future__ import annotations
 
-import re
-
-# Sections that are safe to show before payment. These establish credibility
-# without carrying the argument.
-_OPEN_SECTIONS = (
-    "SECTION 1",  # audit — it's their own credit file, they already have it
-    "SECTION 2",  # statutory basis — public law, and it builds trust
-)
-
-# Everything from here down is the product.
-_GATED_SECTIONS = (
-    "SECTION 3",   # consumer position
-    "SECTION 4",   # theory blocks — the crown jewel
-    "SECTION 4B",  # additional disputed items
-    "SECTION 5",   # specific requests
-    "SECTION 6",   # demand + escalation
-    "SECTION 7",   # disclaimers
-    "SECTION 8",   # tier escalation (MOV / pre-litigation / regulatory)
-)
-
-_SECTION_RE = re.compile(r"^SECTION [0-9]+[A-Z]?\s*—\s*(.+)$", re.MULTILINE)
-
-_TOLL_NOTICE = """
+_LOCKED_NOTICE = """
 ────────────────────────────────────────────────────────────
-  The rest of this letter is ready and waiting.
+  Your letters are written and waiting.
 
-  What is withheld below: the violation theories matched to
-  your specific accounts, the federal case law supporting
-  each one, your state's authorities, and the itemised
-  demands with deadlines.
+  {n_letters} letter(s) · {n_words:,} words · {n_items} disputed item(s)
 
-  {n_sections} more sections · {n_words:,} more words · unlocked at checkout
+  The full text, the violation theories matched to your
+  accounts, the federal case law behind each one, your
+  state's authorities and the itemised demands are
+  unlocked at checkout.
 ────────────────────────────────────────────────────────────
 """
-
-
-def _split_sections(body: str) -> list[tuple[str, str]]:
-    """
-    Break a letter into (heading, text) pairs.
-
-    The first chunk has no heading — it's the address block and salutation,
-    which always stays visible.
-    """
-    marks = list(_SECTION_RE.finditer(body))
-    if not marks:
-        return [("", body)]
-
-    out = [("", body[: marks[0].start()])]
-    for i, m in enumerate(marks):
-        end = marks[i + 1].start() if i + 1 < len(marks) else len(body)
-        out.append((m.group(0).strip(), body[m.start(): end]))
-    return out
 
 
 def redact_letter(letter: dict) -> dict:
     """
-    Return a preview-safe copy of one letter.
+    Return a metadata-only stand-in for one letter.
 
-    The original is not mutated — the full text stays in the encrypted column
-    and is what actually gets mailed and PDF'd after payment.
+    The original is untouched — the full text stays in the encrypted column
+    and is what actually gets mailed and PDF'd after payment. `text` and
+    `body` carry the locked notice rather than an empty string so any caller
+    rendering them shows the paywall instead of a blank page.
     """
     body = letter.get("text") or letter.get("body") or ""
-    if not body:
-        return {**letter, "locked": True}
+    words = len(body.split())
 
-    kept: list[str] = []
-    withheld_words = 0
-    withheld_sections = 0
-
-    for heading, chunk in _split_sections(body):
-        if not heading:
-            kept.append(chunk)
-            continue
-
-        if heading.startswith(_OPEN_SECTIONS):
-            kept.append(chunk)
-            continue
-
-        if heading.startswith(_GATED_SECTIONS):
-            withheld_sections += 1
-            withheld_words += len(chunk.split())
-            # Show the heading so the customer can see what they're buying,
-            # but nothing underneath it.
-            if withheld_sections == 1:
-                kept.append(heading + "\n")
-            continue
-
-        # Unrecognised section — withhold by default. Failing closed here
-        # means a new section added to the engine is never leaked by accident.
-        withheld_sections += 1
-        withheld_words += len(chunk.split())
-
-    preview = "".join(kept).rstrip()
-    preview += "\n" + _TOLL_NOTICE.format(
-        n_sections=withheld_sections, n_words=withheld_words
+    notice = _LOCKED_NOTICE.format(
+        n_letters=1, n_words=words, n_items=letter.get("item_count", 0)
     )
 
     return {
-        **letter,
-        "text": preview,
-        "body": preview,
+        # Identity and proof of work — safe to show, carries no argument.
+        "target": letter.get("target", ""),
+        "type": letter.get("type", "bureau"),
+        "tier": letter.get("tier", 1),
+        "tier_name": letter.get("tier_name", ""),
+        "item_count": letter.get("item_count", 0),
+        "theory_count": letter.get("theory_count", 0),
+        "date": letter.get("date", ""),
+        "id": letter.get("id", ""),
+        # The product itself, withheld.
+        "text": notice,
+        "body": notice,
         "locked": True,
         "preview": True,
-        "withheld_sections": withheld_sections,
-        "withheld_words": withheld_words,
         "full_length": len(body),
-        "preview_length": len(preview),
+        "word_count": words,
     }
 
 

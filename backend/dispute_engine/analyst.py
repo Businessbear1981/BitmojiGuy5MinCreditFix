@@ -524,7 +524,15 @@ def analyze(
         # parser cannot see. Both merge into one map keyed by theory, so an
         # item the parser read as re-aged and the consumer also flagged as a
         # mixed file argues both, instead of whichever ran last.
-        has_parser_view = bool(acct.get('categories'))
+        # Only a ground the parser actually read off the file counts as a
+        # parser view. A ground reconstructed from the item's own bucket
+        # (adapter._categories_for) carries no new reading, and counting it
+        # here disabled every file-derived matcher for every item on the
+        # application path — a fifteen-year-old charge-off stopped arguing
+        # obsolescence and asked the furnisher to verify it instead.
+        has_parser_view = any(
+            not c.get('derived') for c in (acct.get('categories') or [])
+        )
         per_theory = {e['theory_id']: e for e in _theories_from_categories(acct)}
 
         for matcher in matchers:

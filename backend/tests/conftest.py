@@ -61,7 +61,10 @@ def terms_token(client):
 
 TEST_CASE = {
     "name": "Jane Testcase",
-    "address": "123 Main St, Dallas, TX 75201",
+    "address": "123 Main St",
+    "city": "Dallas",
+    "state": "TX",
+    "zip": "75201",
     "dob": "1990-05-01",
     "ssn_last4": "1234",
     "phone": "555-123-4567",

@@ -84,7 +84,15 @@ class CaseRecord(Base):
 
     # Client PII — encrypted at rest
     name = Column(EncryptedString, nullable=False)
+    # Street line only. City/state/ZIP are separate columns because the mail
+    # carrier needs them as separate fields: splitting a free-text address on
+    # commas put "Apt 3B" in the city field and "Austin" in the state field,
+    # Lob rejected the payload, the error was swallowed, and the customer was
+    # told their letters had been posted when nothing had been.
     address = Column(EncryptedString, nullable=False)
+    city = Column(EncryptedString, nullable=True)
+    state = Column(String(2), nullable=True)
+    zip_code = Column(String(10), nullable=True)
     dob = Column(EncryptedString, nullable=False)
     ssn_last4 = Column(EncryptedString, nullable=False)
     phone = Column(EncryptedString, nullable=False)
@@ -164,6 +172,9 @@ def init_db():
 # Columns added after the initial schema. create_all never alters existing
 # tables, so add them at boot (idempotent; safe across multiple workers).
 _ADDED_COLUMNS = [
+    ("city", "TEXT"),
+    ("state", "VARCHAR(2)"),
+    ("zip_code", "VARCHAR(10)"),
     ("manual_pay_method", "VARCHAR(20)"),
     ("manual_pay_code", "VARCHAR(24)"),
     ("manual_pay_requested_at", "TIMESTAMP"),
