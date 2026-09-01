@@ -17,6 +17,8 @@ from dispute_engine.categories import (
     reason_for,
 )
 from equifax_parser import looks_like_equifax, parse_equifax
+from experian_parser import looks_like_experian, parse_experian
+from experian_parser import report_summary as experian_summary
 
 # --- PDF text extraction ---
 try:
@@ -316,7 +318,19 @@ def parse_credit_report_bytes(content: bytes, suffix: str) -> list[dict]:
     if not text.strip():
         return []
 
-    # 1. Structured parser — Equifax is the format we ask consumers to pull.
+    # 1. Experian — the format we actually ask consumers to bring. Runs first
+    #    because it is the common case: on a real 91-page export the keyword
+    #    scanner returned twenty items whose creditors were `Individual`,
+    #    `Signer` and `Hays Mt`, while this parser returns the 36 tradelines
+    #    the report's own header counts, with account numbers and dates.
+    #    Handles both the annual PDF and the fuller detailed record.
+    if looks_like_experian(text):
+        items = parse_experian(text)
+        if items:
+            items[0]["_report_meta"] = experian_summary(text)
+            return items
+
+    # 2. Structured parser — Equifax.
     if looks_like_equifax(text):
         parsed = parse_equifax(text)
         items = parsed.get("accounts", [])
@@ -329,13 +343,13 @@ def parse_credit_report_bytes(content: bytes, suffix: str) -> list[dict]:
             items[0]["_consumer_profile"] = parsed.get("consumer_profile", {})
             return items
 
-    # 2. Claude, for formats without a dedicated parser.
+    # 3. Claude, for formats without a dedicated parser.
     if ANTHROPIC_API_KEY and HAS_ANTHROPIC:
         items = analyze_with_claude(text)
         if items:
             return items
 
-    # 3. Keyword scanner — scanned images, unusual layouts, damaged text.
+    # 4. Keyword scanner — scanned images, unusual layouts, damaged text.
     return analyze_with_keywords(text)
 
 
