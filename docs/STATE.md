@@ -93,3 +93,28 @@ PR #3 (`Kayo-11:ko/fastapi-takeover` → `main`) is the release candidate. Next 
 - Next, in order (Iron Sharpens Iron: one fault, fixed, re-run from the top — not a backlog to work through): ~~(1) outcome ledger~~ done as far as code allows in `7f027cf`, remainder is Sean's call (gap 10); **(2) call `attach_findings` so student-loan findings reach letters — gap 11**; (3) wire `ReliefPanel` into `/koi-pond` + add the `student_loan` bucket to `lib/types.ts`; (4) refresh the forgiveness directory for RAP/post-SAVE — gap 12; (5) write the relief ADR; (6) browser walk before asking Kevin to merge.
 - **Decision waiting on Sean:** where a dispute outcome gets captured. Without it the ledger accumulates disputes that never resolve, and no amount of volume will turn a prior into a measurement.
 - **Worth a look while doing (2):** `guess_category` classifies "Not my account — no contract with collector" as `creditor_direct` rather than `collection` or `identity_error`, and only 14 of the categories map to a violation theory (`PARSER_CATEGORY_THEORIES` 9 + `CONDITIONAL_CATEGORY_THEORY` 5). Items outside that set reach no theory and fall to the fallback section. The fallback is now a valid letter (gap 16), but a valid letter is not the same as an argued one.
+
+## Parsing real bureau reports — 2026-09-01
+
+Measured against three real reports pulled by Sean for the same person in the same week. This section exists because the parser was previously validated only against a synthetic fixture, and the synthetic fixture flattered it.
+
+**What the keyword scanner did on a real 91-page Experian export** (`verified` 2026-09-01): 20 items, furnisher present 0/20, date opened 0/20, account number 0/20. Its "creditors" were `Individual`, `Signer`, `Authorized User`, `Po Box 305,`, `Hays Mt` and `Account Number` — Responsibility *values*, address fragments and field *labels*. It found none of the 6 charge-offs, none of the 6 collections and none of the 30 hard inquiries, while reporting 4 `obsolete` and 4 `re_aging` items the file contains no date support for. On a real TransUnion file it identified `Fraud Victim Rights`, `Remedying The Effects Of Identity Theft` (a heading inside the FCRA legal notice) and the consumer's own name as creditors, producing 9 phantom `identity_theft` items.
+
+**`experian_parser.py` (`dd89584`, wired `290b1fb`)** — written against the real export. 36 tradelines (matching the report header), 20 negative, 29 hard inquiries, 8 duplicates, 51 dispute items. Furnisher 22/22, account 22/22, opened 22/22. Six collections carry the original creditor. `verified` 2026-09-01.
+
+**`canonical.py` (`fe48f1e`)** — one contract between every parser and the letter engine. Resolves field aliases once (`furnisher`/`target`/`account_name`, `reported`/`date_reported`), guarantees every field always present, converts money to `Decimal`, and sorts deterministically by severity. `field_coverage()` is the diagnostic: it shows in one table whether a parse is real, which is how the TransUnion gap was proven rather than guessed.
+
+**Bureau disclosure differs materially — the data is NOT uniform.** Same consumer, same week: Equifax 33 accounts, Experian 36, TransUnion 38.
+
+| Field | Equifax | TransUnion | Experian |
+|---|---|---|---|
+| **Date of first delinquency** | **33** | 10 | **absent** |
+| Date closed / amount past due / actual payment | yes | yes | **absent** |
+| Date of last activity, date major delinquency, months reviewed | **only EQ** | — | — |
+| **Fall-off / removal date** | **absent** | 17 | 30 |
+| **Furnisher address + phone** | **absent** | 212 | 36 |
+| Balance history | absent | 13 | 18 |
+
+18. **Equifax is the best single source, and no bureau is complete.** Equifax discloses the DOFD — the date § 1681c(a)(4) runs from, and the field the obsolescence and re-aging theories depend on. Experian discloses none of it; `implied_dofd` exists only to work around that absence. Conversely Equifax omits the fall-off date, which Experian and TransUnion publish. **They are complementary halves of one arithmetic: DOFD + 7 years should equal the stated fall-off date, and where it does not the bureau has contradicted its own maths on the face of its own disclosure.** That is a § 1681e(b) dispute requiring no assertion from the consumer. Ask for Equifax primary, Experian secondary (it is the only one that yielded the hard inquiries). `verified` 2026-09-01
+19. **No TransUnion parser exists.** TU falls through to the keyword scanner and produces the garbage above. Its format is the richest of the three — `Pay Status` as a code rather than prose, original creditor on 10 accounts, a `Maximum Delinquency` note, and uniquely the **furnisher's mailing address and phone on every tradeline**, which is precisely what § 1681i(a)(7) entitles a consumer to demand. Roughly a day of work.
+20. **`equifax_parser.py` had never been run against a real Equifax file until 2026-09-01.** It works: furnisher 20/20, account 20/20, opened 20/20, balance 20/20, DOFD 10/20. Unconfirmed whether that 10/20 reflects the 9 paid-and-closed student loans having no delinquency, or the `_field()` truncation bug from the static audit. Check before relying on it.
