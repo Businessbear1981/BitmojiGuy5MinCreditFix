@@ -110,6 +110,25 @@ _STATUS_RULES = (
 # has no quarrel with is how a file gets read as a mail-merge.
 _BENIGN = ("never late", "current / terms met", "paid, closed.", "open/never late")
 
+# ── Payment-history grid ────────────────────────────────────────────────────
+# Cells that record a delinquency. Classifying on the status sentence alone
+# misses accounts the bureau describes as healthy while its own grid says
+# otherwise: one JPMCB card in a real file reads "Pays As Agreed" on Equifax
+# and "Paid, Closed." on Experian, while every bureau's grid carries
+# 30/30/30/60 across 2020 and 90/120 in 2021. The grid is the bureau's own
+# data contradicting the bureau's own prose, which is a stronger dispute than
+# anything the consumer could assert — and a status-string classifier cannot
+# see it at all.
+_GRID_ADVERSE = {"30", "60", "90", "120", "150", "180", "CO", "COL"}
+
+# The legend printed under every grid repeats those same tokens as labels
+# ("30" / "Past due 30 days"). Parsing past this line counts the legend as
+# data and marks every account delinquent.
+_GRID_LEGEND = "Current / Terms met"
+
+_GRID_SEVERITY = {"30": 1, "60": 2, "90": 3, "120": 4, "150": 5, "180": 6,
+                  "CO": 7, "COL": 7}
+
 _COLLECTOR_MARKERS = (
     "MIDLAND", "PORTFOLIO RECOV", "LVNV", "RESURGENT", "CBE GROUP",
     "TRANSWORLD", "CREDENCE", "ENHANCED RECOVERY", "IC SYSTEM", "CONVERGENT",
@@ -168,16 +187,55 @@ def _is_collector(name: str) -> bool:
     return any(m in up for m in _COLLECTOR_MARKERS)
 
 
-def _category_for(status: str, furnisher: str) -> str:
+def _grid_markers(block: list[str]) -> list[str]:
+    """
+    Delinquency cells in this account's payment-history grid.
+
+    Bounded by the legend, which repeats the same tokens as labels — reading
+    past it would mark every account in the file delinquent.
+    """
+    try:
+        start = block.index("Payment History")
+    except ValueError:
+        return []
+    end = len(block)
+    for k in range(start + 1, len(block)):
+        if block[k] == _GRID_LEGEND:
+            end = k
+            break
+    return [c for c in block[start + 1:end] if c in _GRID_ADVERSE]
+
+
+def _category_for(status: str, furnisher: str, grid: list[str] | None = None) -> str:
+    """
+    The dispute category, from the status sentence and the payment grid.
+
+    The grid is consulted second but is never overridden by a benign status:
+    a tradeline the bureau calls "Paid, Closed/Never late" while its own grid
+    shows a 90-day delinquency is not a clean account, and the discrepancy is
+    itself the dispute.
+    """
     low = (status or "").lower()
-    if any(b in low for b in _BENIGN) and "past due" not in low:
+    grid = grid or []
+
+    benign_prose = any(b in low for b in _BENIGN) and "past due" not in low
+    if benign_prose and not grid:
         return ""
+
     for needle, bucket in _STATUS_RULES:
         if needle in low:
             if bucket == "collection" and _is_collector(furnisher):
                 return "debt_buyer"
             return bucket
-    return ""
+
+    if not grid:
+        return ""
+    # Status prose said nothing useful, or said the account was fine. Classify
+    # on the worst cell the bureau itself recorded.
+    worst = max(grid, key=lambda c: _GRID_SEVERITY.get(c, 0))
+    if worst in ("CO", "COL"):
+        return "debt_buyer" if _is_collector(furnisher) else "charge_off"
+    return "late_payment"
 
 
 def _blocks(lines: list[str]) -> list[list[str]]:
@@ -290,6 +348,7 @@ def _accounts(text: str) -> list[dict]:
             "on_record_until": _month_year(f.get("On Record Until", "")),
             "original_creditor": f.get("Original Creditor", "").strip(),
             "negative": any(_NEGATIVE_FLAG in ln.upper() for ln in block),
+            "grid": _grid_markers(block),
         })
     _mark_duplicates(out)
     return out
@@ -413,7 +472,8 @@ def parse_experian(text: str) -> list[dict]:
     items: list[dict] = []
 
     for a in _accounts(text):
-        bucket = _category_for(a["status"], a["furnisher"])
+        grid = a.get("grid") or []
+        bucket = _category_for(a["status"], a["furnisher"], grid)
         is_dupe = a.get("duplicate_count", 0) > 1
         if not bucket and not is_dupe:
             continue
@@ -422,6 +482,24 @@ def parse_experian(text: str) -> list[dict]:
         if bucket:
             grounds.append({"category": bucket, "strength": "moderate",
                             "evidence": a["status"]})
+
+        # Where the bureau's own grid contradicts its own status sentence, say
+        # so explicitly. This needs no assertion from the consumer — it is one
+        # document disagreeing with itself.
+        if grid and any(b in (a["status"] or "").lower() for b in _BENIGN):
+            worst = max(grid, key=lambda c: _GRID_SEVERITY.get(c, 0))
+            label = {"CO": "a charge-off", "COL": "a collection"}.get(
+                worst, f"a {worst}-day delinquency")
+            grounds.append({
+                "category": "status_inaccuracy",
+                "strength": "strong",
+                "evidence": (
+                    f"The status reported for this account is "
+                    f"\"{a['status']}\", but the payment history you publish for "
+                    f"the same account records {label}. Both statements cannot "
+                    f"be accurate."
+                ),
+            })
         if is_dupe:
             grounds.append({"category": "duplicate", "strength": "strong",
                             "evidence": a["duplicate_note"]})
@@ -437,8 +515,14 @@ def parse_experian(text: str) -> list[dict]:
             })
 
         # The demand that needs no factual assertion from the consumer.
+        #
+        # A named Original Creditor means the furnisher is collecting someone
+        # else's debt — a collector. Its absence means the furnisher is most
+        # likely the original creditor itself, which is the `creditor_direct`
+        # posture. This was inverted, which labelled a JPMCB card as a
+        # collection and would have aimed collector-only law at a bank.
         grounds.append({
-            "category": "creditor_direct" if a["original_creditor"] else "collection",
+            "category": "collection" if a["original_creditor"] else "creditor_direct",
             "strength": "moderate",
             "evidence": (
                 "I am requesting the description of the procedure used to "
