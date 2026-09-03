@@ -62,10 +62,28 @@ if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 connect_args = {}
+engine_args: dict = {}
 if DATABASE_URL.startswith("sqlite"):
     connect_args = {"check_same_thread": False}
+else:
+    # Postgres behind a pooler drops idle connections, and SQLAlchemy hands
+    # the dead one to the next caller: the first customer after a quiet spell
+    # gets `server closed the connection unexpectedly` as a 500, then it works
+    # on refresh — the hardest shape of bug to diagnose from support tickets.
+    # `pool_pre_ping` costs one round trip and removes the whole class.
+    #
+    # The pool is kept small on purpose. Two uvicorn workers at the default
+    # pool of 5 plus 10 overflow is 30 connections against a Supavisor tier
+    # that may cap lower, and exhausting the pooler fails every request rather
+    # than queueing.
+    engine_args = {
+        "pool_pre_ping": True,
+        "pool_recycle": 300,
+        "pool_size": 3,
+        "max_overflow": 2,
+    }
 
-engine = create_engine(DATABASE_URL, connect_args=connect_args)
+engine = create_engine(DATABASE_URL, connect_args=connect_args, **engine_args)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 Base = declarative_base()
 

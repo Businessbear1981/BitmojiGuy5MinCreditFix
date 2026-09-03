@@ -229,14 +229,27 @@ def _auto_repossession(rng: random.Random, today: date) -> Account:
 
 
 def _student_loan(rng: random.Random, today: date) -> Account:
+    """
+    A student loan with a delinquency actually on it.
+
+    The first version of this archetype was `Paying as agreed`, no amount past
+    due, no delinquency date, and an empty payment grid — a healthy tradeline
+    — while claiming to expect a `student_loan` dispute. The parser correctly
+    produced nothing for it and the suite recorded that as a failure. The
+    fixture was wrong, not the engine: a current student loan is not
+    disputable, and a suite that demands a dispute for one is asking the
+    engine to invent a claim.
+    """
     opened = today - timedelta(days=rng.randint(2000, 6000))
+    balance = rng.randint(1500, 42000)
     return Account(
         furnisher="VERGE FINANCIAL SVCS", account_number=_acct_no(rng),
-        loan_type="Student Loan", status="Paying as agreed",
-        opened=opened, dofd=None, balance=rng.randint(1500, 42000),
-        high_credit=rng.randint(1500, 42000), credit_limit=None, past_due=0,
-        narrative="Student loan, transferred", closed=False, grid="",
-        original_creditor="", expects="student_loan",
+        loan_type="Student Loan", status="Past due 120 days",
+        opened=opened, dofd=opened + timedelta(days=rng.randint(400, 1500)),
+        balance=balance, high_credit=balance, credit_limit=None,
+        past_due=rng.randint(500, 6000),
+        narrative="Student loan, transferred, past due", closed=False,
+        grid="120 90 60 30", original_creditor="", expects="student_loan",
     )
 
 
