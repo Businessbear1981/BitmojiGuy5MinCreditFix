@@ -28,6 +28,7 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import sqlite3
 import threading
 from datetime import datetime, timezone
@@ -65,6 +66,71 @@ def _bits(payload: str) -> str:
     return "".join(f"{byte:08b}" for byte in bytes.fromhex(payload))
 
 
+# Spans that have to survive byte-exact. "Period-space" alone treated every
+# legal abbreviation as a sentence end, so the carrier landed inside the
+# citations: "15 U.S.C. § 1681c" became "15 U.S.C. <zw>§ 1681c", and a bureau
+# searching its own intake for "15 U.S.C. § 1681c" no longer matched the letter
+# that cited it.
+_CITATION_SPAN = re.compile(
+    r"\d+\s+U\.S\.C\.(?:\s*§+\s*[\w().\-]+)*"      # 15 U.S.C. § 1681c(a)(4)
+    r"|§+\s*[\w().\-]+"                            # § 1681i(a)(7)
+    r"|\b\d+\s+[A-Z][A-Za-z.]{0,7}\.?(?:\s+\d[a-z]{0,2})?\s+\d+"  # 84 F. Supp. 3d 1044
+    r"|\bv\.\s+[A-Z][^,\n]{0,70}"                  # v. Experian Information …
+    r"|\([^)\n]{0,40}\d{4}\)"                      # (C.D. Cal. 2014)
+)
+
+# Undotted abbreviations that end in a period without ending a sentence.
+# Dotted ones (U.S.C., C.D., P.O.) are caught by the dotted-token test below.
+_NOT_SENTENCE_END = frozenset({
+    "supp", "cir", "seq", "inc", "ltd", "corp", "llc", "llp", "stat", "art",
+    "sec", "subsec", "para", "rev", "reg", "ibid", "etc", "viz", "mrs",
+    "ave", "apt", "dept", "div", "est", "fed", "dist", "app", "rptr",
+    "cal", "tex", "wash", "mich", "mass", "minn", "colo", "conn", "fla",
+    "ill", "kan", "mont", "neb", "nev", "okla", "ore", "tenn", "wis",
+    "ariz", "ark", "del", "ind", "super", "bankr", "comm", "admin", "misc",
+})
+
+
+def _sentence_anchors(text: str) -> list[int]:
+    """
+    Offsets just past a real sentence end.
+
+    Three things disqualify a period-space: the next character not opening a
+    new sentence, the token before the period being an abbreviation rather
+    than a word, and the position falling inside a citation. What survives is
+    ordinary prose, so the carrier never lands in text that has to be quoted
+    back exactly.
+    """
+    blocked = [m.span() for m in _CITATION_SPAN.finditer(text)]
+
+    anchors: list[int] = []
+    for i in range(len(text) - 2):
+        if text[i] != "." or text[i + 1] != " ":
+            continue
+
+        nxt = text[i + 2]
+        if not (nxt.isupper() or nxt.isdigit() or nxt in '"“'):
+            continue
+
+        # The token ending at this period.
+        j = i - 1
+        while j >= 0 and (text[j].isalpha() or text[j] == "."):
+            j -= 1
+        token = text[j + 1: i]
+        if "." in token:
+            continue          # U.S.C, C.D — mid-citation
+        low = token.lower()
+        if low and (len(low) < 2 or low in _NOT_SENTENCE_END):
+            continue
+
+        at = i + 2
+        if any(start < at < end for start, end in blocked):
+            continue
+
+        anchors.append(at)
+    return anchors
+
+
 def embed_invisible(text: str, fp: str) -> str:
     """
     Weave the fingerprint through the letter body.
@@ -79,11 +145,7 @@ def embed_invisible(text: str, fp: str) -> str:
     payload = _bits(fp)
     carrier = _MARK + "".join(_ONE if b == "1" else _ZERO for b in payload) + _MARK
 
-    # Anchor points: after each period-space. Spread the carrier across them.
-    anchors = []
-    for i in range(len(text) - 1):
-        if text[i] == "." and text[i + 1] == " ":
-            anchors.append(i + 2)
+    anchors = _sentence_anchors(text)
 
     if not anchors:
         return text + carrier
@@ -170,7 +232,11 @@ def stamp_letter(letter: dict, session_id: str, issued_at: datetime | None = Non
         return letter
 
     fp = fingerprint(session_id, issued_at)
-    body = body + provenance_footer(
+    # One blank line between the signature block and the footer rule, matching
+    # the single-blank-line spacing `_assemble()` enforces everywhere else.
+    # Appending the footer to a body that already ended in a newline left a
+    # three-newline gap that no other join in the letter has.
+    body = body.rstrip("\n") + provenance_footer(
         session_id, letter.get("tier", 1), letter.get("tier_name", ""), issued_at
     )
     body = embed_invisible(body, fp)

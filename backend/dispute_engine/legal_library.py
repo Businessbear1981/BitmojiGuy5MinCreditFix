@@ -874,12 +874,35 @@ def get_theory(theory_id: str) -> dict | None:
     return VIOLATION_THEORIES.get(theory_id)
 
 
-def get_verified_cases(theory_id: str) -> list:
-    """Get only verified case law entries for a theory."""
-    theory = VIOLATION_THEORIES.get(theory_id)
-    if not theory:
-        return []
-    return [c for c in theory.get('federal_case_law', []) if c.get('verified')]
+def get_verified_cases(theory_id: str, jurisdiction: str = '') -> list:
+    """
+    Case law for a theory, taken only from the verified authority store.
+
+    The `federal_case_law` entries in this module carry a self-asserted
+    `verified: True` flag that nothing ever checked. A verification pass read
+    each one in the court's own text and found citations that do not support
+    the proposition they were attached to — Grigoryan and Phillips among them,
+    both of which reached real letters.
+
+    `legal_store` requires a named human verifier and an explicit per-entry
+    opt-in, so an unread case cannot reach a letter. No active case law means
+    no Judicial Interpretation block, which is the correct outcome: a letter
+    with fewer citations beats a letter carrying a false one.
+    """
+    # Imported inside the call so this engine package does not pull the
+    # database layer in at import time. The store falls back to its in-repo
+    # seed when the table is unreachable, so a letter can always build.
+    import legal_store
+
+    return [
+        {
+            'citation': a.cite_line(),
+            'holding': a.holding,
+            'outcome': a.outcome,
+        }
+        for a in legal_store.authorities_for([theory_id], jurisdiction)
+        if a.kind == 'case'
+    ]
 
 
 def get_verified_statutes(theory_id: str) -> list:

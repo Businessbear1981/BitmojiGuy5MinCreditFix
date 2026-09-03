@@ -48,6 +48,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import dataclass
 
 from sqlalchemy import (
@@ -447,6 +448,63 @@ SEED: tuple[Authority, ...] = (
 )
 
 
+class CourtLevelError(ValueError):
+    """A case that does not meet the citation standard for this product."""
+
+
+# Reporters and court parentheticals, read straight off the citation string.
+_SUPREME = re.compile(r"\b\d+\s+U\.\s?S\.\s+\d+|\bS\.\s?Ct\.\s|\bL\.\s?Ed\.")
+_CIRCUIT = re.compile(r"\bF\.(?:2d|3d|4th)\b|\(\s*(?:\d{1,2}(?:st|nd|rd|th)|D\.C\.|Fed\.)\s*Cir\.")
+_DISTRICT = re.compile(
+    r"\bF\.\s?Supp\.(?:\s?\d(?:d|th))?\b"
+    r"|\(\s*(?:[NSEWCM]\.D\.|D\.)\s*[A-Z]"
+    r"|\bWL\b"
+)
+
+
+def court_level(citation: str) -> str:
+    """
+    'supreme', 'circuit', 'district', or 'unknown', from the citation alone.
+
+    District first: a citation can name both a district court and a federal
+    reporter, and the district parenthetical is the one that decides it.
+    """
+    text = citation or ""
+    if _DISTRICT.search(text):
+        return "district"
+    if _SUPREME.search(text):
+        return "supreme"
+    if _CIRCUIT.search(text):
+        return "circuit"
+    return "unknown"
+
+
+def assert_citable(citation: str, kind: str) -> None:
+    """
+    The standard a case has to clear before it can go in a customer's letter:
+    **appellate or higher, challenged and upheld on appeal.**
+
+    A trial court's ruling binds nobody, can be reversed, and is not the
+    standard practice — so it has no business in a document a consumer signs
+    and mails. That test is readable from the citation itself, which is why it
+    is enforced here rather than left to whoever is filling the table:
+    `Grigoryan v. Experian, 84 F. Supp. 3d 1044 (C.D. Cal. 2014)` reached real
+    letters, and 'F. Supp. 3d' plus 'C.D. Cal.' says district court before
+    anyone opens the opinion.
+
+    Statutes are exempt — a statute is the text itself, not a ruling about it.
+    """
+    if kind != "case":
+        return
+    level = court_level(citation)
+    if level in ("circuit", "supreme"):
+        return
+    raise CourtLevelError(
+        f"{citation!r} reads as {level} authority. Only a court of appeals or "
+        f"higher may be cited, and only where the holding survived appeal."
+    )
+
+
 def init_legal_store() -> None:
     """Create the table and load any seed row that is not already present."""
     Base.metadata.create_all(bind=engine, tables=[LegalAuthority.__table__])
@@ -464,6 +522,9 @@ def init_legal_store() -> None:
             key = (a.jurisdiction, a.theory, a.citation, a.pinpoint)
             if key in existing:
                 continue
+            # Refuse at the door. A row that cannot lawfully be cited should
+            # never exist in the table, active or not.
+            assert_citable(a.citation, a.kind)
             db.add(LegalAuthority(
                 jurisdiction=a.jurisdiction, theory=a.theory, kind=a.kind,
                 citation=a.citation, pinpoint=a.pinpoint, holding=a.holding,

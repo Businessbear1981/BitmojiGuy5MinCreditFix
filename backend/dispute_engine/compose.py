@@ -142,7 +142,12 @@ def _summary_close(items: list[dict]) -> str:
     stacked.sort(key=lambda i: -len(i["categories"]))
 
     lines = [
-        "SECTION 9 — ITEMS CONTESTED ON MULTIPLE INDEPENDENT GROUNDS",
+        # Numbered 6B, not 9. This block is spliced in immediately before the
+        # disclaimers, so as "SECTION 9" the letter read 6, 9, 7 with no 8 —
+        # and 8 cannot be borrowed because the tier-2 and tier-3 letters use it
+        # for method-of-verification, noncompliance and regulatory escalation.
+        # The suffix convention is already how 4B carries the extra items.
+        "SECTION 6B — ITEMS CONTESTED ON MULTIPLE INDEPENDENT GROUNDS",
         "",
         ("Several of the items above are disputed for more than one reason. The "
         "grounds are independent of each other: each stands on its own, and any "
