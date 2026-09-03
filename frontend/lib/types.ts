@@ -3,16 +3,29 @@
 
 export const PRICE_DISPLAY = '$24.99'
 
-/** A disputable item detected by the report scanner (backend suggestion). */
+/**
+ * A disputable item detected by the report scanner (backend suggestion).
+ *
+ * `amount` is an exact decimal string — "527.00" — not a number. These are
+ * figures quoted back to a credit bureau, and a JavaScript number is a binary
+ * float that cannot hold every value a report prints. Pass it through
+ * unchanged; never parseFloat it.
+ */
 export interface Suggestion {
   bucket: string
   type: 'bureau' | 'creditor'
   target: string
   account: string
-  amount: number | null
+  amount: string
   opened: string | null
   reason: string
   confidence: 'high' | 'medium' | 'low'
+  furnisher?: string
+  dofd?: string | null
+  original_creditor?: string
+  highest_balance?: string
+  falloff_status?: string
+  categories?: { category: string; strength: string; evidence?: string; derived?: boolean }[]
 }
 
 /** A dispute item as confirmed by the customer (backend request shape). */
@@ -20,7 +33,8 @@ export interface DisputeItemInput {
   type: 'bureau' | 'creditor'
   target: string
   account: string
-  amount?: number | null
+  /** Exact decimal string, e.g. "527.00". */
+  amount?: string
   opened?: string | null
   reason: string
 }
@@ -42,7 +56,12 @@ export interface CreateCaseResponse {
 
 export interface UploadResponse {
   filename: string
+  doc_type: 'id' | 'address' | 'report'
   attachments: string[]
+  /** True only once all three document kinds are in hand. */
+  docs_complete: boolean
+  /** Which of id/address/report the case is still missing. */
+  missing: ('id' | 'address' | 'report')[]
   suggestions: Suggestion[]
 }
 

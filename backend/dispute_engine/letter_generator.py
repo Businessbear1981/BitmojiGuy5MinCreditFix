@@ -127,9 +127,22 @@ def _build_section_3_consumer_position(analyst_report: dict, has_fraud: bool) ->
         lines.append('')
 
     if 'validation_failure' in theory_ids:
-        lines.append('For accounts reported by collection agencies and debt buyers, I have not '
-                     'received validation of the debts as required under federal law. I am exercising '
-                     'my right to request verification before these items continue to appear on my report.')
+        # A request, not a claim about what the consumer did or did not
+        # receive. The previous wording — "I have not received validation of
+        # the debts as required under federal law" — asserted a personal fact
+        # the software cannot know, for every collector at once. Collectors
+        # keep mailing logs; one produced notice turns the consumer's own
+        # letter into the furnisher's exhibit. It also misstated the law:
+        # § 1692g(b) obliges a collector to verify *after* a written dispute,
+        # so there is no standing duty to have validated beforehand.
+        #
+        # Asking is strictly stronger. It rests on § 1681i, which binds the
+        # bureau being written to, and nothing in it depends on the debt not
+        # being owed.
+        lines.append('For the collection accounts identified above, I am requesting verification '
+                     'of the debt as reported — the amount, the date of first delinquency, and the '
+                     "reporting entity's authority to furnish it. I am asking that this information "
+                     'be verified before it continues to appear on my report.')
         lines.append('')
 
     if 're_aging' in theory_ids:
@@ -461,13 +474,17 @@ def _fmt_money(value) -> str:
     adapter, `6100.0` as a raw float, and a bare `0` — in a document whose
     entire subject is money. A letter that cannot render a dollar amount
     consistently invites the reader to doubt the rest of it.
+
+    Decimal, never float: this is the figure the bureau is asked to correct,
+    so the letter must show exactly what the report showed.
     """
-    if value is None or value == "":
-        return ""
-    try:
-        return f"${float(str(value).replace('$', '').replace(',', '')):,.2f}"
-    except (TypeError, ValueError):
-        return str(value)
+    from money import fmt_money, parse_money
+
+    if parse_money(value) is None:
+        # Not a number we can vouch for — show it verbatim rather than
+        # inventing a dollar figure around it.
+        return "" if value is None or value == "" else str(value)
+    return fmt_money(value)
 
 
 def generate_collector_letter(

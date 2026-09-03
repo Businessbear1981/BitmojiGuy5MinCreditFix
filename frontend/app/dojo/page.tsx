@@ -57,8 +57,13 @@ export default function DojoPage() {
     setSlots((s) => ({ ...s, [key]: { ...s[key], uploading: true, error: '', filename: file.name, sizeKb: Math.round(file.size / 1024) } }))
     try {
       const res = await uploadDocument(file, key)
-      const ok = res.ok
-      if (!ok) throw new Error(`Upload failed (${res.status})`)
+      if (!res.ok) {
+        // The server explains what is wrong with the file — that a scan cannot
+        // be read, that the export is the wrong kind. Throwing the status code
+        // alone left the customer staring at "Upload failed (422)".
+        const body = await res.json().catch(() => null)
+        throw new Error(body?.error || `Upload failed (${res.status})`)
+      }
       setSlots((s) => ({ ...s, [key]: { ...s[key], uploading: false, armored: true, error: '' } }))
       setUpload(`${key}Uploaded` as 'idUploaded' | 'addressUploaded' | 'reportUploaded', true)
     } catch (e) {
@@ -236,6 +241,31 @@ export default function DojoPage() {
                 <p style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: '#8A8278', marginTop: 6 }}>
                   annualcreditreport.com &middot; Free from all 3 bureaus &middot; No credit card required
                 </p>
+                {/* Which bureau to pick is not a preference. Measured across
+                    all three exports of the same file: Equifax carried the
+                    date of first delinquency on 10 accounts and Experian on
+                    none, and DOFD is what the obsolescence and re-aging
+                    arguments are built from. Saying so here saves the
+                    customer an upload that produces a weaker letter. */}
+                <p style={{
+                  fontFamily: 'var(--font-body)', fontSize: 12, color: '#C9A84C',
+                  marginTop: 10, lineHeight: 1.55, maxWidth: 460,
+                  marginLeft: 'auto', marginRight: 'auto',
+                }}>
+                  On that site, choose <strong>Equifax</strong>.
+                </p>
+                <p style={{
+                  fontFamily: 'var(--font-body)', fontSize: 11, color: '#8A8278',
+                  marginTop: 4, lineHeight: 1.6, maxWidth: 480,
+                  marginLeft: 'auto', marginRight: 'auto',
+                }}>
+                  We ran the same credit file through all three bureau exports.
+                  Equifax&rsquo;s gave us the most to work with — more account
+                  numbers, every balance, and the delinquency dates the
+                  strongest disputes are built on, which the Experian export
+                  leaves out entirely. Another bureau&rsquo;s report still
+                  works; Equifax simply gives your letters more to stand on.
+                </p>
               </div>
               <CreditReportGuide />
             </div>
@@ -331,10 +361,12 @@ function UploadSlot({ cfg, state, onFile }: { cfg: SlotConfig; state: SlotState;
 
       {/* Action */}
       <div>
+        {/* accept must match the server's allow-list exactly. Offering
+            .docx/.html here let the picker take a file the server refused. */}
         <input
           ref={inputRef}
           type="file"
-          accept=".pdf,.png,.jpg,.jpeg,.txt,.csv,.docx,.html,.htm"
+          accept=".pdf,.png,.jpg,.jpeg,.txt,.csv"
           onChange={(e) => {
             const f = e.target.files?.[0]
             if (f) onFile(f)

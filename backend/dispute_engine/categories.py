@@ -466,9 +466,21 @@ def citations_for(category_id: str) -> list[str]:
 # reason of its own. Written in the consumer's voice — these end up in the
 # letter and in the review screen, so they state a position, not a conclusion.
 _REASON_TEMPLATES = {
-    "collection": "I do not recognise this collection account and have no contractual "
-                  "relationship with {target}. I am requesting full validation, including "
-                  "the original signed agreement and proof of the assignment chain.",
+    # Says nothing about whose debt it is — because the software cannot know
+    # that, and the consumer never said it. The old text opened with "I do not
+    # recognise this collection account and have no contractual relationship
+    # with {target}", fired from a parser classification, and put a factual
+    # denial in the consumer's mouth that they had not made. A furnisher
+    # answers that in one move by producing the account log, and the letter
+    # becomes the problem instead of the reporting.
+    #
+    # Accuracy, completeness and verifiability are the grounds that survive
+    # the log: they are the bureau's own duties under § 1681e(b) and
+    # § 1681i, and none of them depends on the debt not being owed.
+    "collection": "I dispute the accuracy and completeness of this collection account as "
+                  "reported. I am requesting verification of the amount, the dates, and "
+                  "{target}'s authority to report it, including documentation of the "
+                  "assignment from the original creditor.",
     "debt_buyer": "{target} is not the original creditor. I am requesting documentation "
                   "of the complete chain of title from the original creditor to {target}.",
     "medical_debt": "This medical account is disputed. I am requesting validation and an "
@@ -493,7 +505,13 @@ _REASON_TEMPLATES = {
                       "authorisation.",
     "duplicate": "This debt appears more than once on my file, counting a single obligation "
                  "multiple times.",
-    "personal_info": "This personal information is not mine and should be removed from my file.",
+    # A former address usually IS the consumer's, and reportable. "Not mine"
+    # was a denial the parser had no basis for; outdated-and-unverified is
+    # what a stale entry actually is, and it is what the consumer can stand
+    # behind without knowing which entry the software flagged.
+    "personal_info": "This personal information is outdated or inaccurate as reported. I am "
+                     "requesting that it be verified against the furnisher's records or "
+                     "removed from my file.",
     "deceased_indicator": "My file carries a deceased indicator in error. I am living and "
                           "this flag is blocking my access to credit.",
     "repossession": "The repossession reported on account {account} is disputed, including "
@@ -520,6 +538,49 @@ _REASON_TEMPLATES = {
 }
 
 
+# Values a parser writes when a field is absent. They are strings, so they
+# pass a truthiness guard and print: "Account Number: Unknown" reached real
+# letters, and so did "the date of first delinquency reported for account
+# Unknown", which is a legal demand about a tradeline it cannot name.
+PLACEHOLDERS = frozenset({
+    "unknown", "none", "n/a", "na", "null", "-", "--", "not reported",
+})
+
+# Categories whose dispute reason asserts something only the consumer can
+# know: that an account is not theirs, that it was opened fraudulently, that
+# the file has been mixed with someone else's, that a deceased flag is wrong.
+#
+# Nothing read off a credit report can establish any of these. Software must
+# never reach them on its own — if it does, the letter states a personal fact
+# the consumer never gave us, over their signature, and a furnisher answers it
+# by producing the account log. Each one is unlocked only by the consumer
+# ticking its affirmation on the review screen.
+CONSUMER_ONLY_CATEGORIES = frozenset({
+    "identity_theft", "identity_error", "mixed_file", "deceased_indicator",
+})
+
+
+def consumer_affirmed(category_id: str, affirmations: dict | None) -> bool:
+    """
+    Whether the consumer personally affirmed what this category asserts.
+
+    Always True for the accuracy-based categories, which claim nothing about
+    the consumer's own knowledge — they dispute what the file says, not whose
+    debt it is, and that is a position the report itself supports.
+    """
+    if category_id not in CONSUMER_ONLY_CATEGORIES:
+        return True
+    required = set(affirmations_for(category_id))
+    given = {k for k, v in (affirmations or {}).items() if v}
+    return bool(required & given)
+
+
+def real_value(value: object) -> str:
+    """The value if it says something, otherwise an empty string."""
+    text = str(value).strip() if value is not None else ""
+    return "" if text.lower() in PLACEHOLDERS else text
+
+
 def reason_for(category_id: str, target: str = "", account: str = "") -> str:
     """A default dispute reason for this category, in the consumer's voice."""
     template = _REASON_TEMPLATES.get(
@@ -527,7 +588,10 @@ def reason_for(category_id: str, target: str = "", account: str = "") -> str:
         "The information reported on account {account} is inaccurate or incomplete "
         "as shown, and I am requesting verification.",
     )
-    return template.format(target=target or "this entity", account=account or "this account")
+    return template.format(
+        target=real_value(target) or "this entity",
+        account=real_value(account) or "this account",
+    )
 
 
 def prompt_taxonomy() -> str:

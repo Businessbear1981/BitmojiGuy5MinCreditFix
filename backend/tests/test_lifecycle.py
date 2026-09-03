@@ -91,6 +91,7 @@ def test_full_lifecycle(client, terms_token):
     resp = client.post(
         f"/api/case/{session_id}/upload",
         files={"file": ("report.txt", io.BytesIO(SAMPLE_REPORT), "text/plain")},
+        data={"doc_type": "report"},
     )
     assert resp.status_code == 200
     suggestions = resp.json()["suggestions"]
@@ -170,32 +171,117 @@ def test_full_lifecycle(client, terms_token):
 
 def test_multiple_uploads_all_persist(client, case_session):
     """Regression: appending to a non-empty attachments list must persist."""
-    for name in ("id.png", "address.png", "report.txt"):
+    for name, doc_type in (("id.png", "id"), ("address.png", "address")):
         resp = client.post(
             f"/api/case/{case_session}/upload",
             files={"file": (name, io.BytesIO(b"data"), "application/octet-stream")},
+            data={"doc_type": doc_type},
         )
         assert resp.status_code == 200
-    # Re-read from the DB via the API — all three must survive
+    # Re-read from the DB via the API — every attachment must survive
     resp = client.post(
         f"/api/case/{case_session}/upload",
-        files={"file": ("extra.txt", io.BytesIO(b"x"), "text/plain")},
+        files={"file": ("report.txt", io.BytesIO(SAMPLE_REPORT), "text/plain")},
+        data={"doc_type": "report"},
     )
-    assert resp.json()["attachments"] == ["id.png", "address.png", "report.txt", "extra.txt"]
+    assert resp.json()["attachments"] == ["id.png", "address.png", "report.txt"]
+
+
+def test_docs_complete_needs_all_three_kinds(client, case_session):
+    """
+    `docs_complete` used to flip on the first upload of any kind, so a case
+    reached letter generation with no credit report in it at all.
+    """
+    resp = client.post(
+        f"/api/case/{case_session}/upload",
+        files={"file": ("id.png", io.BytesIO(b"data"), "application/octet-stream")},
+        data={"doc_type": "id"},
+    )
+    assert resp.json()["docs_complete"] is False
+    assert sorted(resp.json()["missing"]) == ["address", "report"]
+
+    client.post(
+        f"/api/case/{case_session}/upload",
+        files={"file": ("addr.png", io.BytesIO(b"data"), "application/octet-stream")},
+        data={"doc_type": "address"},
+    )
+    resp = client.post(
+        f"/api/case/{case_session}/upload",
+        files={"file": ("report.txt", io.BytesIO(SAMPLE_REPORT), "text/plain")},
+        data={"doc_type": "report"},
+    )
+    assert resp.json()["docs_complete"] is True
+    assert resp.json()["missing"] == []
+
+
+def test_non_report_upload_is_never_parsed_for_disputes(client, case_session):
+    """
+    A bank statement sent to prove an address came back as three dispute
+    items built from the account's opening balance, closing balance and
+    monthly service fee — one of them asserting the account was not the
+    customer's. Only a report may be parsed.
+    """
+    statement = (
+        b"Beginning balance on October 15, 2025 $28,082.74\n"
+        b"Withdrawals and other subtractions -31,354.29\n"
+        b"Service fees -32.45\n"
+        b"Ending balance on November 7, 2025 $237.95\n"
+        b"Account closed for collection purposes\n"
+    )
+    resp = client.post(
+        f"/api/case/{case_session}/upload",
+        files={"file": ("eStmt.txt", io.BytesIO(statement), "text/plain")},
+        data={"doc_type": "address"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["suggestions"] == []
+
+
+def test_unreadable_report_is_refused_not_invented(client, case_session):
+    """
+    A file that yields nothing must be refused with an explanation, rather
+    than accepted as a report with zero items or padded with keyword hits on
+    the report's own headings.
+    """
+    resp = client.post(
+        f"/api/case/{case_session}/upload",
+        files={"file": ("scan.txt", io.BytesIO(b"Addresses\nMonthly Payment\n"), "text/plain")},
+        data={"doc_type": "report"},
+    )
+    assert resp.status_code == 422
+    assert "annualcreditreport.com" in resp.json()["detail"]
 
 
 def test_upload_rejects_bad_type_and_unknown_session(client, case_session):
     resp = client.post(
         f"/api/case/{case_session}/upload",
         files={"file": ("evil.exe", io.BytesIO(b"MZ"), "application/octet-stream")},
+        data={"doc_type": "id"},
     )
     assert resp.status_code == 400
 
     resp = client.post(
         "/api/case/nope123/upload",
         files={"file": ("report.txt", io.BytesIO(b"x"), "text/plain")},
+        data={"doc_type": "report"},
     )
     assert resp.status_code == 404
+
+
+def test_upload_requires_a_document_type(client, case_session):
+    """Without it every upload was parsed as a credit report."""
+    resp = client.post(
+        f"/api/case/{case_session}/upload",
+        files={"file": ("report.txt", io.BytesIO(b"x"), "text/plain")},
+    )
+    assert resp.status_code == 422
+
+    resp = client.post(
+        f"/api/case/{case_session}/upload",
+        files={"file": ("report.txt", io.BytesIO(b"x"), "text/plain")},
+        data={"doc_type": "passport"},
+    )
+    assert resp.status_code == 422
 
 
 def test_fishbowl_status(client):

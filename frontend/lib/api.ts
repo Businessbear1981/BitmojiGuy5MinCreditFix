@@ -79,6 +79,63 @@ function cacheSuggestions(suggestions: Suggestion[]) {
   try { window.localStorage.setItem(SUGGESTIONS_KEY, JSON.stringify(suggestions)) } catch { /* storage blocked */ }
 }
 
+/**
+ * How much a parsed report is worth arguing.
+ *
+ * An item that names an account number is worth more than one that cannot,
+ * because the bureau can look the first one up. Counting both means a report
+ * with more detail wins over a report with more rows.
+ */
+function reportStrength(suggestions: Suggestion[]): number {
+  const identified = suggestions.filter((s) => {
+    const acct = String((s as { account?: unknown }).account ?? '').trim()
+    return acct.length >= 4 && /\d/.test(acct)
+  }).length
+  return identified * 2 + suggestions.length
+}
+
+/** Which bureau a parse describes, by majority of its items' targets. */
+function bureauOf(suggestions: Suggestion[]): string {
+  const tally = new Map<string, number>()
+  for (const s of suggestions) {
+    const t = String((s as { target?: unknown }).target ?? '').trim()
+    if (t) tally.set(t, (tally.get(t) ?? 0) + 1)
+  }
+  let best = ''
+  let seen = 0
+  for (const [name, n] of tally) if (n > seen) { best = name; seen = n }
+  return best
+}
+
+/**
+ * Keep the strongest parse *per bureau*, and keep every bureau.
+ *
+ * Two separate mistakes lived here. First the cache was a plain overwrite, so
+ * uploading three reports left whichever went in last — an Experian parse of
+ * 52 items replaced by a TransUnion parse of 20. Replacing that with a single
+ * strongest-wins cache fixed the junk but then threw Equifax away, and since a
+ * letter is only ever addressed to the bureau whose file it was read from,
+ * that silently reduced a three-bureau product to one letter.
+ *
+ * A consumer disputing with Equifax needs the items Equifax reports, so each
+ * bureau keeps its own parse and only a stronger parse of the *same* bureau
+ * replaces it. Returns whether the incoming parse was adopted.
+ */
+function cacheReportByBureau(suggestions: Suggestion[]): boolean {
+  if (!suggestions.length) return false
+  const bureau = bureauOf(suggestions)
+  if (!bureau) return false
+
+  const existing = loadSuggestions()
+  const sameBureau = existing.filter((s) => bureauOf([s]) === bureau)
+  if (sameBureau.length && reportStrength(suggestions) <= reportStrength(sameBureau)) {
+    return false
+  }
+  const others = existing.filter((s) => bureauOf([s]) !== bureau)
+  cacheSuggestions([...others, ...suggestions])
+  return true
+}
+
 function loadSuggestions(): Suggestion[] {
   if (typeof window === 'undefined') return []
   try {
@@ -149,10 +206,14 @@ export async function uploadDocument(file: File, type: 'id' | 'address' | 'repor
   }
   const fd = new FormData()
   fd.append('file', file)
+  // The slot knows what this document is and the server cannot guess. Omitting
+  // it meant an ID and a bank statement were both parsed as credit reports.
+  fd.append('doc_type', type)
   const res = await fetch(`${API}/api/case/${_sessionId}/upload`, { method: 'POST', body: fd })
   const data = await readJson(res)
   if (res.ok && type === 'report' && Array.isArray(data.suggestions)) {
-    cacheSuggestions(data.suggestions as Suggestion[])
+    data.report_adopted = cacheReportByBureau(data.suggestions as Suggestion[])
+    data.items_in_use = loadSuggestions().length
   }
   if (!res.ok) {
     return jsonResponse({ error: detailMessage(data, 'Upload failed — please try again.') }, res.status)
@@ -191,10 +252,14 @@ function toDisputeView(s: Suggestion, index: number): DisputeItemView {
     // Prefer the furnisher name over the account number for display: the
     // parser writes "Unknown" into `account` for most items, which made every
     // row on the review screen read "Unknown".
-    creditor: s.target || s.account,
-    account_number: '',
+    // The furnisher is who reports the item; `target` is only the bureau the
+    // letter goes to, so prefer the furnisher when the parser found one.
+    creditor: s.furnisher || s.target || s.account,
+    account_number: s.account && !/^unknown$/i.test(s.account) ? s.account : '',
     type: s.type,
-    amount: s.amount != null ? `$${s.amount}` : '',
+    // `amount` is an exact decimal string and "" means the report showed no
+    // figure. A null check alone rendered a bare "$" on every such row.
+    amount: s.amount ? `$${s.amount}` : '',
     date: s.opened ?? '',
     dispute: true,
     dispute_box: s.bucket,
@@ -236,6 +301,13 @@ export async function reviewDisputes(
       ? suggestions[item.suggestion_index]
       : undefined
     if (match) {
+      // Pass the parser's whole reading through, not a six-field summary of
+      // it. Dropping `furnisher` printed "Account Name: Experian" on every
+      // item, and dropping `categories` sent items to the letter's fallback
+      // section instead of the violation theory the parser had already
+      // matched. The server validates each field; unknown values are dropped
+      // there, so forwarding them is safe.
+      const m = match as Suggestion & Record<string, unknown>
       return {
         type: match.type,
         target: match.target,
@@ -243,6 +315,13 @@ export async function reviewDisputes(
         amount: match.amount,
         opened: match.opened,
         reason: match.reason,
+        bucket: m.bucket ?? '',
+        furnisher: m.furnisher ?? '',
+        dofd: m.dofd ?? null,
+        original_creditor: m.original_creditor ?? '',
+        highest_balance: m.highest_balance ?? null,
+        falloff_status: m.falloff_status ?? '',
+        categories: m.categories ?? [],
       }
     }
     // Custom / unmatched item: dispute it directly with the creditor named.

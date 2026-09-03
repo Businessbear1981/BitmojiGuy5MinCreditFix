@@ -19,6 +19,7 @@ from dispute_engine.categories import (
 from equifax_parser import looks_like_equifax, parse_equifax
 from experian_parser import looks_like_experian, parse_experian
 from experian_parser import report_summary as experian_summary
+from money import money_str
 
 # --- PDF text extraction ---
 try:
@@ -140,6 +141,11 @@ def analyze_with_claude(report_text: str) -> list[dict]:
             if bucket_id not in DISPUTE_CATEGORIES:
                 bucket_id = _guess_bucket(item.get("reason", ""))
 
+            # Same bar as the keyword scanner: the model is not allowed to
+            # return a dispute it cannot attribute to a tradeline either.
+            if not _is_attributable(item.get("target", ""), item.get("account", "")):
+                continue
+
             cleaned.append({
                 "bucket": bucket_id,
                 "type": item.get("type", DISPUTE_CATEGORIES.get(bucket_id, {}).get("type", "bureau")),
@@ -169,8 +175,63 @@ def analyze_with_claude(report_text: str) -> list[dict]:
 # Keyword Fallback Scanner
 # ======================================================================
 
+# A credit report is mostly furniture: section headings, field labels, the
+# bureau's own name. The keyword scanner matches a category word anywhere in
+# the text, so it matched these too, and produced "disputes" whose furnisher
+# was "Monthly Payment" or "Addresses".
+_REPORT_FURNITURE = frozenset({
+    "addresses", "other address", "address", "personal information",
+    "monthly payment", "payment history", "account closures", "closures",
+    "accounts", "account history", "account type", "account status",
+    "public records", "inquiries", "credit summary", "score factors",
+    "employment", "employment data", "balance", "high balance",
+    "credit limit", "date opened", "date closed", "last payment",
+    "past due", "responsibility", "terms", "status", "remarks",
+    "original creditor", "creditor contact", "summary", "unknown",
+    "name", "names", "date of birth", "phone numbers", "file number",
+})
+
+_NULLISH = frozenset({"", "unknown", "none", "n/a", "na", "null", "-", "--"})
+
+
+def _is_attributable(target: str, account: str) -> bool:
+    """
+    Whether an item names a tradeline a bureau could actually look up.
+
+    A dispute has to identify what it is about. Without this, a keyword hit on
+    the report's own heading became an item with account="Unknown" and
+    target="Monthly Payment", and those items reached real letters — a demand
+    to delete something that was never an account.
+
+    The keyword scanner has no structure to lean on, so it must show an
+    account identifier: four or more characters containing a digit. The
+    dedicated Experian and Equifax parsers read the account number straight
+    off the tradeline and are unaffected by this.
+
+    A bureau name is a legitimate `target` — that field is who the letter is
+    addressed to, not who furnishes the debt — so only the report's own field
+    labels are refused here.
+    """
+    acct = (account or "").strip()
+    if len(acct) < 4 or acct.lower() in _NULLISH or not any(c.isdigit() for c in acct):
+        return False
+
+    name = re.sub(r"[^a-z ]", " ", (target or "").lower()).strip()
+    name = re.sub(r"\s+", " ", name)
+    if len(name) < 3 or name in _NULLISH:
+        return False
+    return name not in _REPORT_FURNITURE
+
+
 def analyze_with_keywords(report_text: str) -> list[dict]:
-    """Fallback keyword-based scanner when Claude API is not available."""
+    """
+    Fallback keyword-based scanner when no dedicated parser matched.
+
+    Emits only items it can attribute — see `_is_attributable`. Returning
+    nothing is a valid and frequent answer: the upload endpoint turns it into
+    an honest "this file could not be read as a credit report" rather than a
+    letter full of invented tradelines.
+    """
     items = []
     lines = report_text.split("\n")
     seen = set()
@@ -183,24 +244,29 @@ def analyze_with_keywords(report_text: str) -> list[dict]:
         for bucket_id, bucket in DISPUTE_CATEGORIES.items():
             for keyword in bucket["keywords"]:
                 if keyword in line_lower:
+                    # The same window the amount uses. A report prints the
+                    # account number on its own line and the status a line or
+                    # two below, so searching only the matched line found no
+                    # account for the very items the keyword had just hit —
+                    # and `_is_attributable` then dropped every one of them.
+                    context = " ".join(lines[max(0, i - 2):i + 3])
+
                     # Extract account number
                     acct_match = re.search(
-                        r'(?:account|acct)[#:\s]*([A-Za-z0-9\-]+)', line, re.IGNORECASE
+                        r'(?:account|acct)[#:\s]*([A-Za-z0-9\-]+)', context, re.IGNORECASE
                     )
                     account = acct_match.group(1) if acct_match else "Unknown"
 
-                    # Extract dollar amount
-                    amount = None
-                    context = " ".join(lines[max(0, i - 2):i + 3])
+                    # Extract dollar amount — exact decimal string, not a
+                    # float; see money.py.
                     amt_match = re.search(r'\$[\d,]+\.?\d*', context)
-                    if amt_match:
-                        try:
-                            amount = float(amt_match.group().replace("$", "").replace(",", ""))
-                        except ValueError:
-                            pass
+                    amount = money_str(amt_match.group()) if amt_match else ""
 
                     # Detect target
                     target = _detect_target(lines, i)
+
+                    if not _is_attributable(target, account):
+                        break
 
                     key = (bucket_id, target, account)
                     if key not in seen:
@@ -304,6 +370,52 @@ def _guess_bucket(reason: str) -> str:
 # Main entry point
 # ======================================================================
 
+# File-level signals ride on the first item rather than in a second return
+# value. They have to be lifted off before the list is reordered or trimmed.
+_META_KEYS = ("_report_meta", "_data_quality_flags", "_consumer_profile")
+
+
+def _finalise(items: list[dict]) -> list[dict]:
+    """
+    One round's worth, strongest first, with the file-level meta preserved.
+
+    Every parser used to return its full list: the Experian path handed back
+    52 items for one envelope while `MAX_ITEMS_PER_ROUND` and the comment
+    above it say 20, because more than that "reads as a mail-merge and invites
+    a frivolousness finding under § 1681i(a)(3) on the whole letter". The cap
+    was only ever applied on the keyword path.
+
+    Trimming has to happen after the severity sort, and the meta has to be
+    moved onto whichever item survives as first — sorting alone would strand
+    it on an item that is no longer at index 0, or drop it with the tail.
+    """
+    if not items:
+        return []
+
+    meta = {}
+    for item in items:
+        for key in _META_KEYS:
+            if key in item:
+                meta.setdefault(key, item.pop(key))
+
+        # Every item has to state why it is disputed. The Equifax parser
+        # returned reason="" and the API rejects that with 422, so a case
+        # holding a clean Equifax parse could not save its disputes at all.
+        # The text comes from the category the parser actually read, in the
+        # consumer's voice — the same default the keyword and model paths use.
+        if not str(item.get("reason") or "").strip():
+            item["reason"] = reason_for(
+                item.get("bucket") or "",
+                target=item.get("furnisher") or item.get("target") or "",
+                account=item.get("account") or "",
+            )
+
+    kept = _select_strongest(items)
+    if kept and meta:
+        kept[0].update(meta)
+    return kept
+
+
 def parse_credit_report_bytes(content: bytes, suffix: str) -> list[dict]:
     """
     Parse a credit report and extract dispute items.
@@ -313,6 +425,9 @@ def parse_credit_report_bytes(content: bytes, suffix: str) -> list[dict]:
     is reproducible — so it runs first. Claude is the fallback for layouts
     we have not written a parser for, and the keyword scanner is the last
     resort for scanned or mangled text.
+
+    Every path returns through `_finalise`, so the per-round cap applies
+    whichever parser answered.
     """
     text = extract_text_from_bytes(content, suffix)
     if not text.strip():
@@ -328,7 +443,7 @@ def parse_credit_report_bytes(content: bytes, suffix: str) -> list[dict]:
         items = parse_experian(text)
         if items:
             items[0]["_report_meta"] = experian_summary(text)
-            return items
+            return _finalise(items)
 
     # 2. Structured parser — Equifax.
     if looks_like_equifax(text):
@@ -341,16 +456,17 @@ def parse_credit_report_bytes(content: bytes, suffix: str) -> list[dict]:
             items[0]["_report_meta"] = parsed.get("report_meta", {})
             items[0]["_data_quality_flags"] = parsed.get("data_quality_flags", [])
             items[0]["_consumer_profile"] = parsed.get("consumer_profile", {})
-            return items
+            return _finalise(items)
 
     # 3. Claude, for formats without a dedicated parser.
     if ANTHROPIC_API_KEY and HAS_ANTHROPIC:
         items = analyze_with_claude(text)
         if items:
-            return items
+            return _finalise(items)
 
     # 4. Keyword scanner — scanned images, unusual layouts, damaged text.
-    return analyze_with_keywords(text)
+    #    Already selects internally; _finalise is idempotent under the cap.
+    return _finalise(analyze_with_keywords(text))
 
 
 def parse_report_full(content: bytes, suffix: str) -> dict:

@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import dataclasses
 import hmac
 import json
 import re
@@ -8,10 +9,11 @@ import traceback
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from pathlib import Path
 
 import stripe
-from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, field_validator
@@ -49,6 +51,7 @@ from email_sender import send_letters_email
 from fishbowl import check_beta_eligibility, get_fishbowl_status
 from letter_preview import preview_summary, redact_letters
 from mail_service import send_all_letters, verify_webhook_signature
+from money import money_str, parse_money
 from pdf_gen import build_letter_pdf
 from report_parser import parse_credit_report_bytes
 from terms_token import issue_token, verify_token
@@ -85,7 +88,17 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="AE 5-Min Credit Fix", lifespan=lifespan)
-limiter = Limiter(key_func=get_remote_address, storage_uri=config.RATE_LIMIT_STORAGE_URI)
+# key_style="endpoint" buckets by (client IP, view function). slowapi's default
+# is "url", which buckets by the *concrete* request path — so every limit on a
+# route carrying {session_id} was scoped to one session and a caller got a fresh
+# budget for each new session id. Measured: 20 subscribes across 20 sessions
+# never tripped a declared 10/hour, while 13 on one session tripped at the 11th.
+# Only the parameterless routes (/api/terms/accept, /api/case) ever limited.
+limiter = Limiter(
+    key_func=get_remote_address,
+    storage_uri=config.RATE_LIMIT_STORAGE_URI,
+    key_style="endpoint",
+)
 app.state.limiter = limiter
 
 init_db()
@@ -127,6 +140,42 @@ def get_case(session_id: str, db: Session) -> CaseRecord:
     return record
 
 
+# The three documents a case needs before it can produce letters.
+DOC_TYPES: frozenset[str] = frozenset({"id", "address", "report"})
+
+
+def attachment_names(record: CaseRecord) -> list[str]:
+    """
+    Uploaded filenames, in upload order.
+
+    Attachments are stored as {"filename", "doc_type"} dicts. Rows written
+    before uploads carried a type hold bare strings, so both shapes are read.
+    """
+    names: list[str] = []
+    for entry in record.attachments or []:
+        if isinstance(entry, dict):
+            name = entry.get("filename")
+            if name:
+                names.append(str(name))
+        elif entry:
+            names.append(str(entry))
+    return names
+
+
+def attachment_doc_types(record: CaseRecord) -> set[str]:
+    """
+    Which of DOC_TYPES this case actually holds.
+
+    An untyped legacy attachment contributes nothing: we cannot claim a file
+    proves identity when the record never recorded what it was.
+    """
+    return {
+        entry["doc_type"]
+        for entry in record.attachments or []
+        if isinstance(entry, dict) and entry.get("doc_type") in DOC_TYPES
+    }
+
+
 def to_engine_case(record: CaseRecord) -> Case:
     """Convert DB record to ae_creditfix Case for letter generation."""
     client = Client(
@@ -140,8 +189,16 @@ def to_engine_case(record: CaseRecord) -> Case:
         state=record.state or "",
         zip_code=record.zip_code or "",
     )
-    items = [Item(**item) for item in (record.items or [])]
-    case = Case(client=client, items=items, attachments=record.attachments or [])
+    # Only the fields `Item` declares. A stored item also carries what the
+    # parser read (furnisher, dofd, scored categories) for the dispute_engine,
+    # which reads `record.items` directly; passing those to this older
+    # dataclass raised TypeError and took letter generation out entirely.
+    item_fields = {f.name for f in dataclasses.fields(Item)}
+    items = [
+        Item(**{k: v for k, v in item.items() if k in item_fields})
+        for item in (record.items or [])
+    ]
+    case = Case(client=client, items=items, attachments=attachment_names(record))
     case.phases["p1_docs_complete"] = record.docs_complete
     return case
 
@@ -344,20 +401,76 @@ class DisputeItem(BaseModel):
     type: str
     target: str
     account: str
-    amount: float | None = None
+    # Decimal, never float. Pydantic parses the decimal string the parsers
+    # emit into an exact value; a JSON number would already be a float by the
+    # time it arrived. See money.py.
+    amount: Decimal | None = None
     opened: str | None = None
     reason: str
     # Dispute category from the engine taxonomy. Unknown values are dropped
     # rather than rejected: the engine re-derives one from the reason text.
     bucket: str = ""
+
+    # ── What the parser read off the file ────────────────────────────────
+    # These used to stop here. The review round-trip posted six fields, so
+    # everything the parser worked out was thrown away between the upload and
+    # the letter: the furnisher's name fell back to `target` and every item in
+    # an Experian letter was printed as "Account Name: Experian", and with no
+    # scored categories every item reached the letter through the fallback
+    # section instead of a matched violation theory.
+    furnisher: str = ""
+    dofd: str | None = None
+    original_creditor: str = ""
+    highest_balance: Decimal | None = None
+    falloff_status: str = ""
+    # Grounds the parser scored on this tradeline, each {category, strength,
+    # evidence, derived?}. Entries that do not name a known category are
+    # dropped; the analyst re-derives one rather than arguing an unknown.
+    categories: list[dict] = []
+
     # The consumer's own answers for this item. Only recognised affirmation
     # keys survive; anything else is discarded.
     affirmations: dict = {}
+
+    @field_validator("amount", "highest_balance", mode="before")
+    @classmethod
+    def parse_amount(cls, v):
+        """
+        Blank means the report showed no figure, which is not zero.
+
+        The parsers write "" for an absent balance — 8 of 20 items on a real
+        Experian file — and Pydantic cannot turn that into a Decimal, so the
+        whole dispute list was rejected with 422 and no letters could be
+        generated. `parse_money` reads what is there and returns None for what
+        is not.
+        """
+        return parse_money(v)
 
     @field_validator("bucket")
     @classmethod
     def validate_bucket(cls, v):
         return v if v in DISPUTE_CATEGORIES else ""
+
+    @field_validator("categories")
+    @classmethod
+    def validate_categories(cls, v):
+        if not isinstance(v, list):
+            return []
+        cleaned = []
+        for entry in v[:12]:
+            if not isinstance(entry, dict):
+                continue
+            category = str(entry.get("category", ""))
+            if category not in DISPUTE_CATEGORIES:
+                continue
+            strength = str(entry.get("strength", "moderate"))
+            cleaned.append({
+                "category": category,
+                "strength": strength if strength in ("strong", "moderate", "weak") else "moderate",
+                "evidence": str(entry.get("evidence", ""))[:400],
+                "derived": bool(entry.get("derived", False)),
+            })
+        return cleaned
 
     @field_validator("affirmations")
     @classmethod
@@ -478,8 +591,27 @@ async def fishbowl_status(db: Session = Depends(get_db)):
 
 @app.post("/api/case/{session_id}/upload")
 @limiter.limit("20/minute")
-async def upload_doc(session_id: str, request: Request, file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_doc(
+    session_id: str,
+    request: Request,
+    file: UploadFile = File(...),
+    doc_type: str = Form(...),
+    db: Session = Depends(get_db),
+):
     record = get_case(session_id, db)
+
+    # What the document IS has to come over the wire. Without it this endpoint
+    # ran every upload through the credit-report parser, and a bank statement
+    # sent to prove an address came back as three dispute items built from the
+    # account's opening balance, closing balance and monthly service fee — one
+    # of them asserting the account was not the customer's. That is a false
+    # statement to a bureau manufactured out of a document nobody disputed.
+    doc_type = (doc_type or "").strip().lower()
+    if doc_type not in DOC_TYPES:
+        raise HTTPException(
+            422,
+            f"doc_type must be one of {', '.join(sorted(DOC_TYPES))} — got {doc_type!r}",
+        )
 
     # Validate file type
     allowed = {".pdf", ".png", ".jpg", ".jpeg", ".txt", ".csv"}
@@ -492,6 +624,32 @@ async def upload_doc(session_id: str, request: Request, file: UploadFile = File(
     if len(content) > 10 * 1024 * 1024:
         raise HTTPException(400, "File too large. Maximum 10MB.")
 
+    # Parse before persisting, so a file we are going to reject does not leave
+    # a stored blob and an attachment row behind it.
+    suggestions: list[dict] = []
+    if doc_type == "report":
+        if suffix not in (".pdf", ".txt", ".csv"):
+            raise HTTPException(
+                400,
+                f"A credit report has to be the bureau's own export — {suffix} cannot be "
+                "read as one. Download the report from the bureau and upload that file.",
+            )
+        suggestions = parse_credit_report_bytes(content, suffix)
+        if not suggestions:
+            # Name the way out. This fires for a TransUnion export, which no
+            # parser reads yet, and for photos and screenshots — and a bare
+            # "could not read this" leaves a paying customer with nowhere to
+            # go. Equifax is named because it measured best across all three
+            # exports of the same file, not as a preference.
+            raise HTTPException(
+                422,
+                "We could not read this file as a credit report. Get a free report at "
+                "annualcreditreport.com and choose Equifax — we tested all three and that "
+                "export gives your letters the most to work with. Use the site's own "
+                "Download or Save-as-PDF option; a photo or screenshot of a report cannot "
+                "be read.",
+            )
+
     # Encrypt with the per-session key before writing — plaintext never
     # touches disk. Stored name is opaque (no user-controlled path parts).
     session_key = base64.b64decode(record.cypher_key_enc)
@@ -503,19 +661,20 @@ async def upload_doc(session_id: str, request: Request, file: UploadFile = File(
     # Copy before append: assigning the same (mutated) list object back would
     # not be detected as a change by SQLAlchemy and the update would be lost
     attachments = list(record.attachments or [])
-    attachments.append(file.filename)
+    attachments.append({"filename": file.filename, "doc_type": doc_type})
     record.attachments = attachments
-    record.docs_complete = True
+    # Complete means all three kinds are in hand. Flipping this on the first
+    # upload of any kind unsheathed the sword after one file and let a case
+    # reach letter generation with no credit report in it at all.
+    record.docs_complete = DOC_TYPES.issubset(attachment_doc_types(record))
     db.commit()
-
-    # Parse the credit report fully in memory
-    suggestions = []
-    if suffix in (".pdf", ".txt", ".csv"):
-        suggestions = parse_credit_report_bytes(content, suffix)
 
     return {
         "filename": file.filename,
-        "attachments": attachments,
+        "doc_type": doc_type,
+        "attachments": attachment_names(record),
+        "docs_complete": record.docs_complete,
+        "missing": sorted(DOC_TYPES - attachment_doc_types(record)),
         "suggestions": suggestions,
     }
 
@@ -535,13 +694,26 @@ async def confirm_disputes(session_id: str, req: ConfirmDisputesRequest, request
             "type": item.type,
             "target": item.target,
             "account": item.account,
-            "amount": item.amount,
+            # Exact decimal strings in the JSON column. `Decimal` is not JSON
+            # serialisable and the encoder's fallback is float, which is the
+            # representation this is here to avoid.
+            "amount": money_str(item.amount),
             "opened": item.opened,
             "reason": item.reason,
             "status": "open",
             "letters": [],
             "bucket": item.bucket,
             "affirmations": item.affirmations,
+            # Everything the parser read. Rebuilding the item field-by-field
+            # without these was the second place the parser's work was lost:
+            # the model carried them and this loop dropped them again.
+            "furnisher": item.furnisher,
+            "dofd": item.dofd,
+            "original_creditor": item.original_creditor,
+            "highest_balance": money_str(item.highest_balance),
+            "falloff_status": item.falloff_status,
+            "categories": item.categories,
+            "category_count": len(item.categories),
         })
     record.items = items
     db.commit()

@@ -15,7 +15,15 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from .categories import DISPUTE_CATEGORIES, affirmations_for, guess_category
+from .categories import (
+    DISPUTE_CATEGORIES,
+    affirmations_for,
+    consumer_affirmed,
+    guess_category,
+)
+from .categories import (
+    real_value as _real,
+)
 
 # Which bureau a target string refers to, when it refers to one at all.
 _BUREAU_ALIASES = {
@@ -134,12 +142,25 @@ def to_parsed_data(
         item_id = item.get("id") or f"ITEM{idx + 1:03d}"
         category = item.get("bucket") or item.get("category") or guess_category(item.get("reason", ""))
 
+        # A category that asserts fraud, or that an account is not the
+        # consumer's, only stands if the consumer ticked its affirmation. No
+        # parser assigns these today, but nothing stopped one from doing so,
+        # and `guess_category` can reach them from free text. Falling back to
+        # the generic accuracy dispute keeps the item in the letter while
+        # dropping the personal claim nobody made.
+        if not consumer_affirmed(category, item.get("affirmations")):
+            category = "status_inaccuracy"
+
         accounts.append({
             "item_id": item_id,
             # Prefer the furnisher when the parser distinguished it — the
             # letter must name who reports the debt, not who we mail.
-            "account_name": item.get("furnisher") or item.get("target") or "Unknown",
-            "account_number": item.get("account") or "",
+            "account_name": _real(item.get("furnisher")) or _real(item.get("target")) or "Unknown",
+            # An inquiry or a personal-information dispute has no account
+            # number, and the parsers write the placeholder "Unknown" there.
+            # Left as-is it passed the letter's `if account_number` guard and
+            # printed "Account Number: Unknown" to the bureau.
+            "account_number": _real(item.get("account")),
             "account_type": _account_type_for({**item, "bucket": category}),
             "original_creditor": item.get("original_creditor") or "",
             "reported_to": item.get("target") or "",
@@ -147,7 +168,17 @@ def to_parsed_data(
             "highest_balance": _money(item.get("highest_balance")),
             "status": _status_for({**item, "bucket": category}),
             "date_opened": item.get("opened") or "",
-            "date_of_first_delinquency": item.get("dofd") or item.get("opened") or "",
+            # No fallback to date-opened. The Experian export carries no DOFD
+            # at all, so `or item.get("opened")` printed the open date under
+            # the label "Date of First Delinquency" on all 14 items — a
+            # fabricated date, in the one field that sets the seven-year
+            # § 1681c clock, in a letter the consumer signs. The Equifax
+            # letter for the same accounts, mailed the same day, stated
+            # different dates, so the pair contradicted each other in writing.
+            # An absent DOFD must stay absent: the letter omits the line, and
+            # the re-aging and obsolescence matchers correctly decline to
+            # argue a theory they have no date for.
+            "date_of_first_delinquency": _real(item.get("dofd")),
             "date_reported": item.get("reported") or "",
             "category": category,
             # Every ground the parser found on this tradeline, not just the
@@ -189,6 +220,19 @@ def to_parsed_data(
     }
 
 
+# Affirmations that state something only the consumer can know. Nothing in a
+# credit report establishes whether they recognise an account, whether a name
+# is theirs, or what mail they received — so these are set from explicit
+# consumer input and never inferred from a category.
+_PERSONAL_KNOWLEDGE = frozenset({
+    "not_recognized",
+    "confirmed_fraud",
+    "ftc_report_number",
+    "name_not_mine",
+    "no_validation_received",
+})
+
+
 def to_affirmations(
     items: list[dict],
     consumer_input: dict[str, dict] | None = None,
@@ -226,9 +270,23 @@ def to_affirmations(
             "exclude": False,
         }
 
-        # Category-implied defaults, minus anything that must be asserted.
+        # Category-implied defaults, for the grounds the FILE can establish.
+        #
+        # Only `confirmed_fraud` and `ftc_report_number` used to be held back,
+        # so selecting a collection auto-set `no_validation_received` and the
+        # letter then read "Consumer affirms no validation was ever received
+        # from current collector" — once per collector — for a consumer who
+        # had said no such thing. That is a ground manufactured rather than
+        # earned, and the one ground in the stack a furnisher can disprove
+        # from its own mailing log.
+        #
+        # An item is meant to carry several independent grounds; the answer is
+        # for each of them to hold on its own, not for the software to supply
+        # the consumer's testimony. The file-derived ones below still stack
+        # freely — inconsistent dates, an unverifiable chain, a missing DOFD
+        # are all readable off the report itself.
         for key in affirmations_for(category):
-            if key in aff and key not in ("confirmed_fraud", "ftc_report_number"):
+            if key in aff and key not in _PERSONAL_KNOWLEDGE:
                 aff[key] = True
 
         # Explicit consumer input always wins.
