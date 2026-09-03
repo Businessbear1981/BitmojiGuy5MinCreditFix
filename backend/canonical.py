@@ -33,6 +33,8 @@ import re
 from dataclasses import asdict, dataclass, field
 from decimal import Decimal, InvalidOperation
 
+from money import money_str
+
 # Ranking used to order items within a letter. Highest first: a closed
 # statutory window is arithmetic, a "please verify this" is an opinion. Keeping
 # the order deterministic means a letter is reproducible from its inputs, and
@@ -183,8 +185,10 @@ class CanonicalItem:
             "account": self.account_masked,
             "account_type": self.account_type,
             "bucket": self.category,
-            "amount": float(self.balance) if self.balance is not None else None,
-            "highest_balance": float(self.high_balance) if self.high_balance is not None else None,
+            # Decimal out as an exact decimal string. Casting to float here
+            # undid the whole reason these are held as Decimal — see money.py.
+            "amount": money_str(self.balance),
+            "highest_balance": money_str(self.high_balance),
             "opened": self.opened,
             "dofd": self.dofd,
             "date_reported": self.reported,

@@ -48,6 +48,7 @@ import threading
 from datetime import datetime, timezone
 
 import config
+from money import parse_money
 
 _DB = os.environ.get("OUTCOMES_DB", "outcomes.db")
 _lock = threading.Lock()
@@ -122,10 +123,10 @@ def _h(*parts: str) -> str:
 
 def _balance_band(amount) -> str:
     """Coarse buckets — the exact figure is not needed and is more revealing."""
-    try:
-        v = float(amount or 0)
-    except (TypeError, ValueError):
-        return "unknown"
+    # Decimal, not float: this reads the same stored strings the letters do.
+    v = parse_money(amount)
+    if v is None:
+        return "zero" if amount in (0, "0") else "unknown"
     if v <= 0:
         return "zero"
     for cap, label in ((100, "0-100"), (500, "100-500"), (1000, "500-1k"),

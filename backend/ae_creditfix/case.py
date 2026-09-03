@@ -30,7 +30,9 @@ class Item:
     type: str            # 'bureau' or 'creditor'
     target: str
     account: str
-    amount: float | None = None
+    # Money is an exact decimal string here, matching what is stored and what
+    # the parsers emit. Never a float — see money.py.
+    amount: str = ""
     opened: str | None = None
     reason: str = ""
     status: str = "open"
@@ -41,6 +43,24 @@ class Item:
     # Consumer's answers to the review questions for this item, keyed by
     # affirmation name (not_recognized, dofd_uncertain, confirmed_fraud, …).
     affirmations: dict[str, Any] = field(default_factory=dict)
+
+    # ── What the parser read off the credit file ─────────────────────────
+    # `target` is who the letter is addressed to; the furnisher is who
+    # reports the debt, and they are not the same party. Without this field
+    # the letter generator fell back to `target`, so an Experian letter
+    # printed "Account Name: Experian" on every tradeline it disputed.
+    furnisher: str = ""
+    # Date of first delinquency, tracked apart from `opened` because the
+    # obsolescence and re-aging theories both key off it.
+    dofd: str | None = None
+    original_creditor: str = ""
+    highest_balance: str = ""
+    falloff_status: str = ""
+    # Grounds the parser scored on this tradeline. The analyst argues one
+    # theory per ground, so an empty list collapses a multi-ground item into
+    # the letter's fallback section.
+    categories: list[dict[str, Any]] = field(default_factory=list)
+    category_count: int = 0
 
 @dataclass
 class Letter:

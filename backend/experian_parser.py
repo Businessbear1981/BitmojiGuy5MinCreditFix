@@ -67,6 +67,8 @@ import re
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
+from money import money_str
+
 _LABELS = (
     "Account Name", "Account Number", "Account Type", "Responsibility",
     "Interest Type", "Date Opened", "Status", "Status Updated", "Balance",
@@ -170,16 +172,15 @@ def _month_year(raw: str) -> str:
     return f"{int(m.group(2)):04d}-{mon:02d}-01" if mon else ""
 
 
-def _money(raw: str) -> float | None:
-    if not raw or raw.strip() in ("-", "--"):
-        return None
-    m = re.search(r"\$?\s*([\d,]+(?:\.\d{1,2})?)", raw)
-    if not m:
-        return None
-    try:
-        return float(m.group(1).replace(",", ""))
-    except ValueError:
-        return None
+def _money(raw: str) -> str:
+    """
+    A balance as an exact decimal string, or "" when the report shows none.
+
+    Returns the storage form rather than a float: these figures are quoted
+    back to the bureau, and a binary float cannot hold what the report
+    printed. `money.py` owns the representation.
+    """
+    return money_str(raw)
 
 
 def _is_collector(name: str) -> bool:

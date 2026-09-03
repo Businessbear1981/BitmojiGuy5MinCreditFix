@@ -15,6 +15,7 @@ import re
 from datetime import datetime, timezone
 
 from dispute_engine import generate_case_letters, tier_for_day
+from money import fmt_money
 
 from .case import Case, Item, Letter, new_id
 from .templates import BUREAU_ADDRESSES, COVER_SHEET
@@ -71,6 +72,18 @@ def _open_items(case: Case) -> list[dict]:
             "amount": it.amount,
             "opened": it.opened,
             "reason": it.reason,
+            # The parser's own reading. This dict is what the adapter sees, so
+            # a field missing here is a field the letter cannot use however
+            # faithfully the rest of the stack carried it: the furnisher was
+            # read off the file, stored, and then dropped on this line, and
+            # every disputed tradeline printed as "Account Name: Experian".
+            "furnisher": getattr(it, "furnisher", "") or "",
+            "dofd": getattr(it, "dofd", None),
+            "original_creditor": getattr(it, "original_creditor", "") or "",
+            "highest_balance": getattr(it, "highest_balance", None),
+            "falloff_status": getattr(it, "falloff_status", "") or "",
+            "categories": getattr(it, "categories", []) or [],
+            "category_count": getattr(it, "category_count", 0) or 0,
         })
     return out
 
@@ -80,8 +93,11 @@ def make_items_block(items: list[Item]) -> str:
     lines = []
     for it in items:
         parts = [f"- {it.target} | {it.account or 'N/A'}"]
-        if it.amount is not None:
-            parts.append(f"${it.amount:.2f}")
+        # `amount` is an exact decimal string now, so the float format spec
+        # that used to render it would raise. fmt_money owns presentation.
+        shown = fmt_money(it.amount)
+        if shown:
+            parts.append(shown)
         if it.opened:
             parts.append(f"opened {it.opened}")
         parts.append(f"reason: {it.reason or 'N/A'}")

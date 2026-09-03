@@ -28,6 +28,9 @@ from __future__ import annotations
 
 import re
 from datetime import datetime, timezone
+from decimal import Decimal
+
+from money import money_str, parse_money
 
 # ── Account-block boundaries ────────────────────────────────────────────────
 # Equifax opens each tradeline with an indented "NAME - Open|Closed" line.
@@ -50,16 +53,16 @@ def _field(block: str, label: str) -> str:
 _MONEY = re.compile(r"-?[\d,]+(?:\.\d{2})?")
 
 
-def _money(raw: str) -> float | None:
-    if not raw:
-        return None
-    m = _MONEY.search(raw.replace("$", ""))
-    if not m:
-        return None
-    try:
-        return float(m.group().replace(",", ""))
-    except ValueError:
-        return None
+def _money(raw: str) -> Decimal | None:
+    """
+    A balance as an exact `Decimal`, or None when the field is blank.
+
+    Decimal rather than float because this parser compares balances against
+    each other — the balance-equals-past-due check below is exact arithmetic
+    on figures that get quoted back to the bureau. `money.py` owns the
+    representation; the item dicts carry the string form.
+    """
+    return parse_money(raw)
 
 
 def _date(raw: str) -> str:
@@ -165,7 +168,10 @@ def _categories(atype: str, status: str, past_due, dofd: str, opened: str,
             "a high balance is reported with no credit limit, leaving utilisation "
             "uncomputable from the file as furnished")
 
-    if balance and past_due and abs(float(balance) - float(past_due)) < 0.01 and balance > 0:
+    # Exact Decimal comparison. These are cent-quantised, so equality is
+    # equality — the old float subtraction with a 0.01 tolerance was measuring
+    # a rounding artefact that cent-quantised decimals cannot have.
+    if balance and past_due and balance == past_due and balance > 0:
         add("balance_inaccuracy", "weak",
             f"balance and amount past due are both reported as {balance:.2f}, with no "
             f"payment history explaining the equivalence")
@@ -319,9 +325,10 @@ def parse_equifax(text: str) -> dict:
             "account_number": _field(block, "Account Number"),
             "account_type": atype,
             "original_creditor": "",
-            "current_balance": f"{balance:.2f}" if balance is not None else "",
-            "highest_balance": f"{high:.2f}" if high is not None else "",
-            "credit_limit": f"{limit:.2f}" if limit is not None else "",
+            # Decimal in, exact decimal string out — see money.py.
+            "current_balance": money_str(balance),
+            "highest_balance": money_str(high),
+            "credit_limit": money_str(limit),
             "status": f"{status} {open_closed}".strip(),
             "date_opened": opened,
             "date_of_first_delinquency": dofd,
@@ -329,7 +336,7 @@ def parse_equifax(text: str) -> dict:
             "months_reviewed": _field(block, "Months Reviewed"),
             "narrative_codes": [c.strip() for c in narrative.split(",") if c.strip()],
             "payment_grid": grid,
-            "amount_past_due": past_due,
+            "amount_past_due": money_str(past_due),
             # Primary category = the strongest argument available.
             "bucket": category,
             # Every angle this account supports. One item, several independent
@@ -345,7 +352,7 @@ def parse_equifax(text: str) -> dict:
             # clerk who knows Equifax did not lend anyone $527.
             "furnisher": name,
             "account": _field(block, "Account Number"),
-            "amount": balance,
+            "amount": money_str(balance),
             "opened": opened,
             "dofd": dofd,
             # When the FCRA window closes on this item, and how to read it.
