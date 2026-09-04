@@ -16,6 +16,9 @@ export default function StairwayPage() {
   const [loading, setLoading] = useState<'card' | 'cashapp' | 'chime' | null>(null)
   const [error, setError] = useState('')
   const [pending, setPending] = useState<ManualPayPending | null>(null)
+  // Set when the release has not arrived within the watch window, so the page
+  // can say so instead of appearing to still be working.
+  const [stillWaiting, setStillWaiting] = useState(false)
 
   // Stripe cancel_url lands back here with ?session_id= — restore the session
   // so the customer can retry payment after a refresh. Also restore a manual
@@ -43,21 +46,45 @@ export default function StairwayPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // While a manual payment is pending, poll for the admin release and walk
+  // While a manual payment is pending, watch for the admin release and walk
   // the customer through the gate the moment their letters unlock.
+  //
+  // This was a flat 5-second interval with no end. A release is a human
+  // checking Cash App, so the wait is minutes at best and overnight at worst
+  // — one customer left on this screen made roughly a hundred requests, and
+  // on a phone that is battery and data spent on a page showing nothing new.
+  // It backs off to a minute and gives up after fifteen, which is long past
+  // the point where waiting on the screen is the right thing to be doing.
   useEffect(() => {
     if (!pending) return
-    const timer = setInterval(async () => {
+
+    let cancelled = false
+    let handle: ReturnType<typeof setTimeout>
+    const startedAt = Date.now()
+    const GIVE_UP_AFTER = 15 * 60 * 1000
+    let delay = 5000
+
+    async function check() {
+      if (cancelled) return
+      if (Date.now() - startedAt > GIVE_UP_AFTER) {
+        setStillWaiting(true)
+        return
+      }
       try {
         const status = await getCaseStatus()
+        if (cancelled) return
         if (status?.paid) {
-          clearInterval(timer)
           setPaid(true)
           navigateTo('/gate')
+          return
         }
-      } catch { /* server unreachable — keep polling */ }
-    }, 5000)
-    return () => clearInterval(timer)
+      } catch { /* server unreachable — try again after the backoff */ }
+      delay = Math.min(delay * 1.5, 60000)
+      handle = setTimeout(check, delay)
+    }
+
+    handle = setTimeout(check, delay)
+    return () => { cancelled = true; clearTimeout(handle) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pending])
 
@@ -295,6 +322,16 @@ export default function StairwayPage() {
                   We verify payments by hand and unlock your letters as soon as yours lands — this page will
                   move you forward automatically. Keep it open or come back any time.
                 </p>
+                {stillWaiting && (
+                  <p style={{
+                    fontFamily: 'var(--font-body)', fontSize: 11, color: ACCENT,
+                    lineHeight: 1.5, marginTop: 10, marginBottom: 0,
+                  }}>
+                    Still waiting on our end. Your payment and your confirmation code are
+                    safe — nothing is lost. Close this page and come back later, or
+                    refresh to check again now.
+                  </p>
+                )}
               </div>
             )}
 
