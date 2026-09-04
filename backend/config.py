@@ -81,10 +81,17 @@ if IS_PROD and STRIPE_SECRET_KEY and not STRIPE_WEBHOOK_SECRET:
 STRIPE_PRICE_CENTS = 2499
 PRICE_DISPLAY = "$24.99"
 
-# The Watcher. 0 means tracking is included in the base price, which is
-# what beta ships as. Set a value only once checkout is actually wired —
-# a price displayed but never charged is worse than no price at all.
-WATCHER_PRICE_CENTS = int(os.environ.get("WATCHER_PRICE_CENTS", "0"))
+# The Watcher, sold on its own screen. 0 means tracking is included in the
+# base price; any other value requires checkout to be wired, because a price
+# displayed but never charged is worse than no price at all.
+#
+# $39.99 is set against what the tracker actually costs to run. It is the
+# thing that escalates a case to tier 2, and tier 2 is certified mail on all
+# three bureau letters — roughly $21 of postage against a $24.99 base that
+# already spent ~$3 getting round 1 out. Tracking priced below its own
+# postage turns every engaged customer into a loss.
+WATCHER_PRICE_CENTS = int(os.environ.get("WATCHER_PRICE_CENTS", "3999"))
+WATCHER_PRICE_DISPLAY = f"${WATCHER_PRICE_CENTS / 100:.2f}"
 
 # Manual pay (Cash App / Chime): customer sends money to Sean directly and the
 # admin releases their letters after verifying receipt. Tags confirmed with

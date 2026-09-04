@@ -626,24 +626,76 @@ export async function getWatcherStatus(): Promise<Response> {
   }
 }
 
-export async function subscribeWatcher(
-  _notifyMethod: string,
-  _notifyHandle: string,
-  _paymentMethod: string,
-): Promise<Response> {
-  void _notifyMethod; void _notifyHandle; void _paymentMethod
-  return jsonResponse({
-    ok: false,
-    error: 'The Watcher is coming soon — automated 30/60/90-day tracking is not live yet.',
-  })
+/**
+ * Start checkout for the tracker, which is sold separately from the letters.
+ *
+ * Returns `{ checkout_url }` to redirect to, or `{ paid: true }` when there is
+ * nothing to charge — tracking bundled into the base price, or a dev
+ * environment with no Stripe key.
+ */
+export async function watcherCheckout(): Promise<Response> {
+  if (!_sessionId) {
+    return jsonResponse({ error: 'No active session — please complete the intake first.' }, 400)
+  }
+  const res = await fetch(`${API}/api/case/${_sessionId}/watcher/checkout`, { method: 'POST' })
+  const data = await readJson(res)
+  if (!res.ok) {
+    return jsonResponse({ error: detailMessage(data, 'Could not start checkout for tracking.') }, res.status)
+  }
+  return jsonResponse(data, res.status)
 }
 
-export async function getFollowupLetters(_day: number): Promise<Response> {
-  void _day
-  return jsonResponse({
-    ok: false,
-    error: 'Coming soon',
+/**
+ * Turn the tracker on, after it has been paid for.
+ *
+ * The backend validates the channel before anything else, so an address it
+ * cannot deliver to comes back as `{ ok: false, error, channels }` rather than
+ * a subscription that silently never sends. A 402 means checkout has not
+ * completed yet.
+ */
+export async function subscribeWatcher(
+  notifyMethod: string,
+  notifyHandle: string,
+  acceptRetention: boolean = true,
+): Promise<Response> {
+  if (!_sessionId) {
+    return jsonResponse({ ok: false, error: 'No active session.' }, 400)
+  }
+  const res = await fetch(`${API}/api/case/${_sessionId}/watcher/subscribe`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      notify_method: notifyMethod,
+      notify_handle: notifyHandle,
+      accept_retention: acceptRetention,
+    }),
   })
+  const data = await readJson(res)
+  if (!res.ok) {
+    return jsonResponse(
+      { ok: false, error: detailMessage(data, 'Could not turn on tracking.'), status: res.status },
+      res.status,
+    )
+  }
+  return jsonResponse(data, res.status)
+}
+
+/** The generated letters for a milestone round (day 30, 60, 90…). */
+export async function getFollowupLetters(day: number): Promise<Response> {
+  if (!_sessionId) {
+    return jsonResponse({ ok: false, error: 'No active session.' }, 400)
+  }
+  const res = await fetch(`${API}/api/case/${_sessionId}/watcher/followup/${day}`, {
+    method: 'POST',
+  })
+  const data = await readJson(res)
+  if (!res.ok) {
+    return jsonResponse(
+      { ok: false, error: detailMessage(data, `Could not generate the day-${day} letters.`) },
+      res.status,
+    )
+  }
+  return jsonResponse(data, res.status)
 }
 
 // ═════════════════════════════════════════════════════════════════════════════

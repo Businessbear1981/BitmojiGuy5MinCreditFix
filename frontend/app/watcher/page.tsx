@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useShojiNav } from '@/lib/shojiNav'
 import { TopNav } from '@/components/nav/TopNav'
 import { WizardSidebar } from '@/components/sidebar/WizardSidebar'
-import { getWatcherStatus, subscribeWatcher, getFollowupLetters } from '@/lib/api'
+import { getWatcherStatus, subscribeWatcher, watcherCheckout, getFollowupLetters } from '@/lib/api'
 
 const ACCENT = '#FF4444' // Intense red for ninja sentinel vigilance
 
@@ -107,12 +107,25 @@ export default function WatcherPage() {
     if (!notifyHandle) { setSubError('Enter your handle or email'); return }
     setSubscribing(true); setSubError('')
     try {
-      const res = await subscribeWatcher(notifyMethod, notifyHandle, 'manual')
+      // Tracking is a separate purchase, so pay first and subscribe second.
+      // The backend returns 402 from subscribe until the charge has cleared;
+      // going through checkout up front avoids showing that as an error.
+      const payRes = await watcherCheckout()
+      const payData = await payRes.json()
+      if (payData.checkout_url) {
+        window.location.href = payData.checkout_url
+        return
+      }
+      if (!payRes.ok) {
+        setSubError(payData.error || 'Could not start checkout for tracking.')
+        setSubscribing(false)
+        return
+      }
+
+      const res = await subscribeWatcher(notifyMethod, notifyHandle, true)
       const data = await res.json()
       if (data.ok || data.subscribed || data.already) {
         setTracking((t) => t ? { ...t, subscribed: true, notify_method: notifyMethod, notify_handle: notifyHandle } : t)
-      } else if (data.checkout_url) {
-        window.location.href = data.checkout_url
       } else {
         setSubError(data.error || 'Subscription failed')
       }

@@ -20,6 +20,8 @@ from equifax_parser import looks_like_equifax, parse_equifax
 from experian_parser import looks_like_experian, parse_experian
 from experian_parser import report_summary as experian_summary
 from money import money_str
+from transunion_parser import looks_like_transunion, parse_transunion
+from transunion_parser import report_summary as transunion_summary
 
 # --- PDF text extraction ---
 try:
@@ -458,13 +460,22 @@ def parse_credit_report_bytes(content: bytes, suffix: str) -> list[dict]:
             items[0]["_consumer_profile"] = parsed.get("consumer_profile", {})
             return _finalise(items)
 
-    # 3. Claude, for formats without a dedicated parser.
+    # 3. Structured parser — TransUnion. Until this existed TU fell through to
+    #    the keyword scanner, which read the report's own section headings as
+    #    creditors and produced twenty items whose furnisher was "Addresses".
+    if looks_like_transunion(text):
+        items = parse_transunion(text)
+        if items:
+            items[0]["_report_meta"] = transunion_summary(text)
+            return _finalise(items)
+
+    # 4. Claude, for formats without a dedicated parser.
     if ANTHROPIC_API_KEY and HAS_ANTHROPIC:
         items = analyze_with_claude(text)
         if items:
             return _finalise(items)
 
-    # 4. Keyword scanner — scanned images, unusual layouts, damaged text.
+    # 5. Keyword scanner — scanned images, unusual layouts, damaged text.
     #    Already selects internally; _finalise is idempotent under the cap.
     return _finalise(analyze_with_keywords(text))
 

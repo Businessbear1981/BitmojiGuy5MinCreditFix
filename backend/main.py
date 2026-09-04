@@ -1082,14 +1082,25 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
 
     if event.get("type") == "checkout.session.completed":
         session_data = event["data"]["object"]
-        session_id = session_data.get("metadata", {}).get("session_id")
+        metadata = session_data.get("metadata", {})
+        session_id = metadata.get("session_id")
         if session_id:
             record = db.query(CaseRecord).filter_by(session_id=session_id).first()
-            if record and not record.paid:
-                record.paid = True
-                record.stripe_payment_intent = session_data.get("payment_intent")
-                db.commit()
-                _post_payment(record, db)
+            if record:
+                # Two products go through this webhook now. Without reading
+                # the marker, a tracker purchase would flip `paid` and mail
+                # the letters a second time.
+                if metadata.get("product") == "watcher":
+                    if not record.watcher_paid:
+                        record.watcher_paid = True
+                        db.commit()
+                        provenance.record(session_id, "watcher_paid",
+                                          {"amount_cents": config.WATCHER_PRICE_CENTS})
+                elif not record.paid:
+                    record.paid = True
+                    record.stripe_payment_intent = session_data.get("payment_intent")
+                    db.commit()
+                    _post_payment(record, db)
 
     return {"received": True}
 
@@ -1246,6 +1257,7 @@ async def watcher_subscribe(
     reason — see `watcher.CHANNELS`.
     """
     record = get_case(session_id, db)
+    _sync_watcher_payment(record, db)
 
     if not record.paid:
         raise HTTPException(402, "Complete your first round before turning on tracking.")
@@ -1266,14 +1278,14 @@ async def watcher_subscribe(
         return {"ok": True, "already": True,
                 "tracking": watcher.status_payload(record)}
 
-    # Beta: tracking is included rather than sold separately. When a price is
-    # configured, this is where checkout goes — and until then the page must
-    # not display a price it does not charge.
-    if config.WATCHER_PRICE_CENTS:
+    # Tracking is sold on its own screen. Subscribing is the step *after*
+    # paying for it, so this refuses until the payment is recorded rather
+    # than turning the tracker on and invoicing later.
+    if config.WATCHER_PRICE_CENTS and not record.watcher_paid:
         raise HTTPException(
-            501,
-            "Paid tracking is not wired to checkout yet. Unset "
-            "WATCHER_PRICE_CENTS to include it in the base price.",
+            402,
+            f"Tracking is {config.WATCHER_PRICE_DISPLAY}. "
+            f"POST /api/case/{session_id}/watcher/checkout first.",
         )
 
     record.watcher_subscribed = True
@@ -1286,6 +1298,96 @@ async def watcher_subscribe(
 
     return {"ok": True, "subscribed": True,
             "tracking": watcher.status_payload(record)}
+
+
+def _sync_watcher_payment(record: CaseRecord, db: Session) -> None:
+    """
+    Confirm a watcher checkout with Stripe if the webhook has not landed yet.
+
+    The webhook is the source of truth, but a customer returning from Stripe
+    beats it often enough that relying on it alone shows them an unpaid page
+    seconds after they paid. Asking Stripe directly is idempotent and costs
+    one call only while the session is outstanding.
+    """
+    if record.watcher_paid or not record.watcher_stripe_session_id:
+        return
+    if not config.STRIPE_SECRET_KEY:
+        return
+    try:
+        sess = stripe.checkout.Session.retrieve(record.watcher_stripe_session_id)
+    except Exception as e:  # noqa: BLE001 - boundary must degrade, not crash
+        print(f"watcher payment sync failed: {type(e).__name__}")
+        return
+    if sess.get("payment_status") == "paid":
+        record.watcher_paid = True
+        db.commit()
+        provenance.record(record.session_id, "watcher_paid",
+                          {"amount_cents": config.WATCHER_PRICE_CENTS})
+
+
+@app.post("/api/case/{session_id}/watcher/checkout")
+@limiter.limit("5/minute")
+async def watcher_checkout(session_id: str, request: Request, db: Session = Depends(get_db)):
+    """
+    Stripe Checkout for the tracker, which is sold separately from the letters.
+
+    The channel is validated on subscribe rather than here, so the customer
+    pays first and picks where reminders go second — the reverse of the base
+    flow, because tracking has no address to fail on until they choose one.
+    """
+    record = get_case(session_id, db)
+
+    if not record.paid:
+        raise HTTPException(402, "Complete your first round before adding tracking.")
+
+    _sync_watcher_payment(record, db)
+    if record.watcher_paid:
+        return {"already_paid": True, "session_id": session_id}
+
+    if not config.WATCHER_PRICE_CENTS:
+        # Tracking is bundled into the base price; nothing to charge.
+        record.watcher_paid = True
+        db.commit()
+        return {"included": True, "paid": True, "session_id": session_id}
+
+    if not config.STRIPE_SECRET_KEY:
+        # Same rule as the base checkout: production fails closed, dev
+        # completes so the journey stays walkable without keys.
+        if config.IS_PROD and not config.DEMO_MODE:
+            raise HTTPException(503, "Payments are not configured")
+        record.watcher_paid = True
+        db.commit()
+        return {"demo_mode": True, "paid": True, "session_id": session_id}
+
+    checkout = stripe.checkout.Session.create(
+        payment_method_types=["card"],
+        line_items=[{
+            "price_data": {
+                "currency": "usd",
+                "product_data": {
+                    "name": "Dispute Tracking — 12 Month Watcher",
+                    "description": (
+                        "Milestone tracking against the FCRA clock, plus the "
+                        "escalation rounds it triggers, mailed certified to all "
+                        "three bureaus."
+                    ),
+                },
+                "unit_amount": config.WATCHER_PRICE_CENTS,
+            },
+            "quantity": 1,
+        }],
+        mode="payment",
+        success_url=f"{config.FRONTEND_URL}/watcher?session_id={session_id}&paid=true",
+        cancel_url=f"{config.FRONTEND_URL}/watcher?session_id={session_id}",
+        metadata={"session_id": session_id, "product": "watcher"},
+        customer_email=record.email,
+    )
+    record.watcher_stripe_session_id = checkout.id
+    db.commit()
+    provenance.record(session_id, "watcher_checkout_started",
+                      {"amount_cents": config.WATCHER_PRICE_CENTS})
+    return {"checkout_url": checkout.url,
+            "price": config.WATCHER_PRICE_DISPLAY}
 
 
 @app.post("/api/case/{session_id}/watcher/cancel")

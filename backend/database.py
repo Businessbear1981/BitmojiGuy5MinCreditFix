@@ -164,6 +164,11 @@ class CaseRecord(Base):
     # `watcher_retain_until` is the only thing that exempts a case from the
     # 24-hour purge, and it is only ever set by a consumer subscribing. See
     # watcher.retention_notice() for the sentence they have to read first.
+    # Tracking is a separate purchase on its own screen. `paid` covers the
+    # letters; this covers the tracker, and the tracker is what escalates a
+    # case to certified mail on three bureaus.
+    watcher_paid = Column(Boolean, default=False)
+    watcher_stripe_session_id = Column(String(200), nullable=True)
     watcher_subscribed = Column(Boolean, default=False)
     watcher_subscribed_at = Column(UtcDateTime, nullable=True)
     watcher_retain_until = Column(UtcDateTime, nullable=True, index=True)
@@ -204,6 +209,10 @@ _ADDED_COLUMNS = [
     ("acknowledged_at", "TIMESTAMP"),
     ("signature", "TEXT"),
     ("signed_at", "TIMESTAMP"),
+    # Tracking is sold separately on its own screen, so whether it was paid
+    # for is its own fact — `paid` covers the letters and nothing more.
+    ("watcher_paid", "BOOLEAN"),
+    ("watcher_stripe_session_id", "VARCHAR(200)"),
     ("watcher_subscribed", "BOOLEAN"),
     ("watcher_subscribed_at", "TIMESTAMP"),
     ("watcher_retain_until", "TIMESTAMP"),

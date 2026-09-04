@@ -11,6 +11,10 @@ import { uploadDocument } from '@/lib/api'
 
 const ACCENT = '#C9A84C'
 
+/** Slot identity in the UI. Three of them are credit reports. */
+type SlotKey = 'id' | 'address' | 'experian' | 'equifax' | 'transunion'
+
+/** What the server is told the document is. It only knows three kinds. */
 type DocType = 'id' | 'address' | 'report'
 
 interface SlotState {
@@ -19,56 +23,106 @@ interface SlotState {
   sizeKb: number
   uploading: boolean
   error: string
+  /** The bureau the parser actually recognised, which need not be the box. */
+  bureau: string
+  /** Disputable items found, so the box can show what the upload bought. */
+  items: number
 }
 
 interface SlotConfig {
-  key: DocType
+  key: SlotKey
+  docType: DocType
   kanji: string
   armor: string
   title: string
   hint: string
+  required: boolean
 }
 
+const EMPTY: SlotState = {
+  armored: false, filename: '', sizeKb: 0, uploading: false,
+  error: '', bureau: '', items: 0,
+}
+
+// One letter is produced per bureau, built only from that bureau's own file,
+// so three reports mean three letters. Only one is required: a consumer who
+// can pull Equifax but fails Experian's identity check still has a product,
+// and turning a missing report into a dead end would be worse than a shorter
+// dispute. The box a file lands on is a hint — the parser identifies the
+// bureau from the document itself.
 const SLOTS: SlotConfig[] = [
-  { key: 'id',      kanji: '面', armor: 'Helm',      title: 'Photo ID',         hint: 'Upload a picture of your ID · Driver license or state ID · Required for dispute mailing' },
-  { key: 'address', kanji: '鎧', armor: 'Breastplate', title: 'Proof of Residence', hint: 'Utility bill · Bank statement · Lease · Required for dispute mailing' },
-  { key: 'report',  kanji: '剣', armor: 'Sword',     title: 'Credit Report',    hint: 'Annualcreditreport.com PDF · CSV · TXT · All documents mailed with your dispute package' },
+  { key: 'id', docType: 'id', kanji: '面', armor: 'Helm', required: true,
+    title: 'Photo ID',
+    hint: 'Driver license or state ID · Required for dispute mailing' },
+  { key: 'address', docType: 'address', kanji: '鎧', armor: 'Breastplate', required: true,
+    title: 'Proof of Residence',
+    hint: 'Utility bill · Bank statement · Lease · Required for dispute mailing' },
+  { key: 'experian', docType: 'report', kanji: '剣', armor: 'Sword', required: true,
+    title: 'Experian Report',
+    hint: 'Drop the PDF here or click to browse · Earns a letter to Experian' },
+  { key: 'equifax', docType: 'report', kanji: '剣', armor: 'Sword', required: false,
+    title: 'Equifax Report',
+    hint: 'Optional · Earns a second letter, addressed to Equifax' },
+  { key: 'transunion', docType: 'report', kanji: '剣', armor: 'Sword', required: false,
+    title: 'TransUnion Report',
+    hint: 'Optional · Earns a third letter, and carries each furnisher’s address' },
 ]
+
+const REPORT_KEYS: SlotKey[] = ['experian', 'equifax', 'transunion']
 
 export default function DojoPage() {
   const { navigateTo } = useShojiNav()
   const { uploads, setUpload } = useWizardStore()
-  const [slots, setSlots] = useState<Record<DocType, SlotState>>({
-    id:      { armored: uploads.idUploaded,      filename: '', sizeKb: 0, uploading: false, error: '' },
-    address: { armored: uploads.addressUploaded, filename: '', sizeKb: 0, uploading: false, error: '' },
-    report:  { armored: uploads.reportUploaded,  filename: '', sizeKb: 0, uploading: false, error: '' },
+  const [slots, setSlots] = useState<Record<SlotKey, SlotState>>({
+    id:         { ...EMPTY, armored: uploads.idUploaded },
+    address:    { ...EMPTY, armored: uploads.addressUploaded },
+    experian:   { ...EMPTY, armored: uploads.reportUploaded },
+    equifax:    { ...EMPTY },
+    transunion: { ...EMPTY },
   })
 
-  const allArmored = slots.id.armored && slots.address.armored && slots.report.armored
+  const reportsIn = REPORT_KEYS.filter((k) => slots[k].armored).length
+  // One report is enough to proceed. Requiring all three would block anyone
+  // whose identity check fails at a single bureau, which happens often enough
+  // on annualcreditreport.com to matter.
+  const canContinue = slots.id.armored && slots.address.armored && reportsIn > 0
+  const allArmored = canContinue
 
-  // Unsheathe the sword once all 3 pieces are forged
   useEffect(() => {
-    if (allArmored && !uploads.swordUnsheathed) {
+    if (canContinue && !uploads.swordUnsheathed) {
       setUpload('swordUnsheathed', true)
     }
-  }, [allArmored, uploads.swordUnsheathed, setUpload])
+  }, [canContinue, uploads.swordUnsheathed, setUpload])
 
-  async function handleFile(key: DocType, file: File) {
+  async function handleFile(key: SlotKey, file: File) {
+    const cfg = SLOTS.find((c) => c.key === key)
+    if (!cfg) return
     setSlots((s) => ({ ...s, [key]: { ...s[key], uploading: true, error: '', filename: file.name, sizeKb: Math.round(file.size / 1024) } }))
     try {
-      const res = await uploadDocument(file, key)
+      const res = await uploadDocument(file, cfg.docType)
+      const body = await res.json().catch(() => null)
       if (!res.ok) {
         // The server explains what is wrong with the file — that a scan cannot
         // be read, that the export is the wrong kind. Throwing the status code
         // alone left the customer staring at "Upload failed (422)".
-        const body = await res.json().catch(() => null)
         throw new Error(body?.error || `Upload failed (${res.status})`)
       }
-      setSlots((s) => ({ ...s, [key]: { ...s[key], uploading: false, armored: true, error: '' } }))
-      setUpload(`${key}Uploaded` as 'idUploaded' | 'addressUploaded' | 'reportUploaded', true)
+      // The parser identifies the bureau from the document, so a file dropped
+      // on the wrong box is still filed correctly — the box is a hint, not a
+      // constraint, and saying which bureau was recognised is how the customer
+      // learns that without being told off.
+      const suggestions: Array<{ target?: string }> = Array.isArray(body?.suggestions) ? body.suggestions : []
+      const bureau = suggestions.find((x) => x.target)?.target ?? ''
+      setSlots((s) => ({
+        ...s,
+        [key]: { ...s[key], uploading: false, armored: true, error: '', bureau, items: suggestions.length },
+      }))
+      if (key === 'id') setUpload('idUploaded', true)
+      else if (key === 'address') setUpload('addressUploaded', true)
+      else setUpload('reportUploaded', true)
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
-      setSlots((s) => ({ ...s, [key]: { ...s[key], uploading: false, armored: false, error: `Error: ${msg}` } }))
+      setSlots((s) => ({ ...s, [key]: { ...s[key], uploading: false, armored: false, error: msg } }))
     }
   }
 
@@ -144,12 +198,15 @@ export default function DojoPage() {
                 fontFamily: 'var(--font-cinzel), serif', fontSize: 13,
                 color: ACCENT, letterSpacing: 2, textTransform: 'uppercase',
               }}>
-                Armor: {[slots.id.armored, slots.address.armored, slots.report.armored].filter(Boolean).length} of 3 forged
+                Armor: {[slots.id.armored, slots.address.armored].filter(Boolean).length} of 2 &middot;{' '}
+                {reportsIn} of 3 reports
               </span>
               <span style={{
                 fontFamily: 'var(--font-body)', fontSize: 11, color: '#8A8278',
               }}>
-                {allArmored ? '⚔ Sword unsheathed' : 'Continue locked'}
+                {canContinue
+                  ? `⚔ ${reportsIn} letter${reportsIn === 1 ? '' : 's'} — one per bureau`
+                  : 'Continue locked'}
               </span>
             </div>
 
@@ -172,7 +229,7 @@ export default function DojoPage() {
                 <ArmorWarrior
                   idUploaded={slots.id.armored}
                   addressUploaded={slots.address.armored}
-                  reportUploaded={slots.report.armored}
+                  reportUploaded={reportsIn > 0}
                   swordUnsheathed={allArmored}
                 />
               </div>
@@ -338,11 +395,28 @@ function UploadSlot({ cfg, state, onFile }: { cfg: SlotConfig; state: SlotState;
           letterSpacing: 0.5, margin: 0, marginBottom: 2,
         }}>
           {cfg.title}
+          {!cfg.required && (
+            <span style={{
+              fontFamily: 'var(--font-body)', fontSize: 10, color: '#8A8278',
+              letterSpacing: 1, textTransform: 'uppercase', marginLeft: 8,
+            }}>
+              Optional
+            </span>
+          )}
         </p>
         {state.armored ? (
-          <p style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: ACCENT, margin: 0 }}>
-            ✓ {state.filename || 'Uploaded'} {state.sizeKb > 0 && <span style={{ color: '#8A8278' }}>&middot; {state.sizeKb} KB</span>}
-          </p>
+          <>
+            <p style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: ACCENT, margin: 0 }}>
+              ✓ {state.filename || 'Uploaded'} {state.sizeKb > 0 && <span style={{ color: '#8A8278' }}>&middot; {state.sizeKb} KB</span>}
+            </p>
+            {cfg.docType === 'report' && state.bureau && (
+              <p style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: '#8A8278', margin: 0, marginTop: 2 }}>
+                Read as <strong style={{ color: ACCENT }}>{state.bureau}</strong>
+                {state.items > 0 && ` · ${state.items} disputable item${state.items === 1 ? '' : 's'}`}
+                {' · earns a letter to '}{state.bureau}
+              </p>
+            )}
+          </>
         ) : state.uploading ? (
           <p style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: ACCENT, margin: 0, fontStyle: 'italic' }}>
             Forging armor...

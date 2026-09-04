@@ -55,10 +55,16 @@ def _category_section(items: list[dict], start_index: int = 0) -> str:
         return ""
 
     lines = [
-        "SECTION 4B — ADDITIONAL DISPUTED ITEMS",
+        "SECTION 1B — ADDITIONAL DISPUTED ITEMS",
         "",
         ("The following items are disputed on the accuracy grounds stated for each. "
-        "Each is independent of the theories set out above."),
+        "Each is independent of the items set out above."),
+        "",
+        # Said once. This sentence used to close every item in the section, and
+        # the section carried up to nine of them.
+        ("For each item below I am asking the same thing: verify it with the "
+        "furnisher against documentation, and delete it if it cannot be verified "
+        "as reported, per 15 U.S.C. § 1681i(a)(5)(A)."),
         "",
     ]
 
@@ -66,7 +72,7 @@ def _category_section(items: list[dict], start_index: int = 0) -> str:
         category_id = item.get("bucket") or item.get("category") or ""
         category = get_category(category_id)
         label = category.get("label", "Disputed Item")
-        marker = f"4B.{start_index + offset + 1}"
+        marker = f"1B.{start_index + offset + 1}"
 
         lines.append(f"{marker} — {label}")
         lines.append("")
@@ -103,21 +109,17 @@ def _category_section(items: list[dict], start_index: int = 0) -> str:
             lines.append(f"  {note}")
             lines.append("")
 
-        lines.append(
-            "  Requested action: verify this information with the furnisher against "
-            "documentation, and delete it if it cannot be verified as reported, per "
-            "15 U.S.C. § 1681i(a)(5)(A)."
-        )
+        # The requested action is stated once at the head of this section.
         lines.append("")
 
     return "\n".join(lines)
 
 
 def _splice_category_section(body: str, section: str) -> str:
-    """Insert 4B immediately before Section 5 so the numbering reads correctly."""
+    """Insert 1B immediately before Section 2, so it sits with the item schedule."""
     if not section:
         return body
-    marker = "SECTION 5 — SPECIFIC REQUESTS"
+    marker = "SECTION 2 — STATUTORY BASIS FOR THIS DISPUTE"
     if marker in body:
         head, _, tail = body.partition(marker)
         return f"{head}{section}\n{marker}{tail}"
@@ -265,15 +267,11 @@ def generate_case_letters(
         engine_letter["body"] = _splice_category_section(
             engine_letter["body"], _category_section(uncovered)
         )
-        close = _summary_close(targeted)
-        if close:
-            body = engine_letter["body"]
-            marker = "SECTION 7 — DISCLAIMERS"
-            if marker in body:
-                head, _, tail = body.partition(marker)
-                engine_letter["body"] = f"{head}{close}\n{marker}{tail}"
-            else:
-                engine_letter["body"] = f"{body}\n{close}"
+        # The multiple-grounds summary is gone. It restated, for a second
+        # time, grounds the letter had already made — and it was the largest
+        # section in two of three letters, 9,127 characters on Experian alone.
+        # The item schedule now lists every ground under its own account, in
+        # strongest-first order, which says the same thing once.
         engine_letter["item_count"] = len(targeted)
 
         tiered = tiers.apply_tier(

@@ -10,6 +10,8 @@ Rules:
 - Honest position framing throughout
 """
 
+import re
+from collections import Counter
 from datetime import datetime, timezone
 
 from .legal_library import (
@@ -240,9 +242,154 @@ def _build_section_4_theory_blocks(analyst_report: dict) -> str:
     return '\n'.join(lines)
 
 
+def _item_key(item: dict) -> tuple:
+    """
+    What makes two entries the same obligation.
+
+    A servicer that splits one loan across eight tradelines reports the same
+    name and number eight times. Keyed this way they collapse into one item
+    that says so, instead of eight items each announcing that there are eight.
+    """
+    return (
+        (item.get('account_name') or '').strip().upper(),
+        (item.get('account_number') or '').strip().upper(),
+    )
+
+
+def _item_facts(item: dict) -> str:
+    """The account's own reported data, on one line."""
+    acct = item.get('_full_account', {}) or {}
+    bits = []
+    if item.get('account_number'):
+        bits.append(f'Acct {item["account_number"]}')
+    if acct.get('date_opened'):
+        bits.append(f'opened {acct["date_opened"]}')
+    if item.get('current_balance'):
+        bits.append(f'balance {_fmt_money(item["current_balance"])}')
+    dofd = acct.get('date_of_first_delinquency')
+    if dofd:
+        bits.append(f'first delinquency {dofd}')
+    if acct.get('on_record_until'):
+        bits.append(f'on record until {acct["on_record_until"]}')
+    return ' · '.join(bits)
+
+
+def _build_item_schedule(analyst_report: dict) -> str:
+    """
+    Every disputed account once, with its grounds beneath it.
+
+    This replaces four sections that each walked the same items from a
+    different angle — an audit list, a theory-by-theory list, an extras list
+    and a multiple-grounds summary. Measured on a real three-bureau run, 39%
+    of the Experian letter was lines that had already appeared, and the packet
+    ran to 52 pages. A bureau reads none of that, and length is itself the
+    signal § 1681i(a)(3) invites them to act on.
+
+    One account, its reported data, then each independent ground with the
+    reason it applies and the statute it rests on. Grounds stay ordered
+    strongest-first, which carries the same message the old summary section
+    spelled out separately.
+    """
+    grouped: dict[tuple, dict] = {}
+
+    for block in analyst_report['violation_theory_blocks']:
+        theory = get_theory(block['theory_id'])
+        if not theory:
+            continue
+        statutes = get_verified_statutes(block['theory_id'])
+        cases = get_verified_cases(block['theory_id'])
+        basis = block.get('common_factual_pattern', '')
+
+        for item in block['items_affected']:
+            key = _item_key(item)
+            entry = grouped.setdefault(key, {'item': item, 'copies': 0, 'grounds': []})
+            entry['copies'] += 1
+            # The same theory can arrive twice when a duplicate group is
+            # matched per copy; the ground is about the obligation, not the
+            # copy, so it is recorded once.
+            if any(g['theory_id'] == block['theory_id'] for g in entry['grounds']):
+                continue
+            entry['grounds'].append({
+                'theory_id': block['theory_id'],
+                'title': theory['title'],
+                'basis': basis,
+                'notes': item.get('per_item_notes') or [],
+                'statutes': statutes,
+                'cases': cases,
+            })
+
+    # Text that turns up on many items is a statement about the dispute, not
+    # about any one account. The method-of-verification demand is attached to
+    # every tradeline and was printing twelve times in a single letter.
+    note_counts: Counter[str] = Counter()
+    for entry in grouped.values():
+        for ground in entry['grounds']:
+            for note in ground['notes']:
+                note_counts[note] += 1
+            if ground['basis']:
+                note_counts[ground['basis']] += 1
+    universal = {text for text, n in note_counts.items() if n >= 3}
+
+    lines = ['SECTION 1 — DISPUTED ITEMS AND THE GROUNDS FOR EACH', '']
+    lines.append(
+        'Each account below is listed once, followed by every independent '
+        'ground on which I dispute it. The grounds do not depend on one '
+        'another: resolving the narrowest does not dispose of the others.')
+    lines.append('')
+
+    if universal:
+        lines.append('The following applies to every item in this section:')
+        lines.append('')
+        for text in sorted(universal):
+            lines.append(f'  - {text}')
+        lines.append('')
+
+    for n, entry in enumerate(grouped.values(), start=1):
+        item = entry['item']
+        name = item.get('account_name') or 'Unnamed account'
+        lines.append(f'ITEM {n} — {name}')
+
+        facts = _item_facts(item)
+        if facts:
+            lines.append(f'  {facts}')
+        if item.get('status'):
+            lines.append(f'  Reported status: {item["status"]}')
+        # The duplicate count is a fact about the account, stated once here
+        # rather than repeated inside every copy's entry.
+        copies = entry['copies']
+        if copies > 1:
+            lines.append(f'  Appears {copies} times on this file under the same '
+                         f'name and account number.')
+        lines.append('')
+
+        for g_num, ground in enumerate(entry['grounds'], start=1):
+            lines.append(f'  Ground {g_num} · {ground["title"]}')
+            # Anything hoisted above is not repeated here.
+            if ground['basis'] and ground['basis'] not in universal:
+                lines.append(f'    {ground["basis"]}')
+            for note in [n for n in ground['notes'] if n not in universal][:3]:
+                lines.append(f'    {note}')
+            # Citation only. Section 2 states each statute's obligation in
+            # full, once; repeating the sentence under every ground put the
+            # same four lines in the letter six times over.
+            cites = ', '.join(s['citation'] for s in ground['statutes'])
+            if cites:
+                lines.append(f'    Under {cites}')
+            for case in ground['cases']:
+                lines.append(f'    {case["citation"]}')
+                if case.get('holding'):
+                    lines.append(f'      Holding: {case["holding"]}')
+            lines.append('')
+
+    # Grounds and items each close with a blank line, so a ground that ends an
+    # item stacks two — and `_assemble` adds its own between blocks. One blank
+    # line is the spacing everywhere else in the letter.
+    return re.sub(r'\n{3,}', '\n\n', '\n'.join(lines))
+
+
 def _build_section_5_requests(analyst_report: dict) -> str:
     """Section 5 — Specific Requests tied to each theory block."""
-    lines = ['SECTION 5 — SPECIFIC REQUESTS', '']
+    lines = ['SECTION 4 — SPECIFIC REQUESTS', '']
 
     for idx, block in enumerate(analyst_report['violation_theory_blocks']):
         theory = get_theory(block['theory_id'])
@@ -274,22 +421,13 @@ def _build_section_5_requests(analyst_report: dict) -> str:
 
 def _build_section_6_demand(analyst_report: dict) -> str:
     """Section 6 — Cascading Demand for Removal."""
-    lines = ['SECTION 6 — DEMAND FOR REMOVAL', '']
+    lines = ['SECTION 5 — DEMAND FOR REMOVAL', '']
 
-    # List all disputed items
-    lines.append('I demand the removal of the following items from my consumer file:')
-    lines.append('')
-
-    seen_items = set()
-    for block in analyst_report['violation_theory_blocks']:
-        for item in block['items_affected']:
-            if item['item_id'] in seen_items:
-                continue
-            seen_items.add(item['item_id'])
-            item_desc = item.get('account_name', 'Unknown')
-            if item.get('account_number'):
-                item_desc += f' (Acct: {item["account_number"]})'
-            lines.append(f'  - {item_desc}')
+    # Reference the schedule rather than reprinting it. This listed every
+    # item again, including all eight copies of a duplicated tradeline, which
+    # is the same list Section 1 opens with.
+    lines.append('I demand the removal or correction of every item set out in Section 1 '
+                 'of this letter, on the grounds stated against each.')
     lines.append('')
 
     # Cascading grounds
@@ -326,7 +464,7 @@ def _build_section_6_demand(analyst_report: dict) -> str:
 
 def _build_section_7_disclaimers(analyst_report: dict, has_fraud: bool) -> str:
     """Section 7 — Disclaimers."""
-    lines = ['SECTION 7 — DISCLAIMERS', '']
+    lines = ['SECTION 6 — DISCLAIMERS', '']
 
     theory_ids = [b['theory_id'] for b in analyst_report['violation_theory_blocks']]
 
@@ -405,12 +543,14 @@ def generate_bureau_letter(
         '',
     ]
 
+    # The item schedule replaces the old sections 1 and 4: an audit list that
+    # named every account, then a theory-by-theory list that named them all
+    # again. One pass, account-centric, with the grounds nested.
     sections = [
         '\n'.join(header),
-        _build_section_1_audit(analyst_report),
+        _build_item_schedule(analyst_report),
         _build_section_2_statutory_basis(theory_ids),
         _build_section_3_consumer_position(analyst_report, has_fraud),
-        _build_section_4_theory_blocks(analyst_report),
         _build_section_5_requests(analyst_report),
         _build_section_6_demand(analyst_report),
         _build_section_7_disclaimers(analyst_report, has_fraud),
@@ -613,7 +753,16 @@ _BRANDING_PATTERNS = [
 
 
 def sanitize_letter(letter: dict) -> dict:
-    """Scan letter body for internal branding and block if found."""
+    """
+    Final gate: no internal branding, and one blank line everywhere.
+
+    Spacing is normalised here rather than in each builder because sections
+    are also spliced in after `_assemble` has run — the extra-items section
+    arrives from `compose`, and the provenance footer is appended later still.
+    Whichever of them leaves a double blank behind, the letter that goes out
+    has single spacing throughout, which is what stops it reading as
+    machine-produced.
+    """
     body = letter.get('body', '')
     violations = []
     for pattern in _BRANDING_PATTERNS:
@@ -627,6 +776,8 @@ def sanitize_letter(letter: dict) -> dict:
             f'Letter blocked from output.'
         )
 
+    if body:
+        letter['body'] = re.sub(r'\n{3,}', '\n\n', body)
     return letter
 
 

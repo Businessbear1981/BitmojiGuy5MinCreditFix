@@ -103,6 +103,15 @@ def _sentence_anchors(text: str) -> list[int]:
     """
     blocked = [m.span() for m in _CITATION_SPAN.finditer(text)]
 
+    # Belt and braces. Enumerating citation shapes is a losing game — the
+    # letter grew a comma-joined form ("Under 15 U.S.C. § 1681i(a), 15 U.S.C.
+    # § 1681e(b)") that the patterns above did not cover, and the fault only
+    # showed on sessions whose fingerprint bits happened to land there. So
+    # nothing may be inserted in the run following a statutory marker at all,
+    # whatever its shape.
+    for m in re.finditer(r"U\.S\.C\.|§", text):
+        blocked.append((m.start(), m.end() + 48))
+
     anchors: list[int] = []
     for i in range(len(text) - 2):
         if text[i] != "." or text[i + 1] != " ":
